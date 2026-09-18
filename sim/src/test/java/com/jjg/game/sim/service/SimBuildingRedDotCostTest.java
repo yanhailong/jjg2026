@@ -169,7 +169,7 @@ class SimBuildingRedDotCostTest {
         int materialId = 1024005;
         BuildingData building = new BuildingData();
         building.setId(buildingId);
-        building.setLevel(1);
+        building.setLevel(2);
         SimCasinoData casino = new SimCasinoData();
         casino.setBuildingData(Map.of(buildingId, building));
         SimBaseData base = new SimBaseData();
@@ -179,7 +179,6 @@ class SimBuildingRedDotCostTest {
         Player player = mock(Player.class);
         PlayerController controller = mock(PlayerController.class);
         when(controller.getPlayer()).thenReturn(player);
-        when(player.getLevel()).thenReturn(1, 2);
         ctx.setPlayerController(controller);
 
         BuildingUpgradeTableCfg current = mock(BuildingUpgradeTableCfg.class);
@@ -188,14 +187,16 @@ class SimBuildingRedDotCostTest {
         when(current.getCostPerLevel()).thenReturn(List.of(
                 List.of(materialId, 3), List.of(materialId, 4)));
         SimConfigCacheService configs = mock(SimConfigCacheService.class);
-        when(configs.getBuildingUpgradeCfg(buildingId, 1)).thenReturn(current);
-        when(configs.getBuildingUpgradeCfg(buildingId, 2)).thenReturn(mock(BuildingUpgradeTableCfg.class));
+        when(configs.getBuildingUpgradeCfg(buildingId, 2)).thenReturn(current);
+        when(configs.getBuildingUpgradeCfg(buildingId, 3)).thenReturn(mock(BuildingUpgradeTableCfg.class));
         SimBuildingService service = new SimBuildingService();
         ReflectionTestUtils.setField(service, "configCache", configs);
 
         try (var gameData = mockStatic(GameDataManager.class)) {
             base.setAllLevel(5);
-            assertNull(service.redDotUpgradeCost(ctx, buildingId)); // 玩家等级不足
+            // 核心玩家等级低于建筑等级时，仍应按实际建筑升级条件判断。
+            assertEquals(Map.of(goldId, 100L, diamondId, 10L, materialId, 9L),
+                    service.redDotUpgradeCost(ctx, buildingId));
 
             base.setAllLevel(4);
             assertNull(service.redDotUpgradeCost(ctx, buildingId)); // 经营等级不足
