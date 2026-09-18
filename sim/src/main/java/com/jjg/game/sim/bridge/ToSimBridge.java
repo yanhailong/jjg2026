@@ -1,5 +1,7 @@
 package com.jjg.game.sim.bridge;
 
+import com.jjg.game.sim.data.ActivePassPurchase;
+import com.jjg.game.sim.pb.res.ResActivePass;
 import com.jjg.game.common.rpc.IGameRpc;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.data.CommonResult;
@@ -76,6 +78,9 @@ public interface ToSimBridge extends IGameRpc {
 
     /** 斗仙牌完成一次大结算后，批量推进真人玩家当前已接取的对应任务。 */
     CommonResult<Boolean> onDouXianSettled(List<Long> playerIds);
+
+    /** 挖矿兑换成功：按本次消耗的兑换物 ID 和兑换次数推进已接取任务。 */
+    CommonResult<Boolean> onMiningExchange(long playerId, int itemId, long count);
 
     /** 批量上报斗仙牌单回合中实际净赢为正的真人玩家。 */
     CommonResult<Boolean> onDouXianWins(int transactionItemId, Map<Long, Long> playerWins);
@@ -210,4 +215,13 @@ public interface ToSimBridge extends IGameRpc {
      * @param helperIds 协助者 (不含发起者)
      */
     CommonResult<Boolean> onCoopRoomSettle(long ownerId, int taskId, long roomId, boolean success, List<Long> helperIds);
+
+    interface ActivePassBridge extends IGameRpc {
+        ResActivePass activePassInfo(long playerId);
+        ResActivePass claimActivePassTask(long playerId, int passId, int taskId, int day);
+        ResActivePass claimActivePassRewards(long playerId, int passId, int rewardId, int track);
+        ResActivePass buyActivePassPoints(long playerId, int passId, int count, int expectedPurchasedPoints);
+        ActivePassPurchase prepareActivePassOrder(long playerId, int passId, int track);
+        boolean receiveActivePassOrder(long playerId, String orderId);
+    }
 }
