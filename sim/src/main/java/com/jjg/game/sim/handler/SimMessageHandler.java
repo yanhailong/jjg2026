@@ -78,6 +78,8 @@ public class SimMessageHandler implements GmListener {
     @Autowired
     private SimStatsService statsService;
     @Autowired
+    private SlotsStatisticsService slotsStatisticsService;
+    @Autowired
     private SimOperationDashboardService operationDashboardService;
     @Autowired
     private SimConfigCacheService configCacheService;
@@ -729,6 +731,20 @@ public class SimMessageHandler implements GmListener {
     @Command(SimConstant.MsgBean.REQ_OPERATION_CAPACITY)
     public void reqOperationCapacity(PlayerController playerController, ReqOperationCapacity req) {
         execute(playerController, operationDashboardService::onCapacity, ReqOperationCapacity.class);
+    }
+
+    /** 返回游戏场景本轮统计，并消费已持久化的记录。 */
+    @Command(SimConstant.MsgBean.REQ_SLOTS_STATISTICS)
+    public void reqSlotsStatistics(PlayerController playerController, ReqSlotsStatistics req) {
+        ResSlotsStatistics res;
+        try {
+            SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+            res = ctx == null ? new ResSlotsStatistics(Code.NOT_FOUND) : slotsStatisticsService.request(ctx);
+        } catch (Exception e) {
+            log.error("请求slots统计失败 playerId={}", playerController.playerId(), e);
+            res = new ResSlotsStatistics(Code.EXCEPTION);
+        }
+        playerController.send(res);
     }
 
     /**

@@ -6,6 +6,7 @@ import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PlayerController;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.sim.constant.BuildingOutputType;
+import com.jjg.game.sim.constant.SimConstant;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -89,6 +90,8 @@ public class SimPlayerContext {
 
     //是否在模拟游戏场景中
     private AtomicBoolean inCasino = new AtomicBoolean(true);
+    //slots统计信息
+    private SlotsStatisticsData slotsStatisticsData;
 
     public boolean isBuildingRedDotDirty() {
         return buildingRedDotDirty;
@@ -459,5 +462,47 @@ public class SimPlayerContext {
 
     public void setInCasino(AtomicBoolean inCasino) {
         this.inCasino = inCasino;
+    }
+
+    public SlotsStatisticsData getSlotsStatisticsData() {
+        return slotsStatisticsData;
+    }
+
+    public void setSlotsStatisticsData(SlotsStatisticsData slotsStatisticsData) {
+        this.slotsStatisticsData = slotsStatisticsData;
+    }
+
+    /**
+     * slots的统计信息
+     *
+     * @param statInfo
+     * @param slotsSpinResult
+     */
+    public void slotsStatistics(SpinStatInfo statInfo, SlotsSpinResult slotsSpinResult) {
+        if (this.slotsStatisticsData == null) {
+            this.slotsStatisticsData = new SlotsStatisticsData();
+        }
+
+        this.slotsStatisticsData.setSpecialCount(this.slotsStatisticsData.getSpecialCount() + 1);
+        this.slotsStatisticsData.addBigWinCount(statInfo.getBigShowId());
+        if (statInfo.isTriggerFree()) {
+            this.slotsStatisticsData.setFreeCount(this.slotsStatisticsData.getFreeCount() + 1);
+        }
+
+        if (statInfo.getSpecialModes() != null && !statInfo.getSpecialModes().isEmpty()) {
+            this.slotsStatisticsData.setSpinCount(statInfo.getSpecialModes().size());
+        }
+
+        if (statInfo.getJackpotCounts() != null && !statInfo.getJackpotCounts().isEmpty()) {
+            this.slotsStatisticsData.setJackpoolCount(statInfo.getJackpotCounts().size());
+        }
+
+        this.slotsStatisticsData.setAllWinCoin(this.slotsStatisticsData.getAllWinCoin() + statInfo.getWin());
+        this.slotsStatisticsData.setAllBetCoin(this.slotsStatisticsData.getAllBetCoin() + statInfo.getBet());
+
+        this.slotsStatisticsData.setAllSpendPower(this.slotsStatisticsData.getAllSpendPower() + SimConstant.Common.SPIN_COST_POWER);
+        if (slotsSpinResult != null) {
+            this.slotsStatisticsData.setAllSpendPowerGetCoin(this.slotsStatisticsData.getAllSpendPowerGetCoin() + slotsSpinResult.getSpendPowerGetCoin());
+        }
     }
 }

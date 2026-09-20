@@ -8,10 +8,7 @@ import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.sampledata.GameDataManager;
-import com.jjg.game.sampledata.bean.DropItemCfg;
-import com.jjg.game.sampledata.bean.DropNumCfg;
-import com.jjg.game.sampledata.bean.DropTypeCfg;
-import com.jjg.game.sampledata.bean.ItemCfg;
+import com.jjg.game.sampledata.bean.*;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.data.*;
 import org.slf4j.Logger;
@@ -80,6 +77,14 @@ public class SimDropService {
                         ? null : new HashMap<>(base.getDailyDropCount());
                 if (normalMode) {
                     base.setPower(base.getPower() - SimConstant.Common.SPIN_COST_POWER);
+
+                    //计算因消耗能量所以额外的获得
+                    if (statInfo.getWin() > 0) {
+                        GlobalConfigCfg globalConfigCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.EXTRA_COIN);
+                        if (globalConfigCfg != null && globalConfigCfg.getIntValue() > 0) {
+                            slotsSpinResult.setSpendPowerGetCoin(statInfo.getWin() * globalConfigCfg.getIntValue() / 10000);
+                        }
+                    }
                 }
 
                 Map<Integer, Long> dropResult;

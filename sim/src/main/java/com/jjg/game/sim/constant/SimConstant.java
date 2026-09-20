@@ -298,6 +298,10 @@ public interface SimConstant {
         int REQ_ACTIVE_PASS_BUY_POINTS = BASE_MSG_PREFIX | 0x97;
         int RES_ACTIVE_PASS = BASE_MSG_PREFIX | 0x98;
         int NOTIFY_ACTIVE_PASS_UPDATE = BASE_MSG_PREFIX | 0x99;
+
+        //本轮slots统计
+        int REQ_SLOTS_STATISTICS = BASE_MSG_PREFIX | 0x9A;
+        int RES_SLOTS_STATISTICS = BASE_MSG_PREFIX | 0x9B;
     }
 
     interface SpecialGuest {
@@ -485,6 +489,8 @@ public interface SimConstant {
         int ID_SEASON_FEEE_GAME_COUNT = 280;
         //赛季：赛季机台每次旋转被动触发匹配的概率(百分比, 8% 填 8)
         int ID_SEASON_PASSIVE_MATCH_PROB = 281;
+        //玩家通过消耗体力能供获得额外倍数的金币奖励
+        int EXTRA_COIN = 150;
         //赛季：赛季结算，赛季币返还的比例与上限
         int ID_RETURN_COIN_MAX = 284;
         //完成这些新手引导才能生成游客

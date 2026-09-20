@@ -57,7 +57,9 @@ public class SlotsRPCLinkManager {
     @Autowired
     private PlayerStatService playerStatService;
 
-    /** 通知玩家所属 SIM 节点已进入指定引导场景，并返回该场景下尚未完成的引导组。 */
+    /**
+     * 通知玩家所属 SIM 节点已进入指定引导场景，并返回该场景下尚未完成的引导组。
+     */
     public CommonResult<List<Integer>> enterGuidePath(SlotsPlayerGameData playerGameData, String pathName) {
         long playerId = playerGameData.getPlayerId();
         ClusterClient client = resolveSimClient(playerGameData);
@@ -481,13 +483,17 @@ public class SlotsRPCLinkManager {
         }
 
         NotifySimDropItem notify = new NotifySimDropItem();
-        if(result.data.getItemsMap() != null && !result.data.getItemsMap().isEmpty()) {
+        if (result.data.getItemsMap() != null && !result.data.getItemsMap().isEmpty()) {
             Map<Integer, Long> newMap = new HashMap<>();
             for (Map.Entry en : result.data.getItemsMap().entrySet()) {
                 newMap.put(Integer.parseInt(en.getKey().toString()), Long.parseLong(en.getValue().toString()));
             }
             playerStatService.recordSlotItems(playerId, gameType, newMap);
             notify.itemMap = ItemUtils.buildItemInfo(newMap);
+        }
+
+        if (result.data.getSpendPowerGetCoin() > 0) {
+            notify.spendPowerGetCoin = result.data.getSpendPowerGetCoin();
         }
 
         notify.power = result.data.getPower();

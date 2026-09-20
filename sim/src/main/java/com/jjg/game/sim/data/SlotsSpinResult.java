@@ -20,6 +20,8 @@ public class SlotsSpinResult {
     private List<Task> taskUpdates;
     //本次旋转完成任务后，在 SLOT 场景新触发的引导组，由 slots 节点通知客户端
     private List<Integer> guideGroupIds;
+    //因为消耗能量所以额外获取的货币
+    private long spendPowerGetCoin;
 
     public Map<Integer, Long> getItemsMap() {
         return itemsMap;
@@ -80,5 +82,13 @@ public class SlotsSpinResult {
 
     public void setGuideGroupIds(List<Integer> guideGroupIds) {
         this.guideGroupIds = guideGroupIds;
+    }
+
+    public long getSpendPowerGetCoin() {
+        return spendPowerGetCoin;
+    }
+
+    public void setSpendPowerGetCoin(long spendPowerGetCoin) {
+        this.spendPowerGetCoin = spendPowerGetCoin;
     }
 }

@@ -27,6 +27,9 @@ import java.util.Map;
  * @date 2026/5/25
  */
 public interface ToSimBridge extends IGameRpc {
+    /** 在玩家所属 SIM 节点清空本轮 slots 统计。 */
+    boolean clearSlotsStatistics(long playerId);
+
     /** 在玩家所属 SIM 节点完成一个新手引导步骤。 */
     FinishGuideRpcResult finishGuide(long playerId, int guideId);
 

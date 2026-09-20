@@ -55,6 +55,7 @@ import com.jjg.game.sampledata.bean.ItemCfg;
 import com.jjg.game.sampledata.bean.WarehouseCfg;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
+import com.jjg.game.sim.service.SlotsStatisticsService;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,6 +109,8 @@ public class HallMessageHandler implements GmListener, ChooseWareListener, Choos
     private RedeemCodeService redeemCodeService;
     @Autowired
     private SimPlayerContextRegistry simPlayerContextRegistry;
+    @Autowired
+    private SlotsStatisticsService slotsStatisticsService;
 
     /**
      * 进入游戏
@@ -1280,6 +1283,7 @@ public class HallMessageHandler implements GmListener, ChooseWareListener, Choos
     public void onChooseWare(PlayerController playerController, ReqChooseWare req) {
         ResChooseWare res = new ResChooseWare(HallCode.SUCCESS);
         try {
+            slotsStatisticsService.clear(playerController.playerId());
             CommonResult<WareHouseConfigInfo> checkRes = checkBeforeJoinRoom(playerController, req.gameType, req.wareId, req.enterType);
             if (checkRes.code != Code.SUCCESS) {
                 res.code = checkRes.code;

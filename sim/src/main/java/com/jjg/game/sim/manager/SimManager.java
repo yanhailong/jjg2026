@@ -1,6 +1,5 @@
 package com.jjg.game.sim.manager;
 
-import com.alibaba.fastjson.JSONObject;
 import com.jjg.game.alliance.data.AllianceData;
 import com.jjg.game.alliance.service.AllianceCacheService;
 import com.jjg.game.alliance.service.AllianceEventService;
@@ -165,6 +164,8 @@ public class SimManager {
     private PlayerPackService playerPackService;
     @Autowired
     private SimConfigCacheService simConfigCacheService;
+    @Autowired
+    private SlotsStatisticsService slotsStatisticsService;
 
 
     /**
@@ -560,6 +561,7 @@ public class SimManager {
         }
 
         ctx.setSimBaseData(baseData);
+        slotsStatisticsService.load(ctx);
         //加载技能 (须在加载场景数据之前: initUnlock 依赖已入内存的技能等级)
         skillService.loadSkillsData(ctx);
         //加载场景数据
@@ -634,6 +636,7 @@ public class SimManager {
                     return;
                 }
                 simPlayerGameDao.save(ctx.getSimBaseData());
+                slotsStatisticsService.saveOnExit(ctx);
                 if (ctx.getCurrentCasino() != null) {
                     simCasinoDao.save(ctx.getCurrentCasino());
                 }
@@ -748,10 +751,10 @@ public class SimManager {
         SimPlayerContext ctx = null;
         long spinId = statInfo == null ? 0 : statInfo.getSpinId();
         try {
-            log.warn("onSlotsSpin 方法playerId={},gameType={},winTimes={},enterType={},statInfo={},trialPermit={}",
-                    playerId, gameType, winTimes, enterType,
-                    statInfo != null ? JSONObject.toJSONString(statInfo) : "null",
-                    trialPermit != null ? JSONObject.toJSONString(trialPermit) : "null");
+//            log.warn("onSlotsSpin 方法playerId={},gameType={},winTimes={},enterType={},statInfo={},trialPermit={}",
+//                    playerId, gameType, winTimes, enterType,
+//                    statInfo != null ? JSONObject.toJSONString(statInfo) : "null",
+//                    trialPermit != null ? JSONObject.toJSONString(trialPermit) : "null");
             boolean visitTrial = trialPermit != null && trialPermit.isTrial();
             ctx = this.simPlayerContextRegistry.getContext(playerId);
             if (ctx == null) {
@@ -780,6 +783,10 @@ public class SimManager {
             CommonResult<SlotsSpinResult> result = visitTrial
                     ? simVisitService.settleTrialSpin(ctx, gameType, statInfo, trialPermit)
                     : simDropService.onSpin(ctx, gameType, winTimes, statInfo, enterType);
+
+            //slots的统计信息
+            ctx.slotsStatistics(statInfo, result.data);
+
             int actualSpinCostPower = result.success() ? configuredSpinCostPower : 0;
             //须在掉落结算后构造: 本次到账的道具要计入 itemGains, 12202 等按道具计数的条件才能推进
             GameConditionEvent conditionEvent = SimConditionEventFactory.fromSpin(

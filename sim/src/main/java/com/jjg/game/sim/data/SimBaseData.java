@@ -76,6 +76,8 @@ public class SimBaseData extends AbstractData {
     private long dailyOnlineTime;
     //在线时长下次自然日重置时间 (ms)
     private long onlineTimeResetTime;
+    //slots赢奖的最高历史记录
+    private long slotsAthWinCoin;
 
     public void resetOnlineRewardDay(int today) {
         if (onlineRewardDay != today) {
@@ -189,7 +191,7 @@ public class SimBaseData extends AbstractData {
     }
 
     public boolean hasCompletedGuideId(int guideId) {
-        if(completedGuideIds == null || completedGuideIds.isEmpty()){
+        if (completedGuideIds == null || completedGuideIds.isEmpty()) {
             return false;
         }
         return completedGuideIds.contains(guideId);
@@ -516,5 +518,13 @@ public class SimBaseData extends AbstractData {
             loginTime = now;
         }
         return dailyOnlineTime;
+    }
+
+    public long getSlotsAthWinCoin() {
+        return slotsAthWinCoin;
+    }
+
+    public void setSlotsAthWinCoin(long slotsAthWinCoin) {
+        this.slotsAthWinCoin = slotsAthWinCoin;
     }
 }

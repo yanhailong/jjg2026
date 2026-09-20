@@ -24,4 +24,6 @@ public class NotifySimDropItem extends AbstractNotice {
     public int researchPoint;
     @ProtoDesc("今日剩余试玩次数")
     public int remainingTrials;
+    @ProtoDesc("因为消耗能量所以额外获取的货币")
+    public long spendPowerGetCoin;
 }

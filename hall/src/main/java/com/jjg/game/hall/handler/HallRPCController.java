@@ -50,6 +50,7 @@ import com.jjg.game.sim.service.SimPackService;
 import com.jjg.game.sim.service.SimSkillService;
 import com.jjg.game.sim.service.SimTaskService;
 import com.jjg.game.sim.service.SimVisitService;
+import com.jjg.game.sim.service.SlotsStatisticsService;
 import com.jjg.game.social.bridge.ToSocialBridge;
 import com.jjg.game.social.service.ChatService;
 import com.jjg.game.social.service.SocialSender;
@@ -91,6 +92,8 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
     private SimPlayerGameDao simPlayerGameDao;
     @Autowired
     private SimManager simManager;
+    @Autowired
+    private SlotsStatisticsService slotsStatisticsService;
     @Autowired
     private SeasonService seasonService;
     @Autowired
@@ -267,6 +270,13 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
         log.info("后台完成任务处理结束 playerId={},operationType={},taskIds={},completed={}",
                 playerId, operationType, taskIds, completed);
         return Code.SUCCESS;
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public boolean clearSlotsStatistics(long playerId) {
+        slotsStatisticsService.clear(simManager.createContextByPlayerId(playerId));
+        return true;
     }
 
     @Override
