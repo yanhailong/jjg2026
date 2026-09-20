@@ -47,6 +47,13 @@ public class SimTaskDao extends MongoBaseDao<SimTaskData, Long> {
         return mongoTemplate.findOne(query, SimTaskData.class);
     }
 
+    /** 红点使用同一任务快照计算总数与分组数量，只读取主线状态和成就当前节点。 */
+    public SimTaskData findRedDotData(long playerId) {
+        Query query = Query.query(Criteria.where("_id").is(playerId));
+        query.fields().include("mainTask.status").include("achievementTasks");
+        return mongoTemplate.findOne(query, SimTaskData.class);
+    }
+
     /**
      * 统计主线和成就中当前可领取奖励的任务数，只返回计数，不拉取任务文档。
      */
