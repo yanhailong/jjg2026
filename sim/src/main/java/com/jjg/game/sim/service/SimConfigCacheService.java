@@ -152,6 +152,9 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
     private Map<Integer, Map<Integer, DropItemCfg>> dropItemCfgMap = null;
 
+    //迷你商店 needItemId -> id ->cfg
+    private Map<Integer, Map<Integer, ShopMiniCfg>> tmpShopMiniCfgMap = null;
+
     //建筑升级清除cd配置
     private int buildUpgradeCDProp = 0;
     private int buildUpgradeCDClearMs = 0;
@@ -201,6 +204,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         loadMedalBuffConfig();
 
         loadDropItemConfig();
+
+        loadShopMiniConfig();
     }
 
     /**
@@ -626,7 +631,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         }
 
         GlobalConfigCfg buildUpgradeCDCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.ID_WATCH_AD_CLEAR_TIME);
-        if(buildUpgradeCDCfg != null){
+        if (buildUpgradeCDCfg != null) {
             String[] s = buildUpgradeCDCfg.getValue().split("_");
             this.buildUpgradeCDProp = Integer.parseInt(s[0]);
             this.buildUpgradeCDClearMs = Integer.parseInt(s[1]) * 60000;
@@ -839,6 +844,15 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         this.dropItemCfgMap = tmpDropItemCfgMap;
     }
 
+    private void loadShopMiniConfig() {
+        Map<Integer, Map<Integer, ShopMiniCfg>> tmpShopMiniCfgMap = new HashMap<>();
+        for (ShopMiniCfg cfg : GameDataManager.getShopMiniCfgList()) {
+            Map<Integer, ShopMiniCfg> tmpMap = tmpShopMiniCfgMap.computeIfAbsent(cfg.getNeedItemId(), k -> new HashMap<>());
+            tmpMap.put(cfg.getId(), cfg);
+        }
+        this.tmpShopMiniCfgMap = tmpShopMiniCfgMap;
+    }
+
     @Override
     public void initSampleCallbackCollector() {
         addInitSampleFileObserveWithCallBack(CasinoStatsSheetCfg.EXCEL_NAME, this::loadCasinoStatsSheetCfg);
@@ -876,6 +890,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         addInitSampleFileObserveWithCallBack(MedalBuffCfg.EXCEL_NAME, this::loadMedalBuffConfig);
 
         addInitSampleFileObserveWithCallBack(DropItemCfg.EXCEL_NAME, this::loadDropItemConfig);
+        addInitSampleFileObserveWithCallBack(ShopMiniCfg.EXCEL_NAME, this::loadShopMiniConfig);
     }
 
     // ---------------------------------------------------------------------
@@ -1324,5 +1339,30 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
     public int getBuildUpgradeCDClearMs() {
         return buildUpgradeCDClearMs;
+    }
+
+    /**
+     * 获取迷你商店配置
+     * @param itemId
+     * @param level
+     * @return
+     */
+    public ShopMiniCfg getShopMiniCfgMap(int itemId, int level) {
+        if (this.tmpShopMiniCfgMap == null || this.tmpShopMiniCfgMap.isEmpty()) {
+            return null;
+        }
+
+        Map<Integer, ShopMiniCfg> tmpCfgMap = this.tmpShopMiniCfgMap.get(itemId);
+        if (tmpCfgMap == null || tmpCfgMap.isEmpty()) {
+            return null;
+        }
+
+        Map<Integer, ShopMiniCfg> tmpMap = new HashMap<>();
+        for (ShopMiniCfg shopMiniCfg : tmpCfgMap.values()) {
+            if (shopMiniCfg.getPurchaseLevelMin() <= level && level <= shopMiniCfg.getPurchaseLevelMax()) {
+                return shopMiniCfg;
+            }
+        }
+        return null;
     }
 }

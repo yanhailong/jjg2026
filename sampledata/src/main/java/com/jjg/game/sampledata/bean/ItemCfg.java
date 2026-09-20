@@ -41,6 +41,8 @@ public class ItemCfg extends BaseCfgBean {
   protected boolean isBag;
   /** 跳转ID */
   protected List<Integer> jumpId;
+  /** 跳转小商店 */
+  protected boolean jumpShopMini;
   /** 名称多语言ID */
   protected int name;
   /** 是否需要调用多语言 */
@@ -107,6 +109,11 @@ public class ItemCfg extends BaseCfgBean {
   /** 返回跳转ID */
   public List<Integer> getJumpId() {
     return jumpId;
+  }
+
+  /** 返回跳转小商店 */
+  public boolean getJumpShopMini() {
+    return jumpShopMini;
   }
 
   /** 返回名称多语言ID */

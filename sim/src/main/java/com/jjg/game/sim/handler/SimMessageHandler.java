@@ -1,7 +1,5 @@
 package com.jjg.game.sim.handler;
 
-import com.jjg.game.sim.service.ActivePassRouter;
-import com.jjg.game.sim.service.ActivePassService;
 import com.jjg.game.common.cluster.ClusterClient;
 import com.jjg.game.common.concurrent.BaseHandler;
 import com.jjg.game.common.concurrent.PlayerExecutorGroupDisruptor;
@@ -42,11 +40,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 模拟经营游戏消息处理器
@@ -84,6 +82,8 @@ public class SimMessageHandler implements GmListener {
     @Autowired
     private SimConfigCacheService configCacheService;
     @Autowired
+    private SimMiniShopService miniShopService;
+    @Autowired
     private SimTaskService taskService;
     @Autowired
     private SimMedalService medalService;
@@ -107,6 +107,16 @@ public class SimMessageHandler implements GmListener {
     private ActivePassService activePassService;
     @ClusterRpcReference
     private ToSimBridge toSimBridge;
+
+    @Command(SimConstant.MsgBean.REQ_BUY_MINI_SHOP)
+    public void reqBuyMiniShop(PlayerController playerController, ReqBuyMiniShop req) {
+        execute(playerController, ctx -> miniShopService.buy(ctx, req.productId), ReqBuyMiniShop.class);
+    }
+
+    @Command(SimConstant.MsgBean.REQ_MINI_SHOP)
+    public void reqMiniShop(PlayerController playerController, ReqMiniShop req) {
+        execute(playerController, ctx -> miniShopService.getShop(ctx, req.itemId), ReqMiniShop.class);
+    }
 
     @Command(SimConstant.MsgBean.REQ_ACTIVE_PASS_INFO)
     public void reqActivePassInfo(PlayerController pc, ReqActivePassInfo req) {
@@ -138,7 +148,9 @@ public class SimMessageHandler implements GmListener {
         try {
             response = activePassRouter.execute(pc.playerId(), pc.ipAddress(),
                     () -> local.apply(simPlayerContextRegistry.getContext(pc.playerId())), remote);
-            if (response == null) { response = new ResActivePass(Code.EXCEPTION); }
+            if (response == null) {
+                response = new ResActivePass(Code.EXCEPTION);
+            }
         } catch (Exception e) {
             log.error("活跃通行证请求失败 playerId={},cmd={}", pc.playerId(), cmd, e);
             response = new ResActivePass(Code.EXCEPTION);
@@ -692,13 +704,17 @@ public class SimMessageHandler implements GmListener {
     }
     //--------------------------游客相关 end--------------------------
 
-    /** 获取在线收益信息。 */
+    /**
+     * 获取在线收益信息。
+     */
     @Command(SimConstant.MsgBean.REQ_SIM_ONLINE_REWARD)
     public void reqSimOnlineReward(PlayerController playerController, ReqSimOnlineReward req) {
         execute(playerController, ctx -> ctx.send(onlineRewardService.getInfo(ctx)), ReqSimOnlineReward.class);
     }
 
-    /** 领取在线收益。 */
+    /**
+     * 领取在线收益。
+     */
     @Command(SimConstant.MsgBean.REQ_SIM_CLAIM_ONLINE_REWARD)
     public void reqSimClaimOnlineReward(PlayerController playerController, ReqSimClaimOnlineReward req) {
         execute(playerController, ctx -> ctx.send(onlineRewardService.claim(ctx, req.type)),
@@ -733,7 +749,9 @@ public class SimMessageHandler implements GmListener {
         execute(playerController, operationDashboardService::onCapacity, ReqOperationCapacity.class);
     }
 
-    /** 返回游戏场景本轮统计，并消费已持久化的记录。 */
+    /**
+     * 返回游戏场景本轮统计，并消费已持久化的记录。
+     */
     @Command(SimConstant.MsgBean.REQ_SLOTS_STATISTICS)
     public void reqSlotsStatistics(PlayerController playerController, ReqSlotsStatistics req) {
         ResSlotsStatistics res;
@@ -938,7 +956,7 @@ public class SimMessageHandler implements GmListener {
     }
 
     private ResVisitCasino visitCasinoRemotely(PlayerController playerController,
-                                                long targetPlayerId, int casinoId) {
+                                               long targetPlayerId, int casinoId) {
         long playerId = playerController.playerId();
         ClusterClient client = simNodeService.getSimClusterClient(playerId, playerController.ipAddress());
         if (client == null) {

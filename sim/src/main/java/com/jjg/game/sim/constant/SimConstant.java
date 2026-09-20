@@ -302,6 +302,16 @@ public interface SimConstant {
         //本轮slots统计
         int REQ_SLOTS_STATISTICS = BASE_MSG_PREFIX | 0x9A;
         int RES_SLOTS_STATISTICS = BASE_MSG_PREFIX | 0x9B;
+
+        //游客交互产出信息
+        int REQ_GUEST_OUTPUT_INFO = BASE_MSG_PREFIX | 0x9C;
+        int RES_GUEST_OUTPUT_INFO = BASE_MSG_PREFIX | 0x9D;
+
+        //迷你商店
+        int REQ_MINI_SHOP = BASE_MSG_PREFIX | 0x9E;
+        int RES_MINI_SHOP = BASE_MSG_PREFIX | 0x9F;
+        int REQ_BUY_MINI_SHOP = BASE_MSG_PREFIX | 0xA0;
+        int RES_BUY_MINI_SHOP = BASE_MSG_PREFIX | 0xA1;
     }
 
     interface SpecialGuest {

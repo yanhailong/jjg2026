@@ -239,6 +239,7 @@ public class GameDataManager {
     containerMap.put(SeasonTierCfg.class, new SeasonTierCfgContainer());
     containerMap.put(SeasondropDetailedCfg.class, new SeasondropDetailedCfgContainer());
     containerMap.put(SharePromoteCfg.class, new SharePromoteCfgContainer());
+    containerMap.put(ShopMiniCfg.class, new ShopMiniCfgContainer());
     containerMap.put(ShopRechargeListCfg.class, new ShopRechargeListCfgContainer());
     containerMap.put(SouthernMoneyCfg.class, new SouthernMoneyCfgContainer());
     containerMap.put(SpecialAuxiliaryCfg.class, new SpecialAuxiliaryCfgContainer());
@@ -2116,6 +2117,18 @@ public class GameDataManager {
 
   public static List<SharePromoteCfg> getSharePromoteCfgList() {
     return getInstance().getCfgContainer(SharePromoteCfg.class).getCfgBeanList();
+  }
+
+  public static ShopMiniCfg getShopMiniCfg(int key) {
+    return getInstance().getCfgContainer(ShopMiniCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, ShopMiniCfg> getShopMiniCfgMap() {
+    return getInstance().getCfgContainer(ShopMiniCfg.class).getCfgBeanMap();
+  }
+
+  public static List<ShopMiniCfg> getShopMiniCfgList() {
+    return getInstance().getCfgContainer(ShopMiniCfg.class).getCfgBeanList();
   }
 
   public static ShopRechargeListCfg getShopRechargeListCfg(int key) {

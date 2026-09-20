@@ -73,6 +73,9 @@ public enum RechargeType {
     SEASON_PASS(15),
     /** 活跃通行证 */
     ACTIVE_PASS(16),
+
+    /**迷你商店*/
+    SHOP_MINI(17),
     ;
     private final int type;
 
