@@ -516,7 +516,8 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             }
             VisitorStarCfg starCfg = rewardService.getStarCfg(guest.getId(), guest.getStar());
             int rewardedCount = computeInteractionCount(ctx, visitorQuestCfg.getServiceCapacity(), prosperity, starCfg);
-            List<DestinationInfo> destinations = planDestinations(guest, visitorQuestCfg, casino, rewardedCount, false);
+            List<DestinationInfo> destinations = planDestinations(guest, visitorQuestCfg, casino, rewardedCount, false,
+                    canGenerateOrdinaryGuestRewards(ctx, System.currentTimeMillis()));
             if (destinations.isEmpty()) {
                 continue;
             }
@@ -574,7 +575,8 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         }
 
         //规划本次行程的目的地序列 (生成奖励)
-        List<DestinationInfo> destinations = planDestinations(guest, visitorQuestCfg, ctx.getCurrentCasino(), rewardedCount);
+        List<DestinationInfo> destinations = planDestinations(guest, visitorQuestCfg, ctx.getCurrentCasino(), rewardedCount, true,
+                canGenerateOrdinaryGuestRewards(ctx, now));
         if (destinations.isEmpty()) {
             ctx.getCurrentCasino().setLastGenerateTime(now);
 //            log.warn("生成游客失败，目的地序列为空 playerId={},guestId={}", ctx.playerId(), visitorQuestCfg.getId());
@@ -786,10 +788,17 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
      * - 有奖励交互点结算奖励到 dest.rewards (是否添加到玩家身上由调用方决定)
      */
     private List<DestinationInfo> planDestinations(GuestData guest, VisitorQuestCfg cfg, SimCasinoData casino, int rewardedCount) {
-        return planDestinations(guest, cfg, casino, rewardedCount, true);
+        return planDestinations(guest, cfg, casino, rewardedCount, true, true);
     }
 
-    private List<DestinationInfo> planDestinations(GuestData guest, VisitorQuestCfg cfg, SimCasinoData casino, int rewardedCount, boolean recordReception) {
+    private boolean canGenerateOrdinaryGuestRewards(SimPlayerContext ctx, long now) {
+        SimCasinoData casino = ctx.getCurrentCasino();
+        CasinoStatsSheetCfg cfg = configCache.getCasinoStatsSheetCfg(casino.getCasinoId(), casino.getCasinoLevel());
+        return cfg != null && ctx.getSimBaseData().accumulateOnlineTime(now) <= cfg.getVisitorDailyLimit() * 60_000L;
+    }
+
+    private List<DestinationInfo> planDestinations(GuestData guest, VisitorQuestCfg cfg, SimCasinoData casino, int rewardedCount,
+                                                 boolean recordReception, boolean generateRewards) {
         if (rewardedCount < 1) {
             return Collections.emptyList();
         }
@@ -838,7 +847,9 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                 }
                 DestinationInfo dest = pickBuildingDevice(buildingId, casino, recordReception);
                 if (dest != null) {
-                    rewardService.grantReward(guest, dest);
+                    if (generateRewards) {
+                        rewardService.grantReward(guest, dest);
+                    }
                     dest.index = id;
                     id++;
                     result.add(dest);
@@ -857,7 +868,9 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                 cursor++;
                 DestinationInfo dest = pickBuildingDevice(buildingId, casino, recordReception);
                 if (dest != null) {
-                    rewardService.grantReward(guest, dest);
+                    if (generateRewards) {
+                        rewardService.grantReward(guest, dest);
+                    }
                     dest.index = id;
                     id++;
                     result.add(dest);

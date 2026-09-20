@@ -1587,7 +1587,11 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         }
         result.data = index;
         int[] section = getGenerateManager().getSpecialResultLibCacheData().getResultLibSectionMap().get(libType).get(index);
-        log.debug("成功获取区间 modelId = {},gameType = {},libType = {},intdex = {},sectionBegin = {},sectionEnd = {},betValue = {},slotsVipType = {},allBetCount = {},prizelessCount = {}", modelId, this.gameType, libType, index, section[0], section[1], betValue, slotsVipType, allBetCount, prizelessCount);
+        if(section == null){
+            result.code = Code.SAMPLE_ERROR;
+            return result;
+        }
+        log.debug("成功获取区间 modelId = {},gameType = {},libType = {},intdex = {},section {},betValue = {},slotsVipType = {},allBetCount = {},prizelessCount = {}", modelId, this.gameType, libType, index, Arrays.toString(section), betValue, slotsVipType, allBetCount, prizelessCount);
         return result;
     }
 

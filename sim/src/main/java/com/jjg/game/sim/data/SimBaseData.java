@@ -1,5 +1,6 @@
 package com.jjg.game.sim.data;
 
+import com.jjg.game.common.utils.TimeHelper;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -69,6 +70,13 @@ public class SimBaseData extends AbstractData {
     private int onlineRewardDiamondCount;
     //视频冷却结束时间 (ms)，跨日与领取次数一并重置
     private long onlineRewardAdCdEndTime;
+    //本次在线时长已累计到的时刻 (ms)，离线时为 0
+    private long loginTime;
+    //当天累计在线时长 (ms)，跨场景共享
+    private long dailyOnlineTime;
+    //在线时长下次自然日重置时间 (ms)
+    private long onlineTimeResetTime;
+
     public void resetOnlineRewardDay(int today) {
         if (onlineRewardDay != today) {
             onlineRewardDay = today;
@@ -469,5 +477,44 @@ public class SimBaseData extends AbstractData {
 
     public void setSkillAllLevel(int skillAllLevel) {
         this.skillAllLevel = skillAllLevel;
+    }
+
+    public long getLoginTime() {
+        return loginTime;
+    }
+
+    public void setLoginTime(long loginTime) {
+        this.loginTime = loginTime;
+    }
+
+    public long getDailyOnlineTime() {
+        return dailyOnlineTime;
+    }
+
+    public void setDailyOnlineTime(long dailyOnlineTime) {
+        this.dailyOnlineTime = dailyOnlineTime;
+    }
+
+    public long getOnlineTimeResetTime() {
+        return onlineTimeResetTime;
+    }
+
+    public void setOnlineTimeResetTime(long onlineTimeResetTime) {
+        this.onlineTimeResetTime = onlineTimeResetTime;
+    }
+
+    public long accumulateOnlineTime(long now) {
+        if (now >= onlineTimeResetTime) {
+            dailyOnlineTime = 0;
+            onlineTimeResetTime = TimeHelper.getDaysTime(now, 1);
+            if (loginTime > 0) {
+                loginTime = Math.max(loginTime, TimeHelper.getDaysTime(now, 0));
+            }
+        }
+        if (loginTime > 0 && now > loginTime) {
+            dailyOnlineTime += now - loginTime;
+            loginTime = now;
+        }
+        return dailyOnlineTime;
     }
 }

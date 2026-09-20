@@ -33,8 +33,10 @@ public class SpecialModeCfg extends BaseCfgBean {
   protected Map<Integer,Integer> specialGroupGirdID;
   /** 执行次数 */
   protected int triggerCount;
-  /** 游戏模式 */
+  /** 游戏模式ID */
   protected int type;
+  /** 游戏类型名称ID */
+  protected int typeNameId;
 
   /** 返回初始列数 */
   public int getCols() {
@@ -71,9 +73,14 @@ public class SpecialModeCfg extends BaseCfgBean {
     return triggerCount;
   }
 
-  /** 返回游戏模式 */
+  /** 返回游戏模式ID */
   public int getType() {
     return type;
+  }
+
+  /** 返回游戏类型名称ID */
+  public int getTypeNameId() {
+    return typeNameId;
   }
 
   @Override

@@ -152,6 +152,10 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
     private Map<Integer, Map<Integer, DropItemCfg>> dropItemCfgMap = null;
 
+    //建筑升级清除cd配置
+    private int buildUpgradeCDProp = 0;
+    private int buildUpgradeCDClearMs = 0;
+
     @Autowired
     public SimConfigCacheService(ConditionRuleRegistry conditionRules,
                                  ConditionParser conditionParser) {
@@ -620,6 +624,13 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
             }
             this.genGuestGuideSet = tmpGenGuestGuideSet;
         }
+
+        GlobalConfigCfg buildUpgradeCDCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.ID_WATCH_AD_CLEAR_TIME);
+        if(buildUpgradeCDCfg != null){
+            String[] s = buildUpgradeCDCfg.getValue().split("_");
+            this.buildUpgradeCDProp = Integer.parseInt(s[0]);
+            this.buildUpgradeCDClearMs = Integer.parseInt(s[1]) * 60000;
+        }
     }
 
     private void loadSpecialGuestGlobalConfig() {
@@ -865,11 +876,6 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         addInitSampleFileObserveWithCallBack(MedalBuffCfg.EXCEL_NAME, this::loadMedalBuffConfig);
 
         addInitSampleFileObserveWithCallBack(DropItemCfg.EXCEL_NAME, this::loadDropItemConfig);
-    }
-
-    @Override
-    public void changeSampleCallbackCollector() {
-        addChangeSampleFileObserveWithCallBack(GlobalConfigCfg.EXCEL_NAME, this::loadSpecialGuestGlobalConfig);
     }
 
     // ---------------------------------------------------------------------
@@ -1310,5 +1316,13 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         }
         Integer id = tmpMap.get(serverBuildingType);
         return id == null ? 0 : id;
+    }
+
+    public int getBuildUpgradeCDProp() {
+        return buildUpgradeCDProp;
+    }
+
+    public int getBuildUpgradeCDClearMs() {
+        return buildUpgradeCDClearMs;
     }
 }

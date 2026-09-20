@@ -191,6 +191,7 @@ public class SimManager {
             if (login) {
                 buildingService.settleOfflineReward(ctx);
                 ctx.getSimBaseData().setLastOfflineTime(0);
+                ctx.getSimBaseData().setLoginTime(System.currentTimeMillis());
             }
             ctx.getInCasino().set(true);
             log.info("玩家进入sim节点加载SimPlayerContext数据， playerId={}", playerController.playerId());
@@ -246,8 +247,9 @@ public class SimManager {
 
             res.currentCasinoId = ctx.getCurrentCasino().getCasinoId();
 
+            long now = System.currentTimeMillis();
             //下发前先消费联盟助力抵扣, 否则展示的仍是未减少的升级CD
-            buildingService.applyPendingSpeedup(ctx, ctx.getCurrentCasino(), System.currentTimeMillis());
+            buildingService.applyPendingSpeedup(ctx, ctx.getCurrentCasino(), now);
 
             //添加建筑数据
             res.buildings = SimPbConverter.toBuildingInfos(ctx, simConfigCacheService);
@@ -402,6 +404,8 @@ public class SimManager {
         if (ctx != null) {
             long now = System.currentTimeMillis();
             seasonService.stopGemEarnings(ctx, now);
+            ctx.getSimBaseData().accumulateOnlineTime(now);
+            ctx.getSimBaseData().setLoginTime(0);
             ctx.getSimBaseData().setLastOfflineTime(now);
             //循环赛季对局中掉线: 记录离线时刻, 再次进入赛季时据此自动补完对局
             if (ctx.getSeasonPlayerData() != null) {

@@ -636,9 +636,16 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                     log.warn("清除建筑升级 CD失败，玩家观看广告清除cd次数达到限制 playerId={},buildingId={},hasWatchCount={},countLimit={}", ctx.playerId(), buildingId, data.getAdClearCount(), countLimit);
                     return;
                 }
-                //每次观看广告清除的时间
-                int cfgMin = GameDataManager.getGlobalConfigCfg(SimConstant.Global.ID_WATCH_AD_CLEAR_TIME).getIntValue();
-                long reduceMs = (long) cfgMin * TimeHelper.ONE_MINUTE_OF_MILLIS;
+
+                //还剩余的时间ms
+                long remainMs = data.getCdEndTime() - now;
+                long cfgMs = remainMs * configCache.getBuildUpgradeCDProp() / 10000;
+
+                long reduceMs = configCache.getBuildUpgradeCDClearMs();
+                if(cfgMs > configCache.getBuildUpgradeCDClearMs()){
+                    reduceMs = cfgMs;
+                }
+
                 data.setCdEndTime(data.getCdEndTime() - reduceMs);
                 data.setAdClearCount(data.getAdClearCount() + 1);
                 //经营信息: 观看广告数 +1

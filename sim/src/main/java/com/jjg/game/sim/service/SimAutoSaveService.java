@@ -116,6 +116,7 @@ public class SimAutoSaveService implements SimPlayerTickListener {
         //写库失败的数据 savedHash 保持脏, 下个检查周期自然重试
         ctx.setLastSaveTime(now);
 
+        base.accumulateOnlineTime(now);
         enqueueIfChanged(base);
         SimCasinoData casino = ctx.getCurrentCasino();
         if (casino != null) {
