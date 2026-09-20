@@ -1109,28 +1109,51 @@ public class SimTaskService implements IRedDotService {
     @Override
     public List<RedDotDetails> initialize(long playerId, int submodule) {
         SimPlayerContext ctx = contextRegistry.getContext(playerId);
-        Map<Integer, Integer> counts = ctx != null && ctx.getSimTaskData() != null
-                ? claimableCounts(ctx.getSimTaskData())
-                : simTaskDao.findClaimableCounts(playerId);
-        return buildRedDotDetails(counts, submodule);
+        SimTaskData data = ctx != null && ctx.getSimTaskData() != null
+                ? ctx.getSimTaskData() : simTaskDao.findRedDotData(playerId);
+        return buildTaskRedDots(data, submodule);
     }
 
     private void updateTaskRedDot(SimPlayerContext ctx) {
         try {
             redDotManager.updateRedDot(
-                    buildRedDotDetails(claimableCounts(ctx.getSimTaskData()), TaskConstant.TimeConstants.ALL_SUBMODULES),
+                    buildTaskRedDots(ctx.getSimTaskData(), TaskConstant.TimeConstants.ALL_SUBMODULES),
                     ctx.playerId());
         } catch (Exception e) {
             log.error("更新任务红点失败 playerId={}", ctx.playerId(), e);
         }
     }
 
-    private List<RedDotDetails> buildRedDotDetails(Map<Integer, Integer> counts, int submodule) {
+    private List<RedDotDetails> buildTaskRedDots(SimTaskData data, int submodule) {
+        Map<Integer, Integer> counts = data == null ? Map.of() : claimableCounts(data);
+        Map<String, Integer> badges = new TreeMap<>();
+        Map<String, Integer> buildings = new TreeMap<>();
+        if (data != null && data.getAchievementTasks() != null) {
+            data.getAchievementTasks().forEach((groupId, task) -> {
+                if (task == null || task.getStatus() != TaskConstant.TaskStatus.STATUS_COMPLETED) {
+                    return;
+                }
+                SimTaskConfigService.AchievementGroupDef group = taskConfig.achievementGroup(groupId);
+                if (group == null) {
+                    return;
+                }
+                badges.merge(String.valueOf(group.badgeId()), 1, Integer::sum);
+                SimTaskConfigService.AchievementBadgeDef badge = taskConfig.badge(group.badgeId());
+                if (badge != null && badge.buildingId() > 0) {
+                    buildings.merge(String.valueOf(badge.buildingId()), 1, Integer::sum);
+                }
+            });
+        }
         List<RedDotDetails> details = new ArrayList<>(2);
         for (Integer taskType : getSubmodules()) {
             if (submodule == TaskConstant.TimeConstants.ALL_SUBMODULES || submodule == taskType) {
-                details.add(redDotManager.buildRedDotDetails(
-                        getModule(), taskType, counts.getOrDefault(taskType, 0)));
+                RedDotDetails dot = redDotManager.buildRedDotDetails(
+                        getModule(), taskType, counts.getOrDefault(taskType, 0));
+                if (taskType == TaskConstant.TaskType.ACHIEVEMENT) {
+                    dot.setExtra(com.alibaba.fastjson.JSON.toJSONString(
+                            Map.of("badgeCounts", badges, "buildingCounts", buildings)));
+                }
+                details.add(dot);
             }
         }
         return details;
@@ -1139,8 +1162,8 @@ public class SimTaskService implements IRedDotService {
     private Map<Integer, Integer> claimableCounts(SimTaskData data) {
         int mainCount = data.getMainTask() != null
                 && data.getMainTask().getStatus() == TaskConstant.TaskStatus.STATUS_COMPLETED ? 1 : 0;
-        int achievementCount = (int) data.getAchievementTasks().values().stream()
-                .filter(task -> task.getStatus() == TaskConstant.TaskStatus.STATUS_COMPLETED)
+        int achievementCount = data.getAchievementTasks() == null ? 0 : (int) data.getAchievementTasks().values().stream()
+                .filter(task -> task != null && task.getStatus() == TaskConstant.TaskStatus.STATUS_COMPLETED)
                 .count();
         return Map.of(
                 TaskConstant.TaskType.MAIN_LINE, mainCount,
