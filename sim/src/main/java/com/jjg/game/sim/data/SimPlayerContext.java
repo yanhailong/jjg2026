@@ -496,7 +496,11 @@ public class SimPlayerContext {
         }
 
         if (statInfo.getSpecialModes() != null && !statInfo.getSpecialModes().isEmpty()) {
-            this.slotsStatisticsData.setSpecialCount(this.slotsStatisticsData.getSpecialCount() + statInfo.getSpecialModes().size());
+            for (int libtype : statInfo.getSpecialModes()) {
+                if(libtype > 1){
+                    this.slotsStatisticsData.setSpecialCount(this.slotsStatisticsData.getSpecialCount() + 1);
+                }
+            }
         }
 
         if (statInfo.getJackpotCounts() != null && !statInfo.getJackpotCounts().isEmpty()) {

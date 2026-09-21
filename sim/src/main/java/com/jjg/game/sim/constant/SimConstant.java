@@ -508,6 +508,8 @@ public interface SimConstant {
         int ID_SEASON_PASSIVE_MATCH_PROB = 281;
         //玩家通过消耗体力能供获得额外倍数的金币奖励
         int EXTRA_COIN = 150;
+        //游戏结算界面在游戏X次后才在返回大厅时展示
+        int SLOTS_STATISTICS_SHOW = 151;
         //赛季：赛季结算，赛季币返还的比例与上限
         int ID_RETURN_COIN_MAX = 284;
         //完成这些新手引导才能生成游客
