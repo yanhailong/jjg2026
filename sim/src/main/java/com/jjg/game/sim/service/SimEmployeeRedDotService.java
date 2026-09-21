@@ -329,9 +329,11 @@ public class SimEmployeeRedDotService implements IRedDotService, ItemAddListener
             if (levelCap > 0 && employee.getLevel() >= levelCap) {
                 continue;
             }
-            EmployeeLevelCfg nextLevelCfg = getEmployeeLevelCfg(employee.getEmployeeId(), employee.getLevel() + 1);
-            if (nextLevelCfg != null) {
-                Map<Integer, Long> cost = nextLevelCfg.getUpgradeCost();
+            // 升级接口扣除当前等级配置的费用，红点必须使用同一份配置，
+            // 否则下一等级费用较低时会出现材料不足却点亮红点。
+            EmployeeLevelCfg currentLevelCfg = getEmployeeLevelCfg(employee.getEmployeeId(), employee.getLevel());
+            if (currentLevelCfg != null) {
+                Map<Integer, Long> cost = currentLevelCfg.getUpgradeCost();
                 requirements.add(new Requirement(employee.getEmployeeId(), "levelUpIds", cost == null ? Map.of() : cost));
             }
         }
