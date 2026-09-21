@@ -9,7 +9,6 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.constant.TaskConstant;
 import com.jjg.game.core.data.Item;
-import com.jjg.game.core.data.LoginType;
 import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.MailService;
 import com.jjg.game.core.service.PlayerPackService;
@@ -487,10 +486,7 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         ShopRechargeListCfg primary = GameDataManager.getShopRechargeListCfg(passCfg.getShopRechargeListID());
         if (primary != null) {
             info.primaryInfo = new RechargeIdInfo();
-            info.primaryInfo.price = primary.getGoogleShopId();
-            if (ctx.getPlayer().getLoginType() == LoginType.APPLE) {
-                info.primaryInfo.price = primary.getIosShopId();
-            }
+            info.primaryInfo.price = primary.getPrice().toPlainString();
             info.primaryInfo.productId = passCfg.getId() + "_"+ BASIC;
         }
 
@@ -498,10 +494,7 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         ShopRechargeListCfg high = GameDataManager.getShopRechargeListCfg(passCfg.getShopRechargeList1ID());
         if (high != null) {
             info.highInfo = new RechargeIdInfo();
-            info.highInfo.price = high.getGoogleShopId();
-            if (ctx.getPlayer().getLoginType() == LoginType.APPLE) {
-                info.highInfo.price = high.getIosShopId();
-            }
+            info.highInfo.price = high.getPrice().toPlainString();
             info.highInfo.productId = passCfg.getId() + "_" + PREMIUM;
         }
         return info;

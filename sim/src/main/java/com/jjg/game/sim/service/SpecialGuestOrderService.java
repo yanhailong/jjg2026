@@ -3,6 +3,7 @@ package com.jjg.game.sim.service;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Order;
+import com.jjg.game.core.data.PayType;
 import com.jjg.game.core.data.Player;
 import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.pb.RechargeType;
@@ -84,19 +85,20 @@ public class SpecialGuestOrderService implements OrderGenerate {
             return false;
         }
 
+        String orderId = order.getPayChannel() == PayType.IOS.getValue() ? order.getUuid() : order.getId();
         int code;
         if (poolCfg.getPoolType() == SimConstant.SpecialGuest.POOL_PAID) {
             VisitorGenPaidCfg cfg = getCashCfg(cfgId);
             if (cfg == null) {
                 return false;
             }
-            code = simGuestService.invitePurchasedSpecialGuest(context, cfg.getVisitorID(), cfg.getVisitorCount());
+            code = simGuestService.invitePurchasedSpecialGuest(context, orderId, poolCfg.getId(), cfgId, cfg.getVisitorID(), cfg.getVisitorCount());
         } else if (poolCfg.getPoolType() == SimConstant.SpecialGuest.POOL_QUALITY) {
             VisitorQualityAcquisitionCfg cfg = GameDataManager.getVisitorQualityAcquisitionCfg(cfgId);
             if (cfg == null || cfg.getCostType() != COST_CASH || cfg.getPriceValue1() <= 0) {
                 return false;
             }
-            code = simGuestService.inviteQualitySpecialGuests(context, cfg);
+            code = simGuestService.inviteQualitySpecialGuests(context, orderId, poolCfg.getId(), cfg);
         } else {
             return false;
         }

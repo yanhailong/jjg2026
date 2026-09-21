@@ -110,11 +110,7 @@ public class SimMiniShopService implements OrderGenerate {
 
         if (cfg.getShopRechargeListId() > 0) {
             ShopRechargeListCfg shopRechargeListCfg = GameDataManager.getShopRechargeListCfg(cfg.getShopRechargeListId());
-            if (ctx.getPlayer().getLoginType() == LoginType.APPLE) {
-                res.price = shopRechargeListCfg.getIosShopId();
-            } else {
-                res.price = shopRechargeListCfg.getGoogleShopId();
-            }
+            res.price = shopRechargeListCfg.getPrice().toPlainString();
         } else {
             res.costItems = ItemUtils.buildItemInfo(cfg.getCost());
         }

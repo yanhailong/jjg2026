@@ -37,4 +37,8 @@ public class SpecialGuestInfo {
     public int poolId;
     @ProtoDesc("该商品每轮购买次数上限，0表示不限")
     public int maxPurchasePerRefresh;
+    @ProtoDesc("按钮状态  0.可购买  1.达到购买次数上限  2.等待中  3.可领取")
+    public int btnStatus;
+    @ProtoDesc("订单id ，购买后才会赋值")
+    public String orderId;
 }

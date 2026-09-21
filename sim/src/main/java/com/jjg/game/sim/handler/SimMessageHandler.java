@@ -731,6 +731,16 @@ public class SimMessageHandler implements GmListener {
     }
 
     /**
+     * 领取品质特殊游客订单奖励
+     */
+    @Command(SimConstant.MsgBean.REQ_SPECIAL_GUEST_REWARDS)
+    public void reqSpecialGuestRewards(PlayerController playerController, ReqSpecialGuestRewards req) {
+        execute(playerController, ctx -> {
+            guestService.claimSpecialGuestRewards(ctx, req.orderId);
+        }, ReqSpecialGuestRewards.class);
+    }
+
+    /**
      * 获取当前场景已购买的特殊游客
      */
     @Command(SimConstant.MsgBean.REQ_OWNED_SPECIAL_GUEST_LIST)

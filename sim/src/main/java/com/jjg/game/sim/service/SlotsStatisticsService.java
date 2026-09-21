@@ -30,7 +30,9 @@ public class SlotsStatisticsService {
         ctx.setSlotsStatisticsData(slotsStatisticsDao.findById(ctx.playerId()).orElse(null));
     }
 
-    /** 仅由离线保存队列调用，不参加周期全量保存。 */
+    /**
+     * 仅由离线保存队列调用，不参加周期全量保存。
+     */
     public void saveOnExit(SimPlayerContext ctx) {
         SlotsStatisticsData data = ctx.getSlotsStatisticsData();
         if (data != null && !data.isClientReq()) {
@@ -58,6 +60,14 @@ public class SlotsStatisticsService {
         info.allBetCoin = data.getAllBetCoin();
         info.allSpendPower = data.getAllSpendPower();
         info.allSpendPowerGetCoin = data.getAllSpendPowerGetCoin();
+
+        //总盈利
+        long slotsRealWin = data.getAllSpendPowerGetCoin() + data.getAllBetCoin() - data.getAllBetCoin();
+        if(slotsRealWin > ctx.getSimBaseData().getSlotsAthWinCoin()){
+            info.ath = true;
+            ctx.getSimBaseData().setSlotsAthWinCoin(slotsRealWin);
+        }
+
         //删除成功后再标记，删除失败时仍可重试或离线保存。
         slotsStatisticsDao.deleteById(ctx.playerId());
         data.setClientReq(true);
@@ -70,7 +80,9 @@ public class SlotsStatisticsService {
         ctx.setSlotsStatisticsData(null);
     }
 
-    /** 选场可能来自 slots 节点，清理必须在 SIM 数据所属节点执行。 */
+    /**
+     * 选场可能来自 slots 节点，清理必须在 SIM 数据所属节点执行。
+     */
     public void clear(long playerId) {
         SimPlayerContext ctx = contexts.getContext(playerId);
         if (ctx != null) {

@@ -58,6 +58,8 @@ public class SimCasinoData extends AbstractData {
     private Map<Integer, Integer> managerEmployMap;
     //游客羁绊
     private Set<Integer> guestBondsSet;
+    //待领奖的特邀游客购买记录 orderId->商品来源及游客UID集合
+    private Map<String, BuySpecialGuestLogInfo> specialGuestMap;
     //上次生成游客时间(ms) — 运行时, 不持久化
     @Transient
     private transient long lastGenerateTime;
@@ -252,6 +254,19 @@ public class SimCasinoData extends AbstractData {
             this.purchasedGuestMap = new HashMap<>();
         }
         this.purchasedGuestMap.put(data.getUid(), data);
+        if (data.getOrderId() != null) {
+            if (this.specialGuestMap == null) {
+                this.specialGuestMap = new HashMap<>();
+            }
+            BuySpecialGuestLogInfo info = this.specialGuestMap.computeIfAbsent(data.getOrderId(), key -> {
+                BuySpecialGuestLogInfo logInfo = new BuySpecialGuestLogInfo();
+                logInfo.setPoolId(data.getPoolId());
+                logInfo.setCfgId(data.getCfgId());
+                logInfo.setGuestIds(new HashSet<>());
+                return logInfo;
+            });
+            info.getGuestIds().add(data.getUid());
+        }
     }
 
     /**
@@ -541,7 +556,7 @@ public class SimCasinoData extends AbstractData {
         this.cacheGuestInfoList.add(guestInfo);
     }
 
-    public int cacheGuestInfoListSize(){
+    public int cacheGuestInfoListSize() {
         if (this.cacheGuestInfoList == null) {
             return 0;
         }
@@ -558,5 +573,26 @@ public class SimCasinoData extends AbstractData {
 
     public void setCacheGuestSize(int cacheGuestSize) {
         this.cacheGuestSize = cacheGuestSize;
+    }
+
+    public Map<String, BuySpecialGuestLogInfo> getSpecialGuestMap() {
+        return specialGuestMap;
+    }
+
+    public void setSpecialGuestMap(Map<String, BuySpecialGuestLogInfo> specialGuestMap) {
+        this.specialGuestMap = specialGuestMap;
+    }
+
+    public BuySpecialGuestLogInfo findBuySpecialGuestLogInfo(int poolId, int cfgId) {
+        if (this.specialGuestMap == null || this.specialGuestMap.isEmpty()) {
+            return null;
+        }
+
+        for (BuySpecialGuestLogInfo info : this.specialGuestMap.values()) {
+            if (info.getPoolId() == poolId && info.getCfgId() == cfgId) {
+                return info;
+            }
+        }
+        return null;
     }
 }

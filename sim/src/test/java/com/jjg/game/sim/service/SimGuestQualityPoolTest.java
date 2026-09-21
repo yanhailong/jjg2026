@@ -273,21 +273,24 @@ class SimGuestQualityPoolTest {
     void diamondSuccessSharesPaymentFlowButKeepsPaidAndQualityCountersSeparate() {
         casino.getSpecialGuestPurchaseCounts().put("20:101", 7);
         when(purchaseLimit.getIntValue()).thenReturn(1);
-        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(ctx, product);
+        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), eq(product));
         try (var items = mockStatic(ItemUtils.class)) {
             items.when(ItemUtils::getDiamondItemId).thenReturn(5);
             when(pack.removeItem(ctx.getPlayer(), 5, 10, AddType.SIM_SPECIAL_GUEST_BUY)).thenReturn(new CommonResult<>(Code.SUCCESS));
-            assertEquals(Code.SUCCESS, buy(COST_DIAMOND).code);
+            ResBuySpecialGuest result = buy(COST_DIAMOND);
+            assertEquals(Code.SUCCESS, result.code);
+            assertNotNull(result.orderId);
+            verify(service).inviteQualitySpecialGuests(ctx, result.orderId, 30, product);
         }
         assertEquals(Map.of("20:101", 7, "30:101", 1), casino.getSpecialGuestPurchaseCounts());
         verify(counts).addPaidCount(1, POOL_QUALITY, 101);
-        verify(service).inviteQualitySpecialGuests(ctx, product);
-        verify(service, never()).invitePurchasedSpecialGuest(any(), anyInt(), anyLong());
+        verify(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), eq(product));
+        verify(service, never()).invitePurchasedSpecialGuest(any(), anyString(), anyInt(), anyInt(), anyInt(), anyLong());
     }
 
     @Test
     void failedGenerationRefundsDiamondsWithoutCountingPurchase() {
-        doReturn(Code.FAIL).when(service).inviteQualitySpecialGuests(ctx, product);
+        doReturn(Code.FAIL).when(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), eq(product));
         try (var items = mockStatic(ItemUtils.class)) {
             items.when(ItemUtils::getDiamondItemId).thenReturn(5);
             when(pack.removeItem(ctx.getPlayer(), 5, 10, AddType.SIM_SPECIAL_GUEST_BUY)).thenReturn(new CommonResult<>(Code.SUCCESS));
@@ -309,7 +312,7 @@ class SimGuestQualityPoolTest {
         ResBuySpecialGuest res = buy(COST_CASH);
         assertEquals(Code.SUCCESS, res.code);
         assertEquals("ios-order", res.orderId);
-        verify(service, never()).inviteQualitySpecialGuests(any(), any());
+        verify(service, never()).inviteQualitySpecialGuests(any(), anyString(), anyInt(), any());
         verify(counts, never()).addPaidCount(anyLong(), anyInt(), anyInt());
         assertTrue(casino.getSpecialGuestPurchaseCounts().isEmpty());
     }
@@ -320,9 +323,9 @@ class SimGuestQualityPoolTest {
         when(qualityPool.getIsEnabled()).thenReturn(false);
         casino.setSpecialGuestQualityCfgIds(Map.of());
         Order order = cashOrder("1:3:30");
-        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(ctx, product);
+        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), eq(product));
         assertTrue(receipts().onReceivedRecharge(player(), order));
-        verify(service).inviteQualitySpecialGuests(ctx, product);
+        verify(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), eq(product));
         verify(counts).addPaidCount(1, POOL_QUALITY, 101);
         verify(counts, never()).getPaidCount(anyLong(), anyInt(), anyInt());
         assertTrue(casino.getSpecialGuestPurchaseCounts().isEmpty());
@@ -331,7 +334,7 @@ class SimGuestQualityPoolTest {
     @Test
     void failedCashGenerationDoesNotRecordPurchase() {
         when(product.getCostType()).thenReturn(COST_CASH);
-        doReturn(Code.SAMPLE_ERROR).when(service).inviteQualitySpecialGuests(ctx, product);
+        doReturn(Code.SAMPLE_ERROR).when(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), eq(product));
         assertFalse(receipts().onReceivedRecharge(player(), cashOrder("1:4:30")));
         verify(counts, never()).addPaidCount(anyLong(), anyInt(), anyInt());
         assertTrue(casino.getSpecialGuestPurchaseCounts().isEmpty());
@@ -345,11 +348,11 @@ class SimGuestQualityPoolTest {
         when(paid.getVisitorID()).thenReturn(1001);
         when(paid.getVisitorCount()).thenReturn(2);
         data.when(() -> GameDataManager.getVisitorGenPaidCfg(101)).thenReturn(paid);
-        doReturn(Code.SUCCESS).when(service).invitePurchasedSpecialGuest(ctx, 1001, 2);
+        doReturn(Code.SUCCESS).when(service).invitePurchasedSpecialGuest(ctx, "cash-order", 20, 101, 1001, 2);
         assertTrue(receipts().onReceivedRecharge(player(), cashOrder("1:4:20")));
         assertEquals(1, casino.getSpecialGuestPurchaseCounts().get("20:101"));
         verify(counts).addPaidCount(1, POOL_PAID, 101);
-        verify(service, never()).inviteQualitySpecialGuests(any(), any());
+        verify(service, never()).inviteQualitySpecialGuests(any(), anyString(), anyInt(), any());
     }
 
     @Test
@@ -377,10 +380,14 @@ class SimGuestQualityPoolTest {
         equipment.setLevelUnlockEquipment(1, List.of(501));
         when(cache.getBuildingUnlockEquipmentDataByBuildId(50)).thenReturn(equipment);
         data.when(() -> GameDataManager.getBuildingAreaTableCfg(50)).thenReturn(mock(BuildingAreaTableCfg.class));
-        assertEquals(Code.SUCCESS, service.inviteQualitySpecialGuests(ctx, product));
+        assertEquals(Code.SUCCESS, service.inviteQualitySpecialGuests(ctx, "order", 30, product));
         ArgumentCaptor<ResGenPurchasedGuest> response = ArgumentCaptor.forClass(ResGenPurchasedGuest.class);
         verify(ctx).send(response.capture());
         assertEquals(3, response.getValue().guests.size());
+        assertEquals(casino.getPurchasedGuestMap().keySet(), casino.getSpecialGuestMap().get("order").getGuestIds());
+        assertEquals(3, casino.getSpecialGuestMap().get("order").getGuestIds().size());
+        assertEquals(30, casino.getSpecialGuestMap().get("order").getPoolId());
+        assertEquals(101, casino.getSpecialGuestMap().get("order").getCfgId());
         assertEquals(2, response.getValue().guests.stream().filter(g -> g.id == 1001).count());
         verify(alliance).onGuestGenerated(1, true, 3);
         verify(tasks).onConditionEvent(eq(ctx), any());
@@ -393,7 +400,7 @@ class SimGuestQualityPoolTest {
         WeightRandom<Integer> random = mock(WeightRandom.class);
         when(random.next()).thenReturn(1001, 9999);
         when(cache.getVisitorQualityRandom(101)).thenReturn(random);
-        assertEquals(Code.SAMPLE_ERROR, service.inviteQualitySpecialGuests(ctx, product));
+        assertEquals(Code.SAMPLE_ERROR, service.inviteQualitySpecialGuests(ctx, "order", 30, product));
         assertNull(casino.findGuestData(1001));
         verify(ctx, never()).send(any());
     }
@@ -447,7 +454,7 @@ class SimGuestQualityPoolTest {
         casino.setSpecialGuestQualityCfgIds(Map.of(30, List.of(101, 102)));
         casino.getSpecialGuestPurchaseCounts().put("30:102", 1);
         when(purchaseLimit.getIntValue()).thenReturn(1);
-        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(ctx, product);
+        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), eq(product));
         try (var items = mockStatic(ItemUtils.class)) {
             items.when(ItemUtils::getDiamondItemId).thenReturn(5);
             when(pack.removeItem(ctx.getPlayer(), 5, 10, AddType.SIM_SPECIAL_GUEST_BUY)).thenReturn(new CommonResult<>(Code.SUCCESS));
@@ -477,7 +484,7 @@ class SimGuestQualityPoolTest {
     void zeroGlobalPurchaseLimitAllowsFurtherPurchases() {
         when(purchaseLimit.getIntValue()).thenReturn(0);
         casino.getSpecialGuestPurchaseCounts().put("30:101", 100);
-        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(ctx, product);
+        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), eq(product));
         try (var items = mockStatic(ItemUtils.class)) {
             items.when(ItemUtils::getDiamondItemId).thenReturn(5);
             when(pack.removeItem(ctx.getPlayer(), 5, 10, AddType.SIM_SPECIAL_GUEST_BUY)).thenReturn(new CommonResult<>(Code.SUCCESS));
@@ -509,7 +516,7 @@ class SimGuestQualityPoolTest {
         when(purchaseLimit.getIntValue()).thenReturn(1);
         casino.getSpecialGuestPurchaseCounts().put("30:101", 1);
         casino.getSpecialGuestPurchaseCounts().put("30:102", 1);
-        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(ctx, product);
+        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), eq(product));
         assertTrue(receipts().onReceivedRecharge(player(), cashOrder("1:4:30")));
         assertEquals(Map.of("30:101", 2, "30:102", 1), casino.getSpecialGuestPurchaseCounts());
         verify(counts).addPaidCount(1, POOL_QUALITY, 101);
@@ -572,8 +579,24 @@ class SimGuestQualityPoolTest {
         data.when(() -> GameDataManager.getShopRechargeListCfg(10)).thenReturn(shop);
     }
 
+    @Test
+    void cashReceiptUsesTheOrderIdReturnedForItsPaymentChannel() {
+        when(product.getCostType()).thenReturn(COST_CASH);
+        doReturn(Code.SUCCESS).when(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), eq(product));
+        Order order = cashOrder("1:4:30");
+        order.setPayChannel(PayType.GOOGLE.getValue());
+        order.setUuid("ios-order");
+        assertTrue(receipts().onReceivedRecharge(player(), order));
+        verify(service).inviteQualitySpecialGuests(ctx, "cash-order", 30, product);
+
+        order.setPayChannel(PayType.IOS.getValue());
+        assertTrue(receipts().onReceivedRecharge(player(), order));
+        verify(service).inviteQualitySpecialGuests(ctx, "ios-order", 30, product);
+    }
+
     private Order cashOrder(String desc) {
         Order order = new Order();
+        order.setId("cash-order");
         order.setRechargeType(BUY_GUEST);
         order.setProductId("101");
         order.setDesc(desc);

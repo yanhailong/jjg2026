@@ -312,6 +312,10 @@ public interface SimConstant {
         int RES_MINI_SHOP = BASE_MSG_PREFIX | 0x9F;
         int REQ_BUY_MINI_SHOP = BASE_MSG_PREFIX | 0xA0;
         int RES_BUY_MINI_SHOP = BASE_MSG_PREFIX | 0xA1;
+
+        //领取特殊游客奖励
+        int REQ_SPECIAL_GUEST_REWARDS = BASE_MSG_PREFIX | 0xA2;
+        int RES_SPECIAL_GUEST_REWARDS = BASE_MSG_PREFIX | 0xA3;
     }
 
     interface SpecialGuest {

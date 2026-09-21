@@ -27,4 +27,6 @@ public class SlotsStatisticsInfo {
     public int allSpendPower;
     @ProtoDesc("累计因体力额外获得金币")
     public long allSpendPowerGetCoin;
+    @ProtoDesc("是否历史最高")
+    public boolean ath;
 }

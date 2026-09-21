@@ -1,6 +1,7 @@
 package com.jjg.game.sim.data;
 
 import com.jjg.game.sim.pb.struct.DestinationInfo;
+import org.springframework.data.annotation.Transient;
 
 import java.util.Map;
 
@@ -25,6 +26,13 @@ public class PurchasedGuestData {
     private int level;
     //预生成的目的地序列 (rewarded 标记有奖励交互点, 奖励延后领取时才结算)
     private Map<Integer,DestinationInfo> destinations;
+    //特殊游客购买订单，非商品邀请为 null；随游客落库用于领奖清理
+    @Transient
+    private transient String orderId;
+    @Transient
+    private transient int poolId;
+    @Transient
+    private transient int cfgId;
 
     public String getUid() {
         return uid;
@@ -64,5 +72,29 @@ public class PurchasedGuestData {
 
     public void setDestinations(Map<Integer, DestinationInfo> destinations) {
         this.destinations = destinations;
+    }
+
+    public String getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(String orderId) {
+        this.orderId = orderId;
+    }
+
+    public int getPoolId() {
+        return poolId;
+    }
+
+    public void setPoolId(int poolId) {
+        this.poolId = poolId;
+    }
+
+    public int getCfgId() {
+        return cfgId;
+    }
+
+    public void setCfgId(int cfgId) {
+        this.cfgId = cfgId;
     }
 }
