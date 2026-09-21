@@ -1,5 +1,6 @@
 package com.jjg.game.sim.service;
 
+import com.alibaba.fastjson.JSON;
 import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PlayerController;
 import com.jjg.game.core.manager.RedDotManager;
@@ -126,6 +127,7 @@ class SimBuildingRedDotTest {
             assertTrue(dot.getExtra().contains("\"skillCount\":1"));
             assertTrue(dot.getExtra().contains("201"));
             assertTrue(dot.getExtra().contains("202"));
+            assertEquals(2, JSON.parseObject(dot.getExtra()).getJSONObject("skillCounts").getIntValue("102"));
         }
     }
 }

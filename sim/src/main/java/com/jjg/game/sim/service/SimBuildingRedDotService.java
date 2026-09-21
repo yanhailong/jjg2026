@@ -70,10 +70,13 @@ public class SimBuildingRedDotService implements IRedDotService, SimPlayerTickLi
             if (offer.propId() == 0) buildingIds.add(offer.buildingId());
             else skillIds.computeIfAbsent(offer.buildingId(), key -> new TreeSet<>()).add(offer.propId());
         }
+        Map<Integer, Integer> skillCounts = new TreeMap<>();
+        skillIds.forEach((buildingId, propIds) -> skillCounts.put(buildingId, propIds.size()));
         int skillCount = skillIds.isEmpty() ? 0 : 1;
         int count = upgradeEntryCount(buildingIds.size(), skillCount);
         RedDotDetails dot = manager.buildRedDotDetails(getModule(), 1, count, RedDotDetails.RedDotType.COUNT);
         dot.setExtra(JSON.toJSONString(Map.of("ids", ids, "buildingIds", buildingIds, "skillIds", skillIds,
+                "skillCounts", skillCounts,
                 "buildingCount", buildingIds.size(), "skillCount", skillCount,
                 "casinoId", ctx.getCurrentCasino().getCasinoId())));
         String snapshot = JSON.toJSONString(dot);
