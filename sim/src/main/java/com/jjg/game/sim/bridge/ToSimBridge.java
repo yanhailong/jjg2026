@@ -11,6 +11,7 @@ import com.jjg.game.sim.data.*;
 import com.jjg.game.sim.pb.res.ResActivePass;
 import com.jjg.game.sim.pb.res.ResBuyMiniShop;
 import com.jjg.game.sim.pb.res.ResSimTaskReward;
+import com.jjg.game.sim.pb.res.ResSlotsStatistics;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
 
 import java.util.List;
@@ -26,6 +27,9 @@ public interface ToSimBridge extends IGameRpc {
 
     /** 在玩家所属 SIM 节点清空本轮 slots 统计。 */
     boolean clearSlotsStatistics(long playerId);
+
+    /** 在玩家所属 SIM 节点请求本轮 slots 统计。 */
+    ResSlotsStatistics requestSlotsStatistics(long playerId);
 
     /** 在玩家所属 SIM 节点完成一个新手引导步骤。 */
     FinishGuideRpcResult finishGuide(long playerId, int guideId);

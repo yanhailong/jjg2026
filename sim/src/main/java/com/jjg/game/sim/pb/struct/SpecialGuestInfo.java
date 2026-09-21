@@ -3,6 +3,7 @@ package com.jjg.game.sim.pb.struct;
 import com.jjg.game.common.pb.ItemInfo;
 import com.jjg.game.common.proto.ProtoDesc;
 import com.jjg.game.common.proto.ProtobufMessage;
+import com.jjg.game.core.pb.KVInfo;
 
 import java.util.List;
 
@@ -41,4 +42,6 @@ public class SpecialGuestInfo {
     public int btnStatus;
     @ProtoDesc("订单id ，购买后才会赋值")
     public String orderId;
+    @ProtoDesc("该订单的游客交互进度 key是已交互结束  ，  value是总的游客数量")
+    public KVInfo guestCountKVInfo;
 }

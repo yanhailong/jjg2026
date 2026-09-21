@@ -46,10 +46,7 @@ import com.jjg.game.core.data.Account;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PlayerController;
-import com.jjg.game.core.listener.ActivityOpenListener;
-import com.jjg.game.core.listener.ConfigExcelChangeListener;
-import com.jjg.game.core.listener.DropItemListener;
-import com.jjg.game.core.listener.GmListener;
+import com.jjg.game.core.listener.*;
 import com.jjg.game.core.manager.ConditionManager;
 import com.jjg.game.core.manager.CoreMarqueeManager;
 import com.jjg.game.core.manager.DropItemManager;
@@ -65,6 +62,7 @@ import com.jjg.game.sampledata.bean.DropConfigCfg;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -152,6 +150,9 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
     private final GameEventManager gameEventManager;
 
     private volatile Map<EGameEventType, List<ActivityData>> activityConditionCache = Map.of();
+
+    @Autowired(required = false)
+    private List<SimPlayerContextListener> simPlayerContextListeners;
 
     @org.springframework.beans.factory.annotation.Autowired
     private com.jjg.game.core.service.CorePlayerService redDotPlayerService;
@@ -818,9 +819,15 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
                 if (playerEvent.getGameEventType() == EGameEventType.PLAYER_LEVEL) {
                     //添加其他活动进度
                     addPlayerActivityProgress(player, ActivityTargetType.LEVEL.getTargetKey(), player.getLevel(), playerEvent.getNewlyValue());
-                }
-                if (playerEvent.getGameEventType() == EGameEventType.BIND_PHONE) {
+                } else if (playerEvent.getGameEventType() == EGameEventType.BIND_PHONE) {
                     addPlayerActivityProgress(player, ActivityTargetType.BIND_PHONE.getTargetKey(), player.getLevel(), playerEvent.getNewlyValue());
+                } else if (playerEvent.getGameEventType() == EGameEventType.SIM_ALL_LEVEL) {
+                    //初始化进度
+                    int level = 0;
+                    if (simPlayerContextListeners != null && !simPlayerContextListeners.isEmpty()) {
+                        level = simPlayerContextListeners.stream().findFirst().get().allLevel(player);
+                    }
+                    addPlayerActivityProgress(player, ActivityTargetType.SIM_ALL_LEVEL.getTargetKey(), level, playerEvent.getNewlyValue());
                 }
                 //更新活动变化
                 List<ActivityData> openActivityData = new ArrayList<>();

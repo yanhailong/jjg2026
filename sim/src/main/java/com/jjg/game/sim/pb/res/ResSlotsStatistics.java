@@ -16,4 +16,8 @@ public class ResSlotsStatistics extends AbstractResponse {
     public ResSlotsStatistics(int code) {
         super(code);
     }
+
+    public ResSlotsStatistics() {
+        super(0);
+    }
 }
