@@ -6,6 +6,17 @@ public class BuySpecialGuestLogInfo {
     private int poolId;
     private int cfgId;
     private Set<String> guestIds;
+    //购买记录创建时间，毫秒时间戳
+    private long createTime;
+
+    public long getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(long createTime) {
+        this.createTime = createTime;
+    }
+
     public int getPoolId() {
         return poolId;
     }

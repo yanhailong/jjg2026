@@ -260,6 +260,7 @@ public class SimCasinoData extends AbstractData {
             }
             BuySpecialGuestLogInfo info = this.specialGuestMap.computeIfAbsent(data.getOrderId(), key -> {
                 BuySpecialGuestLogInfo logInfo = new BuySpecialGuestLogInfo();
+                logInfo.setCreateTime(System.currentTimeMillis());
                 logInfo.setPoolId(data.getPoolId());
                 logInfo.setCfgId(data.getCfgId());
                 logInfo.setGuestIds(new HashSet<>());

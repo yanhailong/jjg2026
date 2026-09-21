@@ -2380,14 +2380,17 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         if (logInfo == null) {
             return;
         }
-        if (!allSpecialGuestRewardsClaimed(casino, logInfo)) {
+        if (!canClaimSpecialGuestRewards(casino, logInfo, System.currentTimeMillis())) {
             info.btnStatus = 2;
         } else {
             info.btnStatus = 3;
         }
     }
 
-    private boolean allSpecialGuestRewardsClaimed(SimCasinoData casino, BuySpecialGuestLogInfo logInfo) {
+    private boolean canClaimSpecialGuestRewards(SimCasinoData casino, BuySpecialGuestLogInfo logInfo, long now) {
+        if (now - logInfo.getCreateTime() > 10 * TimeHelper.ONE_MINUTE_OF_MILLIS) {
+            return true;
+        }
         for (String uid : logInfo.getGuestIds()) {
             PurchasedGuestData guest = casino.findPurchasedGuest(uid);
             //游客领奖结束后会移除，找不到即表示该游客已全部领取。
@@ -2403,7 +2406,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         return true;
     }
 
-    /** 领取品质商品的订单奖励；游客奖励全部领取且道具入账成功后才删除订单记录。 */
+    /** 游客奖励全部领取或订单超过十分钟后可领品质商品奖励，入账成功后删除订单记录。 */
     public void claimSpecialGuestRewards(SimPlayerContext ctx, String orderId) {
         ResSpecialGuestRewards res = new ResSpecialGuestRewards(Code.SUCCESS);
         try {
@@ -2438,9 +2441,9 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                         ctx.playerId(), orderId, logInfo.getPoolId(), logInfo.getCfgId());
                 return;
             }
-            if (!allSpecialGuestRewardsClaimed(casino, logInfo)) {
+            if (!canClaimSpecialGuestRewards(casino, logInfo, System.currentTimeMillis())) {
                 res.code = Code.FAIL;
-                log.warn("领取特殊游客订单奖励失败，游客奖励尚未全部领取 playerId={},casinoId={},orderId={},poolId={},cfgId={}",
+                log.warn("领取特殊游客订单奖励失败，游客奖励尚未全部领取且订单未超过十分钟 playerId={},casinoId={},orderId={},poolId={},cfgId={}",
                         ctx.playerId(), casino.getCasinoId(), orderId, logInfo.getPoolId(), logInfo.getCfgId());
                 return;
             }
