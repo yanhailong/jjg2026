@@ -184,8 +184,6 @@ class SimBuildingRedDotCostTest {
         BuildingUpgradeTableCfg current = mock(BuildingUpgradeTableCfg.class);
         when(current.getNeedLevel()).thenReturn(5);
         when(current.getUpgradeCost()).thenReturn(Map.of(goldId, 100L, diamondId, 10L, materialId, 2L));
-        when(current.getCostPerLevel()).thenReturn(List.of(
-                List.of(materialId, 3), List.of(materialId, 4)));
         SimConfigCacheService configs = mock(SimConfigCacheService.class);
         when(configs.getBuildingUpgradeCfg(buildingId, 2)).thenReturn(current);
         when(configs.getBuildingUpgradeCfg(buildingId, 3)).thenReturn(mock(BuildingUpgradeTableCfg.class));

@@ -422,13 +422,13 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         if (check != BuildingUpgradeCheck.ADD_PROGRESS && check != BuildingUpgradeCheck.CAN_UPGRADE) return null;
         Map<Integer, Long> totalCost = new HashMap<>(cfg.getUpgradeCost());
         if (check == BuildingUpgradeCheck.ADD_PROGRESS) {
-            List<List<Integer>> progressCosts = cfg.getCostPerLevel();
+            List<List<Long>> progressCosts = cfg.getCostPerLevel();
             for (int i = data.getProgress(); i < progressCosts.size(); i++) {
-                List<Integer> cost = progressCosts.get(i);
+                List<Long> cost = progressCosts.get(i);
                 if (cost == null || cost.size() < 2 || cost.get(0) == null || cost.get(0) <= 0
                         || cost.get(1) == null || cost.get(1) < 0) return null;
                 if (cost.get(1) > 0) {
-                    totalCost.merge(cost.get(0), cost.get(1).longValue(), Long::sum);
+                    totalCost.merge(cost.get(0).intValue(), cost.get(1), Long::sum);
                 }
             }
         }
@@ -471,8 +471,8 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
             Pair<BuildingUpgradeCheck, Integer> check = checkBuildingUpgrade(ctx, data, currentCfg);
             if (check.getFirst() == BuildingUpgradeCheck.ADD_PROGRESS) {
                 //添加进度条
-                List<Integer> list = currentCfg.getCostPerLevel().get(data.getProgress());
-                boolean remove = playerPackService.removeItem(ctx.getPlayer(), list.get(0), list.get(1), AddType.SIM_BUILDING_UPGRADE).success();
+                List<Long> list = currentCfg.getCostPerLevel().get(data.getProgress());
+                boolean remove = playerPackService.removeItem(ctx.getPlayer(), list.get(0).intValue(), list.get(1), AddType.SIM_BUILDING_UPGRADE).success();
                 if (!remove) {
                     log.warn("建筑添加进度条失败, 扣除资源失败 playerId={},buildingId={},level={}，itemId={},count={}", ctx.playerId(), buildingId, data.getLevel(), list.get(0), list.get(1));
                     res.code = Code.NOT_ENOUGH_ITEM;
