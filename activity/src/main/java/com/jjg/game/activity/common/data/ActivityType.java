@@ -55,7 +55,7 @@ public enum ActivityType {
             ActivityTargetType.NONE.getTargetKey(), false, false, false),
     //成长基金
     GROWTH_FUND(15, GrowthFundController.class, true, false,
-            ActivityTargetType.LEVEL.getTargetKey(), false, false, false),
+            ActivityTargetType.SIM_ALL_LEVEL.getTargetKey(), false, false, false),
     //买一送七
     BUY_ONE_GET_SEVEN(19, BuyOneGetSevenController.class, false, false,
             ActivityTargetType.NONE.getTargetKey(), false, false, true),

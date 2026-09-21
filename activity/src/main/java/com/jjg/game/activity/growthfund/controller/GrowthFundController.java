@@ -421,7 +421,11 @@ public class GrowthFundController extends BaseActivityController implements Orde
     public boolean initProgress(Player player, ActivityData activityData) {
         if (canInitProgress(player.getId(), activityData)) {
             //初始化进度
-            addPlayerProgress(player, activityData, player.getLevel(), ActivityTargetType.LEVEL.getTargetKey(), player.getLevel());
+            int level = 0;
+            if (simPlayerContextListeners != null && !simPlayerContextListeners.isEmpty()) {
+                level = simPlayerContextListeners.stream().findFirst().get().allLevel(player);
+            }
+            addPlayerProgress(player, activityData, level, ActivityTargetType.SIM_ALL_LEVEL.getTargetKey(), level);
             log.info("玩家初始化进度 playerId:{} activityId:{}", player.getId(), activityData.getId());
             return true;
         }

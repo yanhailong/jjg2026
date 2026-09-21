@@ -34,7 +34,11 @@ public enum ActivityTargetType {
     /**
      * 绑定手机
      */
-    BIND_PHONE(6, 1 << 5);
+    BIND_PHONE(6, 1 << 5),
+    /**
+     * 场景总等级
+     */
+    SIM_ALL_LEVEL(7, 1 << 6);
     //触发类型
     private final long type;
     //触发key
