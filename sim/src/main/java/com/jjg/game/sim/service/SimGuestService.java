@@ -18,6 +18,7 @@ import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.ItemListener;
 import com.jjg.game.core.manager.RedDotManager;
 import com.jjg.game.core.pb.KVInfo;
+import com.jjg.game.core.pb.NotifyOpenFunction;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.reddot.RedDotDetails;
 import com.jjg.game.core.service.OrderService;
@@ -361,6 +362,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             casino.addPurchasedGuest(data);
             //经营信息: 招商生成一名高级游客即累计一次, 与该游客的目的地数量无关
             ctx.getSimBaseData().addReceptionCount(1);
+            ctx.getSimBaseData().recordGuestGenerated(true, System.currentTimeMillis());
             recordDashboardJourney(casino, destinations, System.currentTimeMillis());
 
             res.guests.add(SimPbConverter.toGuestInfo(data, visitorQuestCfg));
@@ -439,6 +441,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                 //经营信息: 购买游客交互产出金币计入经营收益
                 long destGold = rewardsMap.getOrDefault(ItemUtils.getGoldItemId(), 0L);
                 ctx.getSimBaseData().addBusinessIncome(destGold);
+                ctx.getSimBaseData().recordGuestOutputRewards(rewardsMap, System.currentTimeMillis());
                 allianceEventService.onBusinessIncome(ctx.playerId(), rewardsMap);
             }
         }
@@ -605,6 +608,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
 
             long guestGold = rewardsMap.getOrDefault(ItemUtils.getGoldItemId(), 0L);
             ctx.getSimBaseData().addBusinessIncome(guestGold);
+            ctx.getSimBaseData().recordGuestOutputRewards(rewardsMap, now);
             allianceEventService.onBusinessIncome(ctx.playerId(), rewardsMap);
         }
 
@@ -613,7 +617,26 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
 
         ctx.getCurrentCasino().setLastGenerateTime(now);
         recordDashboardJourney(ctx.getCurrentCasino(), destinations, now);
+        ctx.getSimBaseData().recordGuestGenerated(false, now);
+        notifyGuestOutputLimit(ctx, casinoCfg, now);
         return SimPbConverter.toGuestInfo(guest, destinations, visitorQuestCfg);
+    }
+
+    private void notifyGuestOutputLimit(SimPlayerContext ctx, CasinoStatsSheetCfg cfg, long now) {
+        SimBaseData base = ctx.getSimBaseData();
+        long onlineTime = base.accumulateOnlineTime(now);
+        if (base.isGuestOutputLimitNotified() || cfg.getVisitorDailyLimit() <= 0
+                || ctx.getPlayerController() == null) {
+            return;
+        }
+        long threshold = cfg.getVisitorDailyLimit() * 60_000L
+                * SimConstant.Common.GUEST_OUTPUT_LIMIT_NOTIFY_PERCENT / 100;
+        if (onlineTime >= threshold) {
+            NotifyOpenFunction notify = new NotifyOpenFunction();
+            notify.functionIdList = List.of(SimConstant.Common.GUEST_OUTPUT_LIMIT_FUNCTION_ID);
+            ctx.send(notify);
+            base.setGuestOutputLimitNotified(true);
+        }
     }
 
     /**
@@ -987,6 +1010,24 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         }
         log.info("解锁游客成功 guestId={}", guestId);
         return Code.SUCCESS;
+    }
+
+    /** 获取玩家跨场景共享的当日游客产出统计。 */
+    public ResGuestOutputInfo guestOutputInfo(SimPlayerContext ctx) {
+        SimCasinoData casino = ctx.getCurrentCasino();
+        CasinoStatsSheetCfg cfg = configCache.getCasinoStatsSheetCfg(casino.getCasinoId(), casino.getCasinoLevel());
+        if (cfg == null) {
+            return new ResGuestOutputInfo(Code.NOT_FOUND);
+        }
+        SimBaseData base = ctx.getSimBaseData();
+        ResGuestOutputInfo res = new ResGuestOutputInfo(Code.SUCCESS);
+        res.allTime = (int) (base.accumulateOnlineTime(System.currentTimeMillis()) / 1000);
+        res.timeLimit = cfg.getVisitorDailyLimit() * 60;
+        res.allRewards = base.getGuestOutputRewards() == null
+                ? Collections.emptyList() : ItemUtils.buildItemInfo(base.getGuestOutputRewards());
+        res.normalGuestCount = base.getNormalGuestCount();
+        res.specialGuestCount = base.getSpecialGuestCount();
+        return res;
     }
 
     /**
@@ -2665,6 +2706,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
 
             long guestGold = rewardsMap.getOrDefault(ItemUtils.getGoldItemId(), 0L);
             ctx.getSimBaseData().addBusinessIncome(guestGold);
+            ctx.getSimBaseData().recordGuestOutputRewards(rewardsMap, System.currentTimeMillis());
             allianceEventService.onBusinessIncome(ctx.playerId(), rewardsMap);
         }
     }

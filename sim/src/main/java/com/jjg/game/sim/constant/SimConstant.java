@@ -416,6 +416,9 @@ public interface SimConstant {
     }
 
     interface Common {
+        //普通游客产出时长达到上限80%时通知的功能
+        int GUEST_OUTPUT_LIMIT_FUNCTION_ID = 5015;
+        int GUEST_OUTPUT_LIMIT_NOTIFY_PERCENT = 80;
         //默认解锁的场景id
         int DEFAULT_CASINO_ID = 1;
         //默认场景STATS id (CasinoStatsSheetCfg level=0)

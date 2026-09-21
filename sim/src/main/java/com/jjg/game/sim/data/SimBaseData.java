@@ -76,6 +76,12 @@ public class SimBaseData extends AbstractData {
     private long dailyOnlineTime;
     //在线时长下次自然日重置时间 (ms)
     private long onlineTimeResetTime;
+    //当日游客产出统计，跨场景共享，与在线时长一起跨日重置
+    private int normalGuestCount;
+    private int specialGuestCount;
+    private Map<Integer, Long> guestOutputRewards;
+    //当日是否已通知普通游客产出时长达到80%
+    private boolean guestOutputLimitNotified;
     //slots赢奖的最高历史记录
     private long slotsAthWinCoin;
 
@@ -508,6 +514,12 @@ public class SimBaseData extends AbstractData {
     public long accumulateOnlineTime(long now) {
         if (now >= onlineTimeResetTime) {
             dailyOnlineTime = 0;
+            normalGuestCount = 0;
+            specialGuestCount = 0;
+            guestOutputLimitNotified = false;
+            if (guestOutputRewards != null) {
+                guestOutputRewards.clear();
+            }
             onlineTimeResetTime = TimeHelper.getDaysTime(now, 1);
             if (loginTime > 0) {
                 loginTime = Math.max(loginTime, TimeHelper.getDaysTime(now, 0));
@@ -518,6 +530,43 @@ public class SimBaseData extends AbstractData {
             loginTime = now;
         }
         return dailyOnlineTime;
+    }
+
+    public int getNormalGuestCount() {
+        return normalGuestCount;
+    }
+
+    public boolean isGuestOutputLimitNotified() {
+        return guestOutputLimitNotified;
+    }
+
+    public void setGuestOutputLimitNotified(boolean guestOutputLimitNotified) {
+        this.guestOutputLimitNotified = guestOutputLimitNotified;
+    }
+
+    public int getSpecialGuestCount() {
+        return specialGuestCount;
+    }
+
+    public Map<Integer, Long> getGuestOutputRewards() {
+        return guestOutputRewards;
+    }
+
+    public void recordGuestGenerated(boolean special, long now) {
+        accumulateOnlineTime(now);
+        if (special) {
+            specialGuestCount++;
+        } else {
+            normalGuestCount++;
+        }
+    }
+
+    public void recordGuestOutputRewards(Map<Integer, Long> rewards, long now) {
+        accumulateOnlineTime(now);
+        if (guestOutputRewards == null) {
+            guestOutputRewards = new HashMap<>();
+        }
+        rewards.forEach((itemId, count) -> guestOutputRewards.merge(itemId, count, Long::sum));
     }
 
     public long getSlotsAthWinCoin() {

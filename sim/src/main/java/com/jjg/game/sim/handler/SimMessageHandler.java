@@ -596,6 +596,19 @@ public class SimMessageHandler implements GmListener {
         }, ReqAllGuest.class);
     }
 
+    @Command(SimConstant.MsgBean.REQ_GUEST_OUTPUT_INFO)
+    public void reqGuestOutputInfo(PlayerController playerController, ReqGuestOutputInfo req) {
+        ResGuestOutputInfo res;
+        try {
+            SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+            res = ctx == null ? new ResGuestOutputInfo(Code.NOT_FOUND) : guestService.guestOutputInfo(ctx);
+        } catch (Exception e) {
+            log.error("请求游客产出信息失败 playerId={}", playerController.playerId(), e);
+            res = new ResGuestOutputInfo(Code.EXCEPTION);
+        }
+        playerController.send(res);
+    }
+
     /**
      * 招募游客
      */

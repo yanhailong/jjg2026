@@ -12,15 +12,15 @@ import java.util.List;
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_GAME, cmd = SimConstant.MsgBean.RES_GUEST_OUTPUT_INFO, resp = true)
 @ProtoDesc("游客产出信息")
 public class ResGuestOutputInfo extends AbstractResponse {
-    @ProtoDesc("当日总交互时长")
+    @ProtoDesc("当日累计在线时长（秒，与游客产出时长限制口径一致）")
     public int allTime;
-    @ProtoDesc("上限时长")
+    @ProtoDesc("当前场景游客产出上限时长（秒）")
     public int timeLimit;
     @ProtoDesc("当日累计获得奖励数量")
     public List<ItemInfo> allRewards;
-    @ProtoDesc("普通游客人数")
+    @ProtoDesc("当日普通游客生成人数")
     public int normalGuestCount;
-    @ProtoDesc("特殊游客人数")
+    @ProtoDesc("当日特殊游客生成人数")
     public int specialGuestCount;
 
     public ResGuestOutputInfo(int code) {
