@@ -1,5 +1,6 @@
 package com.jjg.game.sim.service;
 
+import com.jjg.game.common.cluster.ClusterSystem;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.*;
@@ -11,6 +12,7 @@ import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.ShopMiniCfg;
 import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
+import com.jjg.game.sim.condition.SimAllLevelCondition;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import com.jjg.game.sim.pb.res.ResBuyMiniShop;
@@ -28,65 +30,79 @@ public class SimMiniShopService implements OrderGenerate {
     private final PlayerPackService playerPackService;
     private final SimConfigCacheService configCacheService;
     private final SimPlayerContextRegistry simPlayerContextRegistry;
+    private final SimAllLevelCondition simAllLevelCondition;
+    private final ClusterSystem clusterSystem;
 
-    public SimMiniShopService(PlayerPackService playerPackService, SimConfigCacheService configCacheService, SimPlayerContextRegistry simPlayerContextRegistry) {
+    public SimMiniShopService(PlayerPackService playerPackService, SimConfigCacheService configCacheService, SimPlayerContextRegistry simPlayerContextRegistry, SimAllLevelCondition simAllLevelCondition, ClusterSystem clusterSystem) {
         this.playerPackService = playerPackService;
         this.configCacheService = configCacheService;
         this.simPlayerContextRegistry = simPlayerContextRegistry;
+        this.simAllLevelCondition = simAllLevelCondition;
+        this.clusterSystem = clusterSystem;
     }
 
-    public void buy(SimPlayerContext ctx, String productId) {
+    public ResBuyMiniShop buy(SimPlayerContext ctx, String productId) {
         ResBuyMiniShop res = new ResBuyMiniShop(Code.SUCCESS);
         res.productId = productId;
         try {
             ShopMiniCfg cfg = GameDataManager.getShopMiniCfg(Integer.parseInt(productId));
             if (cfg == null || cfg.getShopRechargeListId() > 0) {
                 res.code = Code.SAMPLE_ERROR;
-                ctx.send(res);
-                return;
+                return res;
             }
 
             if (ctx.getSimBaseData().getAllLevel() < cfg.getPurchaseLevelMin() || ctx.getSimBaseData().getAllLevel() > cfg.getPurchaseLevelMax()) {
                 res.code = Code.NOT_FOUND;
                 log.warn("下单失败，等级范围不合适 playerId={},producetId={},allLevel={},min={},max={}", ctx.getPlayer().getId(), productId, ctx.getSimBaseData().getAllLevel(), cfg.getPurchaseLevelMin(), cfg.getPurchaseLevelMax());
-                ctx.send(res);
-                return;
+                return res;
             }
 
             if (cfg.getCost() == null || cfg.getCost().isEmpty()) {
                 res.code = Code.SAMPLE_ERROR;
-                ctx.send(res);
-                return;
+                return res;
             }
 
-            CommonResult<ItemOperationResult> commonResult = playerPackService.exchangePackItems(ctx.getPlayer(), null, cfg.getCost(), cfg.getGoods(), AddType.SIM_MINI_SHOP, null);
-            if (!commonResult.success()) {
-                res.code = commonResult.code;
-                ctx.send(res);
-                log.warn("迷你商店购买失败 playerId={},productId={}", ctx.getPlayer().getId(), productId);
-                return;
+            CommonResult<ItemOperationResult> removeResult = playerPackService.removeItem(ctx.getPlayer(), ItemUtils.buildItems(cfg.getCost()), AddType.SIM_MINI_SHOP);
+            if (!removeResult.success()) {
+                res.code = removeResult.code;
+                log.warn("迷你商店购买失败,扣除道具失败 playerId={},productId={}", ctx.getPlayer().getId(), productId);
+                return res;
             }
+
+            playerPackService.addItems(ctx.playerId(), cfg.getGoods(), AddType.SIM_MINI_SHOP);
         } catch (Exception e) {
             log.error("购买迷你商店商品异常 playerId={},productId={}", ctx.playerId(), productId, e);
             res.code = Code.EXCEPTION;
         }
-        ctx.send(res);
+        return res;
     }
 
 
-    public void getShop(SimPlayerContext ctx, int itemId) {
+    public ResMiniShop getShop(PlayerController playerController, int itemId) {
         ResMiniShop res = new ResMiniShop(Code.SUCCESS);
         if (itemId <= 0) {
             res.code = Code.PARAM_ERROR;
-            ctx.send(res);
-            return;
+            return res;
         }
 
-        ShopMiniCfg cfg = configCacheService.getShopMiniCfgMap(itemId, ctx.getSimBaseData().getAllLevel());
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        int allLevel = 0;
+        if (ctx != null) {
+            allLevel = ctx.getSimBaseData().getAllLevel();
+        } else {
+            allLevel = simAllLevelCondition.getAllLevel(playerController.playerId(), playerController.ipAddress());
+        }
+
+        if (allLevel <= 0) {
+            res.code = Code.PARAM_ERROR;
+            log.warn("获取玩家等级失败,无法获取迷你商店数据 playerId={},itemId={}", playerController.playerId(), itemId);
+            return res;
+        }
+
+        ShopMiniCfg cfg = configCacheService.getShopMiniCfgMap(itemId, allLevel);
         if (cfg == null) {
             res.code = Code.NOT_FOUND;
-            ctx.send(res);
-            return;
+            return res;
         }
 
         res.productId = cfg.getId() + "";
@@ -102,7 +118,7 @@ public class SimMiniShopService implements OrderGenerate {
         } else {
             res.costItems = ItemUtils.buildItemInfo(cfg.getCost());
         }
-        ctx.send(res);
+        return res;
     }
 
     @Override
@@ -151,6 +167,12 @@ public class SimMiniShopService implements OrderGenerate {
             return false;
         }
         // 等级只在下单时校验，已付款订单不因玩家升级而拒绝发货。
-        return playerPackService.addItems(player.getId(), shopMiniCfg.getGoods(), AddType.SHOP_RECHARGE, order.getId()).success();
+        playerPackService.addItems(player.getId(), shopMiniCfg.getGoods(), AddType.SHOP_RECHARGE, order.getId()).success();
+        ResBuyMiniShop res = new ResBuyMiniShop(Code.SUCCESS);
+        res.productId = order.getProductId();
+        res.items = ItemUtils.buildItemInfo(shopMiniCfg.getGoods());
+
+        clusterSystem.sendToPlayer(res, player.getId());
+        return true;
     }
 }

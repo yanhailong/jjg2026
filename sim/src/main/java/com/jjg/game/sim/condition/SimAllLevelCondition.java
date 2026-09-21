@@ -75,15 +75,7 @@ public class SimAllLevelCondition implements ConditionHandler<PreparedCondition>
 
     @Override
     public MatchResultData match(ConditionContext ctx, PreparedCondition config) {
-        SimPlayerContext simContext = contextRegistry.getContext(ctx.player().getId());
-        int allLevel;
-        if (simContext != null) {
-            allLevel = simContext.getSimBaseData() == null ? 0 : simContext.getSimBaseData().getAllLevel();
-        } else if (NodeType.HALL.name().equalsIgnoreCase(nodeConfig.getType())) {
-            allLevel = simPlayerGameDao.findAllLevelById(ctx.player().getId());
-        } else {
-            allLevel = remoteAllLevelCache.get(ctx.player().getId(), playerId -> getAllLevelRemotely(ctx));
-        }
+        int allLevel = getAllLevel(ctx.player().getId(), ctx.player().getIp());
         ConditionUpdate update = config.evaluate(
                 new StateConditionEvent(StateConditionEvent.Type.PLAYER_LEVEL, 0, allLevel, 0));
         return update.completed(update.apply(0))
@@ -91,9 +83,26 @@ public class SimAllLevelCondition implements ConditionHandler<PreparedCondition>
                 : MatchResultData.notMatch(getErrorCode(), config.target(), allLevel);
     }
 
-    private int getAllLevelRemotely(ConditionContext ctx) {
-        long playerId = ctx.player().getId();
-        ClusterClient client = simNodeService.getSimClusterClient(playerId, ctx.player().getIp());
+    /**
+     * 获取玩家所有场景等级之和。优先读本地上下文，Hall 无上下文时读库，
+     * 其他节点通过 RPC 获取并按玩家 ID 缓存 10 秒；远程获取失败返回的 0 也会缓存。
+     *
+     * @param playerId 玩家 ID
+     * @param ip 玩家 IP，用于 SIM 节点路由回退
+     */
+    public int getAllLevel(long playerId, String ip) {
+        SimPlayerContext simContext = contextRegistry.getContext(playerId);
+        if (simContext != null) {
+            return simContext.getSimBaseData() == null ? 0 : simContext.getSimBaseData().getAllLevel();
+        }
+        if (NodeType.HALL.name().equalsIgnoreCase(nodeConfig.getType())) {
+            return simPlayerGameDao.findAllLevelById(playerId);
+        }
+        return remoteAllLevelCache.get(playerId, id -> getAllLevelRemotely(id, ip));
+    }
+
+    private int getAllLevelRemotely(long playerId, String ip) {
+        ClusterClient client = simNodeService.getSimClusterClient(playerId, ip);
         if (client == null) {
             log.warn("获取模拟经营总等级失败，未找到玩家 sim 节点 playerId={}", playerId);
             return 0;

@@ -40,6 +40,7 @@ import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import com.jjg.game.sim.dao.SimPlayerGameDao;
 import com.jjg.game.sim.pb.res.NotifySimTaskUpdate;
 import com.jjg.game.sim.pb.res.ResSimTaskReward;
+import com.jjg.game.sim.pb.res.ResBuyMiniShop;
 import com.jjg.game.sim.pb.res.NotifyTogetherPlayInvite;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
 import com.jjg.game.sim.service.SimCoopTaskService;
@@ -49,6 +50,8 @@ import com.jjg.game.sim.service.SimGuestService;
 import com.jjg.game.sim.service.SimPackService;
 import com.jjg.game.sim.service.SimSkillService;
 import com.jjg.game.sim.service.SimTaskService;
+import com.jjg.game.sim.service.SimMiniShopService;
+import com.jjg.game.sim.service.SimNodeService;
 import com.jjg.game.sim.service.SimVisitService;
 import com.jjg.game.sim.service.SlotsStatisticsService;
 import com.jjg.game.social.bridge.ToSocialBridge;
@@ -100,6 +103,10 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
     private SimCoopTaskService simCoopTaskService;
     @Autowired
     private SimTaskService simTaskService;
+    @Autowired
+    private SimMiniShopService simMiniShopService;
+    @Autowired
+    private SimNodeService simNodeService;
     @Autowired
     private SimPackService simPackService;
     @Autowired
@@ -336,6 +343,18 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
     public CommonResult<SlotsSpinResult> onSlotsSpin(long playerId, int gameType, int winTimes, boolean changeNode,
                                                      SpinStatInfo statInfo, VisitTrialSpinPermit trialPermit, int enterType) {
         return simManager.onSlotsSpin(playerId, gameType, winTimes, changeNode, statInfo, trialPermit, enterType);
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public ResBuyMiniShop buyMiniShop(long playerId, String productId) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
+        if (ctx == null) {
+            ResBuyMiniShop response = new ResBuyMiniShop(Code.NOT_FOUND);
+            response.productId = productId;
+            return response;
+        }
+        return simMiniShopService.buy(ctx, productId);
     }
 
     @Override

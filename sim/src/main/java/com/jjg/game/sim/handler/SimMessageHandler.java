@@ -110,12 +110,46 @@ public class SimMessageHandler implements GmListener {
 
     @Command(SimConstant.MsgBean.REQ_BUY_MINI_SHOP)
     public void reqBuyMiniShop(PlayerController playerController, ReqBuyMiniShop req) {
-        execute(playerController, ctx -> miniShopService.buy(ctx, req.productId), ReqBuyMiniShop.class);
+        ResBuyMiniShop response;
+        try {
+            SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+            response = ctx == null ? buyMiniShopRemotely(playerController, req.productId)
+                    : miniShopService.buy(ctx, req.productId);
+        } catch (Exception e) {
+            log.error("购买迷你商店商品异常 playerId={},productId={}", playerController.playerId(), req.productId, e);
+            response = new ResBuyMiniShop(Code.EXCEPTION);
+        }
+        response.productId = req.productId;
+        playerController.send(response);
+    }
+
+    private ResBuyMiniShop buyMiniShopRemotely(PlayerController playerController, String productId) {
+        ClusterClient client = simNodeService.getSimClusterClient(playerController.playerId(), playerController.ipAddress());
+        if (client == null) {
+            return new ResBuyMiniShop(Code.NOT_FOUND);
+        }
+        GameRpcContext rpcContext = GameRpcContext.getContext();
+        RpcReqParameterBuilder previousBuilder = rpcContext.getReqParameterBuilder();
+        try {
+            rpcContext.withReqParameterBuilder(RpcReqParameterBuilder.create()
+                    .addClusterClient(client).setTryMillisPerClient(1000));
+            ResBuyMiniShop response = toSimBridge.buyMiniShop(playerController.playerId(), productId);
+            return response == null ? new ResBuyMiniShop(Code.EXCEPTION) : response;
+        } finally {
+            rpcContext.setReqParameterBuilder(previousBuilder);
+        }
     }
 
     @Command(SimConstant.MsgBean.REQ_MINI_SHOP)
     public void reqMiniShop(PlayerController playerController, ReqMiniShop req) {
-        execute(playerController, ctx -> miniShopService.getShop(ctx, req.itemId), ReqMiniShop.class);
+        ResMiniShop response;
+        try {
+            response = miniShopService.getShop(playerController, req.itemId);
+        } catch (Exception e) {
+            log.error("查询迷你商店异常 playerId={},itemId={}", playerController.playerId(), req.itemId, e);
+            response = new ResMiniShop(Code.EXCEPTION);
+        }
+        playerController.send(response);
     }
 
     @Command(SimConstant.MsgBean.REQ_ACTIVE_PASS_INFO)
@@ -1349,7 +1383,13 @@ public class SimMessageHandler implements GmListener {
             } else if ("unlockAllBuild".equalsIgnoreCase(gmOrders[0])) {
                 SimPlayerContext ctx = this.simPlayerContextRegistry.getContext(playerController.playerId());
                 buildingService.gmUnlockAllBuilds(ctx);
-            } else {
+            } else if("reqActivePassInfo".equalsIgnoreCase(gmOrders[0])){
+                executeActivePass(playerController, SimConstant.MsgBean.REQ_ACTIVE_PASS_INFO, activePassService::info, rpc -> rpc.activePassInfo(playerController.playerId()));
+            }else if("reqMiniShop".equalsIgnoreCase(gmOrders[0])){
+                ReqMiniShop req = new ReqMiniShop();
+                req.itemId = Integer.parseInt(gmOrders[1]);
+                reqMiniShop(playerController, req);
+            }else {
                 res.code = Code.NOT_FOUND;
             }
         } catch (Exception e) {

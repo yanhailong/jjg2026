@@ -1,7 +1,5 @@
 package com.jjg.game.sim.bridge;
 
-import com.jjg.game.sim.data.ActivePassPurchase;
-import com.jjg.game.sim.pb.res.ResActivePass;
 import com.jjg.game.common.rpc.IGameRpc;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.data.CommonResult;
@@ -9,13 +7,9 @@ import com.jjg.game.core.data.Item;
 import com.jjg.game.season.data.SeasonFreeSpinResult;
 import com.jjg.game.season.pb.res.ResSeasonMatch;
 import com.jjg.game.season.pb.res.ResSeasonTrialProgress;
-import com.jjg.game.sim.data.SlotsEntrySessionData;
-import com.jjg.game.sim.data.SimSkillsData;
-import com.jjg.game.sim.data.FinishGuideRpcResult;
-import com.jjg.game.sim.data.SkipGuideGroupRpcResult;
-import com.jjg.game.sim.data.SlotsSpinResult;
-import com.jjg.game.sim.data.SpinStatInfo;
-import com.jjg.game.sim.data.VisitTrialSpinPermit;
+import com.jjg.game.sim.data.*;
+import com.jjg.game.sim.pb.res.ResActivePass;
+import com.jjg.game.sim.pb.res.ResBuyMiniShop;
 import com.jjg.game.sim.pb.res.ResSimTaskReward;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
 
@@ -27,6 +21,9 @@ import java.util.Map;
  * @date 2026/5/25
  */
 public interface ToSimBridge extends IGameRpc {
+    /** 在玩家所属 SIM 节点购买迷你商店商品。 */
+    ResBuyMiniShop buyMiniShop(long playerId, String productId);
+
     /** 在玩家所属 SIM 节点清空本轮 slots 统计。 */
     boolean clearSlotsStatistics(long playerId);
 
