@@ -196,19 +196,11 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
         if (fixedItemId == null || fixedItemId <= 0) {
             return 0;
         }
-        for (int i = 1; i < newbieGuideDraw.size(); i++) {
-            Integer guideId = newbieGuideDraw.get(i);
-            if (guideId == null || guideId <= 0) {
-                continue;
-            }
-            int groupId = groupOfGuide(guideId);
-            if (groupId > 0
-                    && baseData.hasTriggeredGuideGroup(groupId)
-                    && !baseData.hasCompletedGuideGroup(groupId)) {
-                return fixedItemId;
-            }
-        }
-        return 0;
+
+        int maxGuideId = baseData.maxGuideId();
+
+        boolean match = newbieGuideDraw.stream().anyMatch(guideId -> guideId > maxGuideId);
+        return match ? fixedItemId : 0;
     }
 
     /** 获取指定引导组包含的全部步骤ID。 */

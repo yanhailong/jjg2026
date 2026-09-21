@@ -41,8 +41,14 @@ public class SimPlayerContext {
     private SeasonPlayerData seasonPlayerData;
     private ActivePassData activePassData;
 
-    public ActivePassData getActivePassData() { return activePassData; }
-    public void setActivePassData(ActivePassData data) { activePassData = data; }
+    public ActivePassData getActivePassData() {
+        return activePassData;
+    }
+
+    public void setActivePassData(ActivePassData data) {
+        activePassData = data;
+    }
+
     //成就徽章固定值加成缓存 (BuildingOutputType -> 固定值; 登录/成就完成后刷新; 内存态不落库)
     private Map<BuildingOutputType, Integer> medalBuffMap = new EnumMap<>(BuildingOutputType.class);
 
@@ -483,14 +489,14 @@ public class SimPlayerContext {
             this.slotsStatisticsData = new SlotsStatisticsData();
         }
 
-        this.slotsStatisticsData.setSpecialCount(this.slotsStatisticsData.getSpecialCount() + 1);
+        this.slotsStatisticsData.setSpinCount(this.slotsStatisticsData.getSpinCount() + 1);
         this.slotsStatisticsData.addBigWinCount(statInfo.getBigShowId());
         if (statInfo.isTriggerFree()) {
             this.slotsStatisticsData.setFreeCount(this.slotsStatisticsData.getFreeCount() + 1);
         }
 
         if (statInfo.getSpecialModes() != null && !statInfo.getSpecialModes().isEmpty()) {
-            this.slotsStatisticsData.setSpinCount(statInfo.getSpecialModes().size());
+            this.slotsStatisticsData.setSpecialCount(this.slotsStatisticsData.getSpecialCount() + statInfo.getSpecialModes().size());
         }
 
         if (statInfo.getJackpotCounts() != null && !statInfo.getJackpotCounts().isEmpty()) {
