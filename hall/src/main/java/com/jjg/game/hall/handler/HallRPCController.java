@@ -40,6 +40,7 @@ import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import com.jjg.game.sim.dao.SimPlayerGameDao;
 import com.jjg.game.sim.pb.res.NotifySimTaskUpdate;
 import com.jjg.game.sim.pb.res.ResSimTaskReward;
+import com.jjg.game.sim.pb.res.ResSlotsStatistics;
 import com.jjg.game.sim.pb.res.ResBuyMiniShop;
 import com.jjg.game.sim.pb.res.NotifyTogetherPlayInvite;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
@@ -284,6 +285,12 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
     public boolean clearSlotsStatistics(long playerId) {
         slotsStatisticsService.clear(simManager.createContextByPlayerId(playerId));
         return true;
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public ResSlotsStatistics requestSlotsStatistics(long playerId) {
+        return slotsStatisticsService.request(simManager.createContextByPlayerId(playerId));
     }
 
     @Override

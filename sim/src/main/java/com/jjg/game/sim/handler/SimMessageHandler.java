@@ -814,12 +814,29 @@ public class SimMessageHandler implements GmListener {
         ResSlotsStatistics res;
         try {
             SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
-            res = ctx == null ? new ResSlotsStatistics(Code.NOT_FOUND) : slotsStatisticsService.request(ctx);
+            res = ctx == null ? requestSlotsStatisticsRemotely(playerController) : slotsStatisticsService.request(ctx);
         } catch (Exception e) {
             log.error("请求slots统计失败 playerId={}", playerController.playerId(), e);
             res = new ResSlotsStatistics(Code.EXCEPTION);
         }
         playerController.send(res);
+    }
+
+    private ResSlotsStatistics requestSlotsStatisticsRemotely(PlayerController playerController) {
+        ClusterClient client = simNodeService.getSimClusterClient(playerController.playerId(), playerController.ipAddress());
+        if (client == null) {
+            return new ResSlotsStatistics(Code.NOT_FOUND);
+        }
+        GameRpcContext rpcContext = GameRpcContext.getContext();
+        RpcReqParameterBuilder previousBuilder = rpcContext.getReqParameterBuilder();
+        try {
+            rpcContext.withReqParameterBuilder(RpcReqParameterBuilder.create()
+                    .addClusterClient(client).setTryMillisPerClient(1000));
+            ResSlotsStatistics response = toSimBridge.requestSlotsStatistics(playerController.playerId());
+            return response == null ? new ResSlotsStatistics(Code.EXCEPTION) : response;
+        } finally {
+            rpcContext.setReqParameterBuilder(previousBuilder);
+        }
     }
 
     /**

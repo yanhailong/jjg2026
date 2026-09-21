@@ -2380,30 +2380,40 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         if (logInfo == null) {
             return;
         }
-        if (!canClaimSpecialGuestRewards(casino, logInfo, System.currentTimeMillis())) {
-            info.btnStatus = 2;
-        } else {
-            info.btnStatus = 3;
-        }
+        int completed = countCompletedSpecialGuests(casino, logInfo);
+        info.guestCountKVInfo = new KVInfo(completed, logInfo.getGuestIds().size());
+        info.btnStatus = completed == info.guestCountKVInfo.value
+                || System.currentTimeMillis() - logInfo.getCreateTime() > 10 * TimeHelper.ONE_MINUTE_OF_MILLIS ? 3 : 2;
     }
 
     private boolean canClaimSpecialGuestRewards(SimCasinoData casino, BuySpecialGuestLogInfo logInfo, long now) {
         if (now - logInfo.getCreateTime() > 10 * TimeHelper.ONE_MINUTE_OF_MILLIS) {
             return true;
         }
+        return countCompletedSpecialGuests(casino, logInfo) == logInfo.getGuestIds().size();
+    }
+
+    private int countCompletedSpecialGuests(SimCasinoData casino, BuySpecialGuestLogInfo logInfo) {
+        int completed = 0;
         for (String uid : logInfo.getGuestIds()) {
             PurchasedGuestData guest = casino.findPurchasedGuest(uid);
             //游客领奖结束后会移除，找不到即表示该游客已全部领取。
             if (guest == null || guest.getDestinations() == null) {
+                completed++;
                 continue;
             }
+            boolean allClaimed = true;
             for (DestinationInfo destination : guest.getDestinations().values()) {
                 if (!destination.claimed) {
-                    return false;
+                    allClaimed = false;
+                    break;
                 }
             }
+            if (allClaimed) {
+                completed++;
+            }
         }
-        return true;
+        return completed;
     }
 
     /** 游客奖励全部领取或订单超过十分钟后可领品质商品奖励，入账成功后删除订单记录。 */
