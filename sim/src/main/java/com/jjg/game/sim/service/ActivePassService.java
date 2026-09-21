@@ -1,19 +1,26 @@
 package com.jjg.game.sim.service;
 
-import com.jjg.game.sim.dao.ActivePassDao;
-import com.jjg.game.sim.data.ActivePassData;
-import com.jjg.game.sim.data.ActivePassTask;
 import com.jjg.game.common.utils.TimeHelper;
-import com.jjg.game.core.base.condition.numeric.*;
+import com.jjg.game.core.base.condition.numeric.ConditionEvent;
+import com.jjg.game.core.base.condition.numeric.ConditionUpdate;
+import com.jjg.game.core.base.condition.numeric.PreparedCondition;
+import com.jjg.game.core.base.condition.numeric.StateConditionEvent;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.constant.TaskConstant;
 import com.jjg.game.core.data.Item;
-import com.jjg.game.core.service.MailService;
+import com.jjg.game.core.data.LoginType;
 import com.jjg.game.core.service.CorePlayerService;
+import com.jjg.game.core.service.MailService;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.utils.ItemUtils;
+import com.jjg.game.sampledata.GameDataManager;
+import com.jjg.game.sampledata.bean.ActivePassCfg;
 import com.jjg.game.sampledata.bean.PassRewardCfg;
+import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
+import com.jjg.game.sim.dao.ActivePassDao;
+import com.jjg.game.sim.data.ActivePassData;
+import com.jjg.game.sim.data.ActivePassTask;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.listener.SimConditionEventListener;
 import com.jjg.game.sim.listener.SimPlayerTickListener;
@@ -22,6 +29,7 @@ import com.jjg.game.sim.pb.res.ResActivePass;
 import com.jjg.game.sim.pb.struct.ActivePassInfo;
 import com.jjg.game.sim.pb.struct.ActivePassRewardInfo;
 import com.jjg.game.sim.pb.struct.ActivePassTaskInfo;
+import com.jjg.game.sim.pb.struct.RechargeIdInfo;
 import com.jjg.game.social.service.SocialSender;
 import org.springframework.stereotype.Service;
 
@@ -31,7 +39,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import static com.jjg.game.sim.constant.SimConstant.ActivePass.*;
 import static com.jjg.game.sim.constant.SimConstant.MsgBean.*;
 
-/** 活跃通行证聚合，所有写操作由所属SIM节点的玩家线程串行执行。 */
+/**
+ * 活跃通行证聚合，所有写操作由所属SIM节点的玩家线程串行执行。
+ */
 @Service
 public class ActivePassService implements SimConditionEventListener, SimPlayerTickListener {
     private final ActivePassConfigService config;
@@ -58,11 +68,15 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
 
     public void initData(SimPlayerContext ctx) {
         long now = System.currentTimeMillis();
-        for (ActivePassData old : dao.expired(ctx.playerId(), now)) { settle(old); }
+        for (ActivePassData old : dao.expired(ctx.playerId(), now)) {
+            settle(old);
+        }
         ensureCurrent(ctx, now);
     }
 
-    /** 换期先结算，日切只替换每日任务，不清积分、周期任务或付费状态。 */
+    /**
+     * 换期先结算，日切只替换每日任务，不清积分、周期任务或付费状态。
+     */
     public ActivePassData ensureCurrent(SimPlayerContext ctx, long now) {
         ActivePassConfigService.Index index = config.index();
         ActivePassConfigService.Period period = index.active(now);
@@ -111,25 +125,37 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
                 }
                 reset = true;
             }
-            if (reset) { saves.enqueueSave(data); }
+            if (reset) {
+                saves.enqueueSave(data);
+            }
         }
-        if (reset) { notifyUpdate(ctx, true, taskInfos(data)); }
+        if (reset) {
+            notifyUpdate(ctx, true, taskInfos(data));
+        }
         return data;
     }
 
     @Override
-    public void onTick(SimPlayerContext ctx, long now) { ensureCurrent(ctx, now); }
+    public void onTick(SimPlayerContext ctx, long now) {
+        ensureCurrent(ctx, now);
+    }
 
     @Override
     public ConditionEvent onConditionEvent(SimPlayerContext ctx, ConditionEvent event) {
-        if (ctx == null || ctx.getSimBaseData() == null || event == null) { return null; }
+        if (ctx == null || ctx.getSimBaseData() == null || event == null) {
+            return null;
+        }
         ActivePassData data = ensureCurrent(ctx, System.currentTimeMillis());
-        if (data == null) { return null; }
+        if (data == null) {
+            return null;
+        }
         List<ActivePassTaskInfo> changed = new ArrayList<>();
         advance(data.getDailyTasks().values(), event, changed);
         advance(data.getPeriodTasks().values(), event, changed);
         pollStates(ctx, data, changed);
-        if (!changed.isEmpty()) { notifyUpdate(ctx, false, changed); }
+        if (!changed.isEmpty()) {
+            notifyUpdate(ctx, false, changed);
+        }
         return null;
     }
 
@@ -137,7 +163,9 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         var index = config.index();
         for (ActivePassTask task : tasks) {
             var definition = index.task(task.getTaskId());
-            if (definition == null || task.isClaimed() || task.getProgress() >= definition.condition().target()) { continue; }
+            if (definition == null || task.isClaimed() || task.getProgress() >= definition.condition().target()) {
+                continue;
+            }
             ConditionUpdate update = definition.condition().evaluate(event);
             long next = Math.min(definition.condition().target(), update.apply(task.getProgress()));
             if (next != task.getProgress()) {
@@ -147,20 +175,28 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         }
     }
 
-    /** 状态条件读取当前状态，不把历史累计行为导入当期任务。 */
+    /**
+     * 状态条件读取当前状态，不把历史累计行为导入当期任务。
+     */
     private void pollStates(SimPlayerContext ctx, ActivePassData data, List<ActivePassTaskInfo> changed) {
         com.jjg.game.core.data.Player player = null;
         for (ActivePassTask task : allTasks(data)) {
             var def = config.index().task(task.getTaskId());
-            if (def == null || task.isClaimed() || task.getProgress() >= def.condition().target()) { continue; }
+            if (def == null || task.isClaimed() || task.getProgress() >= def.condition().target()) {
+                continue;
+            }
             PreparedCondition condition = def.condition();
             long previous = task.getProgress();
             if (stats.readsCurrentState(condition)) {
                 task.setProgress(Math.min(condition.target(), stats.progress(ctx, condition)));
             } else if (condition.eventType() == StateConditionEvent.class) {
                 // 玩家可能正在游戏节点升级，不能使用大厅登录时保留的旧Player快照。
-                if (player == null) { player = players.get(ctx.playerId()); }
-                if (player == null) { continue; }
+                if (player == null) {
+                    player = players.get(ctx.playerId());
+                }
+                if (player == null) {
+                    continue;
+                }
                 StateConditionEvent event = switch (condition.spec().id()) {
                     case 1 -> new StateConditionEvent(StateConditionEvent.Type.PLAYER_LEVEL, 0, player.getLevel(), 0);
                     case 3 -> new StateConditionEvent(StateConditionEvent.Type.VIP_LEVEL, 0, player.getVipLevel(), 0);
@@ -168,31 +204,45 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
                 };
                 task.setProgress(Math.min(condition.target(), condition.evaluate(event).apply(task.getProgress())));
             }
-            if (changed != null && previous != task.getProgress()) { changed.add(taskInfo(task)); }
+            if (changed != null && previous != task.getProgress()) {
+                changed.add(taskInfo(task));
+            }
         }
     }
 
     public ResActivePass info(SimPlayerContext ctx) {
         ActivePassData data = ensureCurrent(ctx, System.currentTimeMillis());
-        if (data != null) { pollStates(ctx, data, null); }
-        return response(REQ_ACTIVE_PASS_INFO, Code.SUCCESS, data);
+        if (data != null) {
+            pollStates(ctx, data, null);
+        }
+        return response(ctx, REQ_ACTIVE_PASS_INFO, Code.SUCCESS, data);
     }
 
     public ResActivePass claimTask(SimPlayerContext ctx, int passId, int taskId, int day) {
         ActivePassData data = ensureCurrent(ctx, System.currentTimeMillis());
-        if (!matches(data, passId)) { return response(REQ_ACTIVE_PASS_TASK_CLAIM, Code.NOT_FOUND, data); }
+        if (!matches(data, passId)) {
+            return response(ctx, REQ_ACTIVE_PASS_TASK_CLAIM, Code.NOT_FOUND, data);
+        }
         var def = config.index().task(taskId);
-        if (def == null) { return response(REQ_ACTIVE_PASS_TASK_CLAIM, Code.PARAM_ERROR, data); }
+        if (def == null) {
+            return response(ctx, REQ_ACTIVE_PASS_TASK_CLAIM, Code.PARAM_ERROR, data);
+        }
         if (def.config().getTaskType() == TaskConstant.TaskType.ACTIVE_PASS_DAILY && data.getDay() != day) {
-            return response(REQ_ACTIVE_PASS_TASK_CLAIM, Code.NOT_FOUND, data);
+            return response(ctx, REQ_ACTIVE_PASS_TASK_CLAIM, Code.NOT_FOUND, data);
         }
         Map<Integer, ActivePassTask> tasks = def.config().getTaskType() == TaskConstant.TaskType.ACTIVE_PASS_DAILY
                 ? data.getDailyTasks() : data.getPeriodTasks();
         ActivePassTask task = tasks.get(def.config().getGroup());
-        if (task == null || task.getTaskId() != taskId) { return response(REQ_ACTIVE_PASS_TASK_CLAIM, Code.NOT_FOUND, data); }
-        if (task.isClaimed()) { return response(REQ_ACTIVE_PASS_TASK_CLAIM, Code.SUCCESS, data); }
+        if (task == null || task.getTaskId() != taskId) {
+            return response(ctx, REQ_ACTIVE_PASS_TASK_CLAIM, Code.NOT_FOUND, data);
+        }
+        if (task.isClaimed()) {
+            return response(ctx, REQ_ACTIVE_PASS_TASK_CLAIM, Code.SUCCESS, data);
+        }
         pollStates(ctx, data, null);
-        if (task.getProgress() < def.condition().target()) { return response(REQ_ACTIVE_PASS_TASK_CLAIM, Code.FAIL, data); }
+        if (task.getProgress() < def.condition().target()) {
+            return response(ctx, REQ_ACTIVE_PASS_TASK_CLAIM, Code.FAIL, data);
+        }
         // 通行证任务只产生通行证积分，不调用积分大奖的积分入口。
         data.setPoints(Math.addExact(data.getPoints(), def.config().getIntegralNum()));
         task.setClaimed(true);
@@ -210,42 +260,48 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         }
         saves.enqueueSave(data);
         notifyUpdate(ctx, false, taskInfos(data));
-        return response(REQ_ACTIVE_PASS_TASK_CLAIM, Code.SUCCESS, data);
+        return response(ctx, REQ_ACTIVE_PASS_TASK_CLAIM, Code.SUCCESS, data);
     }
 
     public ResActivePass buyPoints(SimPlayerContext ctx, int passId, int count, int expectedPurchasedPoints) {
         ActivePassData data = ensureCurrent(ctx, System.currentTimeMillis());
-        if (!matches(data, passId)) { return response(REQ_ACTIVE_PASS_BUY_POINTS, Code.NOT_FOUND, data); }
+        if (!matches(data, passId)) {
+            return response(ctx, REQ_ACTIVE_PASS_BUY_POINTS, Code.NOT_FOUND, data);
+        }
         var price = config.purchasePrice();
         if (price == null || count <= 0 || expectedPurchasedPoints != data.getPurchasedPoints()) {
-            return response(REQ_ACTIVE_PASS_BUY_POINTS, Code.PARAM_ERROR, data);
+            return response(ctx, REQ_ACTIVE_PASS_BUY_POINTS, Code.PARAM_ERROR, data);
         }
         long points = (long) count * price.points();
         var period = config.index().period(passId);
         long maximum = period.rewards().getLast().getActivePoints();
         if (points > price.limit() - (long) data.getPurchasedPoints() || data.getPoints() >= maximum
                 || points > maximum - data.getPoints() || price.count() > Long.MAX_VALUE / count) {
-            return response(REQ_ACTIVE_PASS_BUY_POINTS, Code.PARAM_ERROR, data);
+            return response(ctx, REQ_ACTIVE_PASS_BUY_POINTS, Code.PARAM_ERROR, data);
         }
         var player = ctx.getPlayer() == null ? players.get(ctx.playerId()) : ctx.getPlayer();
-        if (player == null) { return response(REQ_ACTIVE_PASS_BUY_POINTS, Code.NOT_FOUND, data); }
+        if (player == null) {
+            return response(ctx, REQ_ACTIVE_PASS_BUY_POINTS, Code.NOT_FOUND, data);
+        }
         var result = pack.removeItems(player, Map.of(price.itemId(), price.count() * count),
                 AddType.ACTIVITY, "active-pass-points:" + passId);
         if (result == null || !result.success()) {
-            return response(REQ_ACTIVE_PASS_BUY_POINTS, result == null ? Code.EXCEPTION : result.code, data);
+            return response(ctx, REQ_ACTIVE_PASS_BUY_POINTS, result == null ? Code.EXCEPTION : result.code, data);
         }
         data.setPurchasedPoints(data.getPurchasedPoints() + (int) points);
         data.setPoints(data.getPoints() + points);
         saves.enqueueSave(data);
         notifyUpdate(ctx, false, List.of());
-        return response(REQ_ACTIVE_PASS_BUY_POINTS, Code.SUCCESS, data);
+        return response(ctx, REQ_ACTIVE_PASS_BUY_POINTS, Code.SUCCESS, data);
     }
 
     public ResActivePass claimRewards(SimPlayerContext ctx, int passId, int rewardId, int track) {
         ActivePassData data = ensureCurrent(ctx, System.currentTimeMillis());
-        if (!matches(data, passId)) { return response(REQ_ACTIVE_PASS_REWARD_CLAIM, Code.NOT_FOUND, data); }
+        if (!matches(data, passId)) {
+            return response(ctx, REQ_ACTIVE_PASS_REWARD_CLAIM, Code.NOT_FOUND, data);
+        }
         if (rewardId < 0 || (track != 0 && track != FREE && track != BASIC && track != PREMIUM)) {
-            return response(REQ_ACTIVE_PASS_REWARD_CLAIM, Code.PARAM_ERROR, data);
+            return response(ctx, REQ_ACTIVE_PASS_REWARD_CLAIM, Code.PARAM_ERROR, data);
         }
         Map<Integer, Long> items = new LinkedHashMap<>();
         Map<Integer, Integer> claims = new LinkedHashMap<>();
@@ -254,12 +310,12 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         if (!items.isEmpty()) {
             var result = pack.addItems(ctx.playerId(), items, AddType.ACTIVITY, "active-pass:" + passId, true);
             if (result == null || !result.success()) {
-                return response(REQ_ACTIVE_PASS_REWARD_CLAIM, result == null ? Code.EXCEPTION : result.code, data);
+                return response(ctx, REQ_ACTIVE_PASS_REWARD_CLAIM, result == null ? Code.EXCEPTION : result.code, data);
             }
             data.getClaimedRewards().putAll(claims);
             saves.enqueueSave(data);
         }
-        response = response(REQ_ACTIVE_PASS_REWARD_CLAIM, Code.SUCCESS, data);
+        response = response(ctx, REQ_ACTIVE_PASS_REWARD_CLAIM, Code.SUCCESS, data);
         response.items = ItemUtils.buildItemInfo(items);
         return response;
     }
@@ -267,15 +323,23 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
     private void collect(ActivePassData data, int rewardId, int requestedTrack,
                          Map<Integer, Long> items, Map<Integer, Integer> claims) {
         var period = config.index().period(data.getPassId());
-        if (period == null) { throw new IllegalStateException("历史通行证配置不存在: " + data.getPassId()); }
+        if (period == null) {
+            throw new IllegalStateException("历史通行证配置不存在: " + data.getPassId());
+        }
         for (PassRewardCfg reward : period.rewards()) {
-            if (reward.getActivePoints() > data.getPoints() || (rewardId != 0 && reward.getId() != rewardId)) { continue; }
+            if (reward.getActivePoints() > data.getPoints() || (rewardId != 0 && reward.getId() != rewardId)) {
+                continue;
+            }
             int mask = data.getClaimedRewards().getOrDefault(reward.getId(), 0);
             for (int track : new int[]{FREE, BASIC, PREMIUM}) {
                 if ((requestedTrack != 0 && requestedTrack != track) || (mask & track) != 0
-                        || ((FREE | data.getPurchasedTracks()) & track) == 0) { continue; }
+                        || ((FREE | data.getPurchasedTracks()) & track) == 0) {
+                    continue;
+                }
                 Map<Integer, Long> rewards = rewards(reward, track);
-                if (rewards == null || rewards.isEmpty()) { continue; }
+                if (rewards == null || rewards.isEmpty()) {
+                    continue;
+                }
                 rewards.forEach((id, count) -> items.merge(id, count, Math::addExact));
                 mask |= track;
             }
@@ -292,9 +356,13 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         };
     }
 
-    /** 按期、按轨道幂等补发；邮件失败时保留旧期，下一次访问重试。 */
+    /**
+     * 按期、按轨道幂等补发；邮件失败时保留旧期，下一次访问重试。
+     */
     public void settle(ActivePassData data) {
-        if (data.isSettled()) { return; }
+        if (data.isSettled()) {
+            return;
+        }
         for (int track : new int[]{FREE, BASIC, PREMIUM}) {
             Map<Integer, Long> items = new LinkedHashMap<>();
             Map<Integer, Integer> claims = new LinkedHashMap<>();
@@ -315,41 +383,63 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
     }
 
     public boolean unlock(SimPlayerContext ctx, int passId, int track) {
-        if (track != BASIC && track != PREMIUM) { return false; }
+        if (track != BASIC && track != PREMIUM) {
+            return false;
+        }
         ActivePassData current = ensureCurrent(ctx, System.currentTimeMillis());
         ActivePassData data = matches(current, passId) ? current
                 : dao.findById(ActivePassData.key(ctx.playerId(), passId)).orElse(null);
-        if (data == null) { return false; }
+        if (data == null) {
+            return false;
+        }
         if ((data.getPurchasedTracks() & track) == 0) {
             data.setPurchasedTracks(data.getPurchasedTracks() | track);
             data.setSettled(false);
         }
-        if (data != current) { settle(data); }
+        if (data != current) {
+            settle(data);
+        }
         saveReceipt(data);
-        if (data == current) { notifyUpdate(ctx, false, List.of()); }
+        if (data == current) {
+            notifyUpdate(ctx, false, List.of());
+        }
         return true;
     }
 
-    /** 支付流程只有确认期数据已落库才允许创建订单/确认发货成功。 */
+    /**
+     * 支付流程只有确认期数据已落库才允许创建订单/确认发货成功。
+     */
     public void saveReceipt(ActivePassData data) {
         data.buildKey();
         saves.awaitPending();
         dao.save(data);
     }
 
-    private static boolean matches(ActivePassData data, int passId) { return data != null && data.getPassId() == passId; }
-    private static ActivePassTask newTask(int id) { ActivePassTask task = new ActivePassTask(); task.setTaskId(id); return task; }
+    private static boolean matches(ActivePassData data, int passId) {
+        return data != null && data.getPassId() == passId;
+    }
+
+    private static ActivePassTask newTask(int id) {
+        ActivePassTask task = new ActivePassTask();
+        task.setTaskId(id);
+        return task;
+    }
+
     private List<ActivePassTask> allTasks(ActivePassData data) {
         List<ActivePassTask> tasks = new ArrayList<>(data.getDailyTasks().values());
         tasks.addAll(data.getPeriodTasks().values());
         return tasks;
     }
+
     private List<ActivePassTaskInfo> taskInfos(ActivePassData data) {
         return data == null ? List.of() : allTasks(data).stream().map(this::taskInfo).filter(Objects::nonNull).toList();
     }
+
     private ActivePassTaskInfo taskInfo(ActivePassTask task) {
         var def = config.index().task(task.getTaskId());
-        if (def == null) { return null; }
+        if (def == null) {
+            return null;
+        }
         ActivePassTaskInfo info = new ActivePassTaskInfo();
         info.taskId = task.getTaskId();
         info.group = def.config().getGroup();
@@ -359,19 +449,27 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         info.status = task.isClaimed() ? 2 : info.progress >= info.target ? 1 : 0;
         return info;
     }
-    private ResActivePass response(int cmd, int code, ActivePassData data) {
+
+    private ResActivePass response(SimPlayerContext ctx, int cmd, int code, ActivePassData data) {
         ResActivePass response = new ResActivePass(code);
         response.requestCmd = cmd;
-        response.info = assemble(data);
+        response.info = assemble(ctx, data);
         return response;
     }
-    private ActivePassInfo assemble(ActivePassData data) {
+
+    private ActivePassInfo assemble(SimPlayerContext ctx, ActivePassData data) {
         ActivePassInfo info = new ActivePassInfo();
-        if (data == null) { return info; }
+        if (data == null) {
+            return info;
+        }
         info.passId = data.getPassId();
         info.endTime = data.getEndTime();
         info.points = data.getPoints();
-        info.level = config.index().period(info.passId).level(info.points);
+
+        var period = config.index().period(data.getPassId());
+        ActivePassCfg passCfg = period.config();
+
+        info.level = period.level(data.getPoints());
         info.purchasedPoints = data.getPurchasedPoints();
         info.purchasedTracks = data.getPurchasedTracks();
         info.day = data.getDay();
@@ -382,8 +480,33 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
             reward.claimedTracks = entry.getValue();
             return reward;
         }).toList();
+
+        info.passName = passCfg.getPassName();
+
+        //初级付费
+        ShopRechargeListCfg primary = GameDataManager.getShopRechargeListCfg(passCfg.getShopRechargeListID());
+        if (primary != null) {
+            info.primaryInfo = new RechargeIdInfo();
+            info.primaryInfo.price = primary.getGoogleShopId();
+            if (ctx.getPlayer().getLoginType() == LoginType.APPLE) {
+                info.primaryInfo.price = primary.getIosShopId();
+            }
+            info.primaryInfo.productId = passCfg.getId() + "_"+ BASIC;
+        }
+
+        //高级付费
+        ShopRechargeListCfg high = GameDataManager.getShopRechargeListCfg(passCfg.getShopRechargeList1ID());
+        if (high != null) {
+            info.highInfo = new RechargeIdInfo();
+            info.highInfo.price = high.getGoogleShopId();
+            if (ctx.getPlayer().getLoginType() == LoginType.APPLE) {
+                info.highInfo.price = high.getIosShopId();
+            }
+            info.highInfo.productId = passCfg.getId() + "_" + PREMIUM;
+        }
         return info;
     }
+
     private void notifyUpdate(SimPlayerContext ctx, boolean reset, List<ActivePassTaskInfo> tasks) {
         ActivePassData data = ctx.getActivePassData();
         NotifyActivePassUpdate message = new NotifyActivePassUpdate(Code.SUCCESS);

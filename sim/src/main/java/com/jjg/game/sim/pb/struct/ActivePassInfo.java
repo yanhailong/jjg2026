@@ -17,4 +17,10 @@ public class ActivePassInfo {
     public int day;
     public List<ActivePassTaskInfo> tasks;
     public List<ActivePassRewardInfo> rewards;
+    @ProtoDesc("名称多语言id")
+    public int passName;
+    @ProtoDesc("初级付费信息")
+    public RechargeIdInfo primaryInfo;
+    @ProtoDesc("高级付费信息")
+    public RechargeIdInfo highInfo;
 }
