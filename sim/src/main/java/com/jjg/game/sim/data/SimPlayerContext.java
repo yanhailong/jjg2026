@@ -510,8 +510,8 @@ public class SimPlayerContext {
         this.slotsStatisticsData.setAllWinCoin(this.slotsStatisticsData.getAllWinCoin() + statInfo.getWin());
         this.slotsStatisticsData.setAllBetCoin(this.slotsStatisticsData.getAllBetCoin() + statInfo.getBet());
 
-        this.slotsStatisticsData.setAllSpendPower(this.slotsStatisticsData.getAllSpendPower() + SimConstant.Common.SPIN_COST_POWER);
         if (slotsSpinResult != null) {
+            this.slotsStatisticsData.setAllSpendPower(this.slotsStatisticsData.getAllSpendPower() + SimConstant.Common.SPIN_COST_POWER);
             this.slotsStatisticsData.setAllSpendPowerGetCoin(this.slotsStatisticsData.getAllSpendPowerGetCoin() + slotsSpinResult.getSpendPowerGetCoin());
         }
     }
