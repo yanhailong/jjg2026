@@ -282,13 +282,6 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
 
     @Override
     @RpcCallSetting(processorModKey = "#arg0")
-    public boolean clearSlotsStatistics(long playerId) {
-        slotsStatisticsService.clear(simManager.createContextByPlayerId(playerId));
-        return true;
-    }
-
-    @Override
-    @RpcCallSetting(processorModKey = "#arg0")
     public ResSlotsStatistics requestSlotsStatistics(long playerId) {
         return slotsStatisticsService.request(simManager.createContextByPlayerId(playerId));
     }

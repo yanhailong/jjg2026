@@ -25,9 +25,6 @@ public interface ToSimBridge extends IGameRpc {
     /** 在玩家所属 SIM 节点购买迷你商店商品。 */
     ResBuyMiniShop buyMiniShop(long playerId, String productId);
 
-    /** 在玩家所属 SIM 节点清空本轮 slots 统计。 */
-    boolean clearSlotsStatistics(long playerId);
-
     /** 在玩家所属 SIM 节点请求本轮 slots 统计。 */
     ResSlotsStatistics requestSlotsStatistics(long playerId);
 

@@ -52,10 +52,7 @@ public class SlotsStatisticsService {
         }
 
         GlobalConfigCfg globalConfigCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.SLOTS_STATISTICS_SHOW);
-        if (globalConfigCfg != null || data.getSpinCount() < globalConfigCfg.getIntValue()) {
-            //删除成功后再标记，删除失败时仍可重试或离线保存。
-            slotsStatisticsDao.deleteById(ctx.playerId());
-            data.setClientReq(true);
+        if (globalConfigCfg == null || data.getSpinCount() < globalConfigCfg.getIntValue()) {
             return res;
         }
 
