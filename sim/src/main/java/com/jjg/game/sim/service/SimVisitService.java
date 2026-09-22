@@ -137,7 +137,6 @@ public class SimVisitService implements IRedDotService {
                         simRobotService.bind(playerId, bindPlayerId);
                     }
                 }
-                System.out.println(bindPlayerId);
                 target = findTarget(ctx.playerId(), bindPlayerId, casinoId);
             } else {
                 target = findTarget(ctx.playerId(), playerId, casinoId);

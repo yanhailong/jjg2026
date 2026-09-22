@@ -71,12 +71,11 @@ public class SlotsStatisticsService {
         info.allSpendPowerGetCoin = data.getAllSpendPowerGetCoin();
 
         //总盈利
-        long slotsRealWin = data.getAllSpendPowerGetCoin() + data.getAllBetCoin() - data.getAllBetCoin();
+        long slotsRealWin = data.getAllSpendPowerGetCoin() + data.getAllWinCoin() - data.getAllBetCoin();
         if (slotsRealWin > ctx.getSimBaseData().getSlotsAthWinCoin()) {
             info.ath = true;
             ctx.getSimBaseData().setSlotsAthWinCoin(slotsRealWin);
         }
-
         //删除成功后再标记，删除失败时仍可重试或离线保存。
         slotsStatisticsDao.deleteById(ctx.playerId());
         data.setClientReq(true);

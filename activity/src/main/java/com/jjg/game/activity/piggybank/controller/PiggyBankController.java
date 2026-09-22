@@ -161,9 +161,6 @@ public class PiggyBankController extends BaseActivityController implements Order
                 .multiply(BigDecimal.valueOf(globalConfigCfg.getIntValue()))
                 .divide(GameConstant.TEN_THOUSAND_BD, RoundingMode.DOWN);
 
-
-        System.out.println(baseAdd);
-
         long activityId = activityData.getId();
         Map<Integer, PiggyBankCfg> baseCfgBeanMap = getDetailCfgBean(activityData);
         boolean changeStatus = false;
