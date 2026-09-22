@@ -12,7 +12,7 @@ import com.jjg.game.sim.pb.struct.SpecialGuestInfo;
 public class ResBuySpecialGuest extends AbstractResponse {
     @ProtoDesc("购买订单id，关联本次购买生成的特殊游客")
     public String orderId;
-    @ProtoDesc("特殊游客最新信息；广告购买成功时为替换后的展示配置")
+    @ProtoDesc("特殊游客最新信息，广告商品领取订单奖励成功后才替换")
     public SpecialGuestInfo specialGuest;
 
     public ResBuySpecialGuest(int code) {

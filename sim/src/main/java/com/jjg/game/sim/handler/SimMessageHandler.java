@@ -731,7 +731,7 @@ public class SimMessageHandler implements GmListener {
     }
 
     /**
-     * 领取品质特殊游客订单奖励
+     * 领取广告或品质特殊游客订单奖励
      */
     @Command(SimConstant.MsgBean.REQ_SPECIAL_GUEST_REWARDS)
     public void reqSpecialGuestRewards(PlayerController playerController, ReqSpecialGuestRewards req) {

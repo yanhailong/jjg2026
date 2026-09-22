@@ -19,14 +19,19 @@ public class VisitorGenWatchVideoCfg extends BaseCfgBean {
   /** 配置表工作薄名 */
   public static final String SHEET_NAME = "VisitorGenWatchVideo";
 
+  /** 邀请成功后奖励，在游客离开后领取 */
+  protected Map<Integer,Long> RewardDisplay;
   /** 观看CD时间（min） */
   protected int ViewCD;
   /** 单个游客数量 */
   protected int VisitorCount;
   /** 游客道具ID */
   protected int VisitorID;
-  /** 客户端资源 */
-  protected String icon;
+
+  /** 返回邀请成功后奖励，在游客离开后领取 */
+  public Map<Integer,Long> getRewardDisplay() {
+    return RewardDisplay;
+  }
 
   /** 返回观看CD时间（min） */
   public int getViewCD() {
@@ -41,11 +46,6 @@ public class VisitorGenWatchVideoCfg extends BaseCfgBean {
   /** 返回游客道具ID */
   public int getVisitorID() {
     return VisitorID;
-  }
-
-  /** 返回客户端资源 */
-  public String getIcon() {
-    return icon;
   }
 
   @Override

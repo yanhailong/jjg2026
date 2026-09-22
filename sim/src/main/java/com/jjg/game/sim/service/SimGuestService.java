@@ -1,6 +1,5 @@
 package com.jjg.game.sim.service;
 
-import com.alibaba.fastjson.JSONObject;
 import com.jjg.game.alliance.service.AllianceEventService;
 import com.jjg.game.common.config.NodeConfig;
 import com.jjg.game.common.pb.ItemInfo;
@@ -1492,7 +1491,6 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             res.code = Code.EXCEPTION;
         }
         ctx.send(res);
-        log.error("特殊游客列表 res={}", JSONObject.toJSONString(res));
     }
 
     /**
@@ -1608,9 +1606,9 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                     res.code = result.code;
                     if (result.success()) {
                         res.orderId = orderId;
-                        VisitorGenWatchVideoCfg nextCfg = GameDataManager.getVisitorGenWatchVideoCfg(result.data);
-                        if (nextCfg != null) {
-                            res.specialGuest = toSpecialGuestInfo(ctx, baseData, nextCfg,
+                        VisitorGenWatchVideoCfg cfg = GameDataManager.getVisitorGenWatchVideoCfg(result.data);
+                        if (cfg != null) {
+                            res.specialGuest = toSpecialGuestInfo(ctx, baseData, cfg,
                                     getFirstSpecialGuestPoolCfg(casino, SimConstant.SpecialGuest.POOL_AD));
                         }
                     }
@@ -1688,7 +1686,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
     }
 
     /**
-     * 观看广告购买特殊游客。调用方需先完成卡池初始化；成功时返回替换后的广告配置 ID。
+     * 观看广告购买特殊游客。成功时保留当前商品，领取订单奖励后再替换。
      */
     private CommonResult<Integer> buySpecialGuestWithAd(SimPlayerContext ctx, SimBaseData baseData, String orderId, int poolId, int cfgId) {
         if (baseData.getSpecialGuestAdCfgIds() == null
@@ -1702,6 +1700,11 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         if (!validAdSpecialGuestCfg(cfg)) {
             log.warn("观看特殊游客广告失败，配置无效 playerId={},cfgId={}", ctx.playerId(), cfgId);
             return new CommonResult<>(Code.PARAM_ERROR);
+        }
+        if (ctx.getCurrentCasino().findBuySpecialGuestLogInfo(poolId, cfgId) != null) {
+            log.warn("观看特殊游客广告失败，该商品订单奖励尚未领取 playerId={},poolId={},cfgId={}",
+                    ctx.playerId(), poolId, cfgId);
+            return new CommonResult<>(Code.REPEAT_OP);
         }
         long now = System.currentTimeMillis();
         if (now < baseData.getSpecialGuestAdCdEndTime()) {
@@ -1728,14 +1731,13 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         }
         int newDailyCount = specialGuestDailyCountService.addAdCount(ctx.playerId());
         baseData.setSpecialGuestAdCdEndTime(now + (long) cfg.getViewCD() * TimeHelper.ONE_MINUTE_OF_MILLIS);
-        int nextCfgId = replaceSpecialGuestAdOffer(baseData, cfgId);
         updateSpecialGuestRedDot(ctx.playerId(), SimConstant.SpecialGuest.RED_DOT_AD_AVAILABLE);
         baseData.incWatchAdCount();
         allianceEventService.onAdWatch(ctx.playerId());
-        log.info("观看特殊游客广告成功 playerId={},cfgId={},nextCfgId={},visitorItemId={},visitorCount={},dailyBuyCount={},cdEndTime={}",
-                ctx.playerId(), cfgId, nextCfgId, cfg.getVisitorID(), cfg.getVisitorCount(), newDailyCount,
+        log.info("观看特殊游客广告成功 playerId={},cfgId={},orderId={},visitorItemId={},visitorCount={},dailyBuyCount={},cdEndTime={}",
+                ctx.playerId(), cfgId, orderId, cfg.getVisitorID(), cfg.getVisitorCount(), newDailyCount,
                 baseData.getSpecialGuestAdCdEndTime());
-        return new CommonResult<>(Code.SUCCESS, nextCfgId);
+        return new CommonResult<>(Code.SUCCESS, cfgId);
     }
 
     /**
@@ -2050,8 +2052,21 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             }
             if (baseData.getSpecialGuestAdCfgIds() == null
                     || isSpecialGuestRefreshDue(baseData.getSpecialGuestAdNextRefreshTime(), now)) {
-                baseData.setSpecialGuestAdCfgIds(selectCfgIds(
-                        GameDataManager.getVisitorGenWatchVideoCfgList(), adPoolCfg.getDisplayCount(), Collections.emptySet()));
+                Set<Integer> pendingCfgIds = new LinkedHashSet<>();
+                if (casino.getSpecialGuestMap() != null) {
+                    for (BuySpecialGuestLogInfo order : casino.getSpecialGuestMap().values()) {
+                        if (order.getPoolId() == adPoolCfg.getId()) {
+                            pendingCfgIds.add(order.getCfgId());
+                        }
+                    }
+                }
+                List<Integer> adCfgIds = new ArrayList<>(pendingCfgIds);
+                List<VisitorGenWatchVideoCfg> candidates = GameDataManager.getVisitorGenWatchVideoCfgList();
+                if (candidates != null && !pendingCfgIds.isEmpty()) {
+                    candidates = candidates.stream().filter(cfg -> !pendingCfgIds.contains(cfg.getId())).toList();
+                }
+                adCfgIds.addAll(selectCfgIds(candidates, adPoolCfg.getDisplayCount() - adCfgIds.size(), Collections.emptySet()));
+                baseData.setSpecialGuestAdCfgIds(adCfgIds);
                 baseData.setSpecialGuestAdNextRefreshTime(nextSpecialGuestRefreshTime(adPoolCfg, now));
             }
         }
@@ -2242,7 +2257,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
     }
 
     /**
-     * 合并广告、付费和本轮已命中的品质商品，并填充跨节点每日计数。
+     * 合并当前展示商品与全部购买订单，刷新后仍保留每笔订单的入口。
      */
     private List<SpecialGuestInfo> buildSpecialGuestList(SimPlayerContext ctx, SimBaseData baseData) {
         List<SpecialGuestInfo> result = new ArrayList<>();
@@ -2280,12 +2295,64 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             for (int cfgId : entry.getValue()) {
                 VisitorQualityAcquisitionCfg cfg = GameDataManager.getVisitorQualityAcquisitionCfg(cfgId);
                 if (validQualitySpecialGuestCfg(cfg)) {
+                    //本轮买过的商品由订单行展示；刷新后次数清零，新商品与旧订单分别展示。
+                    if (casino.getSpecialGuestPurchaseCounts().getOrDefault(specialGuestPurchaseKey(poolCfg.getId(), cfgId), 0) > 0
+                            && casino.findBuySpecialGuestLogInfo(poolCfg.getId(), cfgId) != null) {
+                        continue;
+                    }
                     result.add(toSpecialGuestInfo(ctx, cfg, poolCfg));
                 }
             }
         }
 
 
+        if (casino.getSpecialGuestMap() != null) {
+            Set<String> displayedOrderIds = new HashSet<>();
+            for (SpecialGuestInfo info : result) {
+                if (info.orderId != null) {
+                    displayedOrderIds.add(info.orderId);
+                }
+            }
+            for (Map.Entry<String, BuySpecialGuestLogInfo> entry : casino.getSpecialGuestMap().entrySet()) {
+                if (displayedOrderIds.contains(entry.getKey())) {
+                    continue;
+                }
+                BuySpecialGuestLogInfo order = entry.getValue();
+                VisitorTargetListCfg poolCfg = GameDataManager.getVisitorTargetListCfg(order.getPoolId());
+                if (poolCfg == null || poolCfg.getRegionID() != casino.getCasinoId()) {
+                    log.warn("购买游客订单展示失败，卡池配置不存在或场景不匹配 playerId={},orderId={},poolId={}",
+                            ctx.playerId(), entry.getKey(), order.getPoolId());
+                    continue;
+                }
+                SpecialGuestInfo info = null;
+                if (poolCfg.getPoolType() == SimConstant.SpecialGuest.POOL_AD) {
+                    VisitorGenWatchVideoCfg cfg = GameDataManager.getVisitorGenWatchVideoCfg(order.getCfgId());
+                    if (cfg != null) {
+                        info = toSpecialGuestInfo(ctx, baseData, cfg, poolCfg);
+                    }
+                } else if (poolCfg.getPoolType() == SimConstant.SpecialGuest.POOL_QUALITY) {
+                    VisitorQualityAcquisitionCfg cfg = GameDataManager.getVisitorQualityAcquisitionCfg(order.getCfgId());
+                    if (cfg != null) {
+                        info = toSpecialGuestInfo(ctx, cfg, poolCfg);
+                    }
+                } else if (poolCfg.getPoolType() == SimConstant.SpecialGuest.POOL_PAID) {
+                    VisitorGenPaidCfg cfg = GameDataManager.getVisitorGenPaidCfg(order.getCfgId());
+                    if (cfg != null) {
+                        info = toSpecialGuestInfo(ctx, cfg, poolCfg);
+                    }
+                }
+                if (info == null) {
+                    log.warn("购买游客订单展示失败，商品配置不存在或卡池类型无效 playerId={},orderId={},poolId={},cfgId={}",
+                            ctx.playerId(), entry.getKey(), order.getPoolId(), order.getCfgId());
+                    continue;
+                }
+                info.orderId = entry.getKey();
+                if (poolCfg.getPoolType() != SimConstant.SpecialGuest.POOL_PAID) {
+                    updateSpecialGuestButtonStatus(casino, info);
+                }
+                result.add(info);
+            }
+        }
         return result;
     }
 
@@ -2299,14 +2366,14 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         info.price = "0";
         info.dailyBuyCount = specialGuestDailyCountService.getAdCount(ctx.playerId());
         info.dailyLimitCount = poolCfg.getDailyViewLimit();
-        //广告领取后立即刷新该槽位，因此返回的始终是尚未购买的新展示。
         info.viewCd = cfg.getViewCD();
         info.viewCdEndTime = baseData.getSpecialGuestAdCdEndTime();
-        info.output = getSpecialGuestOutput(ctx, info.itemId);
+        info.output = ItemUtils.buildItemInfo(cfg.getRewardDisplay());
         info.visitorGiftPackCount = poolCfg.getVisitorGiftPackCount();
         info.poolId = poolCfg.getId();
         info.maxPurchasePerRefresh = GameDataManager.getGlobalConfigCfg(SimConstant.Global.SPECIAL_GUEST_MAX_PURCHASE_PER_REFRESH).getIntValue();
 
+        updateSpecialGuestButtonStatus(ctx.getCurrentCasino(), info);
         return info;
     }
 
@@ -2350,7 +2417,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         info.poolId = poolCfg.getId();
         info.maxPurchasePerRefresh = GameDataManager.getGlobalConfigCfg(SimConstant.Global.SPECIAL_GUEST_MAX_PURCHASE_PER_REFRESH).getIntValue();
 
-        updateSpecialGuestButtonStatus(ctx.getCurrentCasino(), info);
+        updateSpecialGuestPurchaseButtonStatus(info);
         return info;
     }
 
@@ -2360,7 +2427,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         info.btnStatus = dailyLimitReached || refreshLimitReached ? 1 : 0;
     }
 
-    /** 品质卡池已购订单的等待、领奖状态优先于限购状态。 */
+    /** 广告和品质卡池已购订单的等待、领奖状态优先于限购状态。 */
     private void updateSpecialGuestButtonStatus(SimCasinoData casino, SpecialGuestInfo info) {
         updateSpecialGuestPurchaseButtonStatus(info);
         BuySpecialGuestLogInfo logInfo;
@@ -2416,7 +2483,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         return completed;
     }
 
-    /** 游客奖励全部领取或订单超过十分钟后可领品质商品奖励，入账成功后删除订单记录。 */
+    /** 游客奖励全部领取或订单超过十分钟后可领广告、品质商品奖励，入账成功后删除订单记录。 */
     public void claimSpecialGuestRewards(SimPlayerContext ctx, String orderId) {
         ResSpecialGuestRewards res = new ResSpecialGuestRewards(Code.SUCCESS);
         try {
@@ -2436,7 +2503,8 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                 return;
             }
             VisitorTargetListCfg poolCfg = GameDataManager.getVisitorTargetListCfg(logInfo.getPoolId());
-            if (poolCfg == null || poolCfg.getPoolType() != SimConstant.SpecialGuest.POOL_QUALITY
+            if (poolCfg == null || (poolCfg.getPoolType() != SimConstant.SpecialGuest.POOL_QUALITY
+                    && poolCfg.getPoolType() != SimConstant.SpecialGuest.POOL_AD)
                     || poolCfg.getRegionID() != casino.getCasinoId()) {
                 res.code = Code.PARAM_ERROR;
                 log.warn("领取特殊游客订单奖励失败，卡池配置不存在、类型或场景不匹配 playerId={},casinoId={},orderId={},poolId={},poolType={},regionId={}",
@@ -2444,12 +2512,25 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                         poolCfg == null ? null : poolCfg.getPoolType(), poolCfg == null ? null : poolCfg.getRegionID());
                 return;
             }
-            VisitorQualityAcquisitionCfg cfg = GameDataManager.getVisitorQualityAcquisitionCfg(logInfo.getCfgId());
-            if (cfg == null) {
-                res.code = Code.SAMPLE_ERROR;
-                log.warn("领取特殊游客订单奖励失败，品质商品配置不存在 playerId={},orderId={},poolId={},cfgId={}",
-                        ctx.playerId(), orderId, logInfo.getPoolId(), logInfo.getCfgId());
-                return;
+            Map<Integer, Long> rewards;
+            if (poolCfg.getPoolType() == SimConstant.SpecialGuest.POOL_AD) {
+                VisitorGenWatchVideoCfg cfg = GameDataManager.getVisitorGenWatchVideoCfg(logInfo.getCfgId());
+                if (cfg == null) {
+                    res.code = Code.SAMPLE_ERROR;
+                    log.warn("领取特殊游客订单奖励失败，广告商品配置不存在 playerId={},orderId={},poolId={},cfgId={}",
+                            ctx.playerId(), orderId, logInfo.getPoolId(), logInfo.getCfgId());
+                    return;
+                }
+                rewards = cfg.getRewardDisplay();
+            } else {
+                VisitorQualityAcquisitionCfg cfg = GameDataManager.getVisitorQualityAcquisitionCfg(logInfo.getCfgId());
+                if (cfg == null) {
+                    res.code = Code.SAMPLE_ERROR;
+                    log.warn("领取特殊游客订单奖励失败，品质商品配置不存在 playerId={},orderId={},poolId={},cfgId={}",
+                            ctx.playerId(), orderId, logInfo.getPoolId(), logInfo.getCfgId());
+                    return;
+                }
+                rewards = cfg.getRewardDisplay();
             }
             if (!canClaimSpecialGuestRewards(casino, logInfo, System.currentTimeMillis())) {
                 res.code = Code.FAIL;
@@ -2457,7 +2538,6 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                         ctx.playerId(), casino.getCasinoId(), orderId, logInfo.getPoolId(), logInfo.getCfgId());
                 return;
             }
-            Map<Integer, Long> rewards = cfg.getRewardDisplay();
             if (rewards != null && !rewards.isEmpty()) {
                 CommonResult<ItemOperationResult> result = playerPackService.addItems(
                         ctx.playerId(), rewards, AddType.SIM_GUEST_REWARDS, null, false);
@@ -2473,6 +2553,9 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                 casino.setSpecialGuestMap(null);
             }
             ctx.setLastSaveTime(0);
+            if (poolCfg.getPoolType() == SimConstant.SpecialGuest.POOL_AD) {
+                replaceSpecialGuestAdOffer(ctx.getSimBaseData(), logInfo.getCfgId());
+            }
             res.items = rewards == null || rewards.isEmpty() ? Collections.emptyList() : ItemUtils.buildItemInfo(rewards);
         } catch (Exception e) {
             log.error("领取特殊游客订单奖励异常 playerId={},orderId={}", ctx.playerId(), orderId, e);

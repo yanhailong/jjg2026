@@ -94,6 +94,204 @@ class SimGuestQualityPoolTest {
     }
 
     @Test
+    void adPurchaseRetainsOfferAndReportsOrderProgress() {
+        VisitorTargetListCfg adPool = pool(10, POOL_AD, 100);
+        VisitorGenWatchVideoCfg ad = mock(VisitorGenWatchVideoCfg.class);
+        when(ad.getId()).thenReturn(201);
+        when(ad.getVisitorID()).thenReturn(1001);
+        when(ad.getVisitorCount()).thenReturn(1);
+        when(ad.getRewardDisplay()).thenReturn(Map.of(2002, 8L));
+        data.when(() -> GameDataManager.getVisitorGenWatchVideoCfg(201)).thenReturn(ad);
+        base.setSpecialGuestAdCfgIds(List.of(201));
+        ReflectionTestUtils.setField(service, "redDotManager", mock(RedDotManager.class));
+        ReflectionTestUtils.setField(service, "allianceEventService", mock(AllianceEventService.class));
+        doAnswer(invocation -> {
+            PurchasedGuestData guest = new PurchasedGuestData();
+            guest.setUid("ad-guest");
+            guest.setOrderId(invocation.getArgument(1));
+            guest.setPoolId(10);
+            guest.setCfgId(201);
+            guest.setDestinations(Map.of(0, new com.jjg.game.sim.pb.struct.DestinationInfo()));
+            casino.addPurchasedGuest(guest);
+            return Code.SUCCESS;
+        }).when(service).invitePurchasedSpecialGuest(eq(ctx), anyString(), eq(10), eq(201), eq(1001), eq(1L));
+
+        service.buySpecialGuest(ctx, 10, 201, COST_AD, 0);
+        ArgumentCaptor<ResBuySpecialGuest> response = ArgumentCaptor.forClass(ResBuySpecialGuest.class);
+        verify(ctx).send(response.capture());
+        ResBuySpecialGuest result = response.getValue();
+        assertEquals(Code.SUCCESS, result.code);
+        assertEquals(List.of(201), base.getSpecialGuestAdCfgIds());
+        assertEquals(201, result.specialGuest.id);
+        assertEquals(result.orderId, result.specialGuest.orderId);
+        assertEquals(2, result.specialGuest.btnStatus);
+        assertEquals(0, result.specialGuest.guestCountKVInfo.key);
+        assertEquals(1, result.specialGuest.guestCountKVInfo.value);
+        assertEquals(2002, result.specialGuest.output.getFirst().itemId);
+
+        service.buySpecialGuest(ctx, 10, 201, COST_AD, 0);
+        verify(ctx, times(2)).send(response.capture());
+        assertEquals(Code.REPEAT_OP, response.getValue().code);
+        verify(counts, times(1)).addAdCount(1L);
+        casino.removePurchasedGuest("ad-guest");
+        SpecialGuestInfo ready = ReflectionTestUtils.invokeMethod(service, "toSpecialGuestInfo", ctx, base, ad, adPool);
+        assertEquals(3, ready.btnStatus);
+        assertEquals(1, ready.guestCountKVInfo.key);
+        casino.setSpecialGuestMap(null);
+        when(adPool.getDailyViewLimit()).thenReturn(1);
+        when(counts.getAdCount(1L)).thenReturn(1);
+        SpecialGuestInfo limited = ReflectionTestUtils.invokeMethod(service, "toSpecialGuestInfo", ctx, base, ad, adPool);
+        assertEquals(1, limited.btnStatus);
+        when(counts.getAdCount(1L)).thenReturn(0);
+        SpecialGuestInfo available = ReflectionTestUtils.invokeMethod(service, "toSpecialGuestInfo", ctx, base, ad, adPool);
+        assertEquals(0, available.btnStatus);
+    }
+
+    @Test
+    void timedAdRefreshKeepsPendingOfferAndRefreshesRemainingSlots() {
+        VisitorTargetListCfg adPool = pool(10, POOL_AD, 100);
+        when(adPool.getDisplayCount()).thenReturn(2);
+        VisitorGenWatchVideoCfg pending = mock(VisitorGenWatchVideoCfg.class);
+        when(pending.getId()).thenReturn(201);
+        VisitorGenWatchVideoCfg next = mock(VisitorGenWatchVideoCfg.class);
+        when(next.getId()).thenReturn(202);
+        data.when(GameDataManager::getVisitorGenWatchVideoCfgList).thenReturn(List.of(pending, next));
+        BuySpecialGuestLogInfo order = new BuySpecialGuestLogInfo();
+        order.setPoolId(10);
+        order.setCfgId(201);
+        casino.setSpecialGuestMap(Map.of("order", order));
+        base.setSpecialGuestAdCfgIds(List.of(201, 203));
+        base.setSpecialGuestAdNextRefreshTime(1L);
+        assertEquals(true, ReflectionTestUtils.invokeMethod(service, "ensureSpecialGuestOffers", ctx, 2L));
+        assertEquals(List.of(201, 202), base.getSpecialGuestAdCfgIds());
+    }
+
+    @Test
+    void refreshedListKeepsEveryOrderWithItsOwnStatus() {
+        quality(102, COST_DIAMOND, Map.of(1001, 1L));
+        when(qualityPool.getVisitorWeight()).thenReturn(List.of(List.of(102, 1)));
+        PurchasedGuestData waiting = new PurchasedGuestData();
+        waiting.setUid("waiting");
+        waiting.setOrderId("quality-waiting");
+        waiting.setPoolId(30);
+        waiting.setCfgId(101);
+        waiting.setDestinations(Map.of(0, new com.jjg.game.sim.pb.struct.DestinationInfo()));
+        casino.addPurchasedGuest(waiting);
+        BuySpecialGuestLogInfo ready = new BuySpecialGuestLogInfo();
+        ready.setPoolId(30);
+        ready.setCfgId(101);
+        ready.setCreateTime(System.currentTimeMillis());
+        ready.setGuestIds(Set.of("removed"));
+        casino.getSpecialGuestMap().put("quality-ready", ready);
+
+        VisitorGenWatchVideoCfg ad = mock(VisitorGenWatchVideoCfg.class);
+        when(ad.getId()).thenReturn(201);
+        when(ad.getRewardDisplay()).thenReturn(Map.of(2002, 1L));
+        data.when(() -> GameDataManager.getVisitorGenWatchVideoCfg(201)).thenReturn(ad);
+        BuySpecialGuestLogInfo adOrder = new BuySpecialGuestLogInfo();
+        adOrder.setPoolId(10);
+        adOrder.setCfgId(201);
+        adOrder.setGuestIds(Set.of("removed-ad"));
+        casino.getSpecialGuestMap().put("ad-order", adOrder);
+
+        ReflectionTestUtils.invokeMethod(service, "refreshQualitySpecialGuestOffers", casino, List.of(qualityPool));
+        assertEquals(List.of(102), casino.getSpecialGuestQualityCfgIds().get(30));
+        List<SpecialGuestInfo> infos = ReflectionTestUtils.invokeMethod(service, "buildSpecialGuestList", ctx, base);
+        assertEquals(4, infos.size());
+        Map<String, SpecialGuestInfo> orders = new HashMap<>();
+        for (SpecialGuestInfo info : infos) {
+            if (info.orderId != null) {
+                assertNull(orders.put(info.orderId, info));
+            }
+        }
+        assertEquals(casino.getSpecialGuestMap().keySet(), orders.keySet());
+        assertEquals(2, orders.get("quality-waiting").btnStatus);
+        assertEquals(0, orders.get("quality-waiting").guestCountKVInfo.key);
+        assertEquals(3, orders.get("quality-ready").btnStatus);
+        assertEquals(1, orders.get("quality-ready").guestCountKVInfo.key);
+        assertEquals(3, orders.get("ad-order").btnStatus);
+
+        casino.setSpecialGuestQualityCfgIds(Map.of(30, List.of(101)));
+        infos = ReflectionTestUtils.invokeMethod(service, "buildSpecialGuestList", ctx, base);
+        assertEquals(4, infos.size());
+        assertNull(infos.getFirst().orderId);
+        assertEquals(0, infos.getFirst().btnStatus);
+        assertEquals(4, infos.stream().map(info -> info.orderId).distinct().count());
+    }
+
+    @Test
+    void manualRefreshShowsThreeNewOffersBeforeThreePurchasedOrders() {
+        VisitorGenWatchVideoCfg ad = mock(VisitorGenWatchVideoCfg.class);
+        when(ad.getId()).thenReturn(201);
+        data.when(() -> GameDataManager.getVisitorGenWatchVideoCfg(201)).thenReturn(ad);
+        base.setSpecialGuestAdCfgIds(List.of(201));
+        for (int id = 102; id <= 106; id++) {
+            quality(id, COST_DIAMOND, Map.of(1001, 1L));
+        }
+        casino.setSpecialGuestQualityCfgIds(Map.of(30, List.of(101, 102, 103)));
+        ReflectionTestUtils.setField(service, "redDotManager", mock(RedDotManager.class));
+        doAnswer(invocation -> {
+            VisitorQualityAcquisitionCfg bought = invocation.getArgument(3);
+            PurchasedGuestData guest = new PurchasedGuestData();
+            guest.setUid("guest-" + bought.getId());
+            guest.setOrderId(invocation.getArgument(1));
+            guest.setPoolId(30);
+            guest.setCfgId(bought.getId());
+            guest.setDestinations(Map.of(0, new com.jjg.game.sim.pb.struct.DestinationInfo()));
+            casino.addPurchasedGuest(guest);
+            return Code.SUCCESS;
+        }).when(service).inviteQualitySpecialGuests(eq(ctx), anyString(), eq(30), any());
+        List<SpecialGuestInfo> initial = ReflectionTestUtils.invokeMethod(service, "buildSpecialGuestList", ctx, base);
+        assertEquals(4, initial.size());
+        assertTrue(initial.stream().allMatch(info -> info.btnStatus == 0 && info.orderId == null));
+        try (var items = mockStatic(ItemUtils.class)) {
+            items.when(ItemUtils::getDiamondItemId).thenReturn(5);
+            when(pack.removeItem(ctx.getPlayer(), 5, 10, AddType.SIM_SPECIAL_GUEST_BUY)).thenReturn(new CommonResult<>(Code.SUCCESS));
+            for (int id = 101; id <= 103; id++) {
+                service.buySpecialGuest(ctx, 30, id, COST_DIAMOND, 0);
+            }
+        }
+        List<SpecialGuestInfo> purchased = ReflectionTestUtils.invokeMethod(service, "buildSpecialGuestList", ctx, base);
+        assertEquals(4, purchased.size());
+        assertEquals(0, purchased.getFirst().btnStatus);
+        assertTrue(purchased.subList(1, 4).stream().allMatch(info -> info.btnStatus == 2 && info.orderId != null));
+        Set<String> orderIds = new HashSet<>(casino.getSpecialGuestMap().keySet());
+
+        when(qualityPool.getDisplayCount()).thenReturn(3);
+        when(qualityPool.getVisitorWeight()).thenReturn(List.of(List.of(104, 1), List.of(105, 1), List.of(106, 1)));
+        when(cache.getSpecialGuestRefreshCosts()).thenReturn(List.of(new Item(1980000, 0)));
+        clearInvocations(ctx);
+        service.refreshSpecialGuests(ctx);
+        ArgumentCaptor<ResSpecialGuestList> response = ArgumentCaptor.forClass(ResSpecialGuestList.class);
+        verify(ctx).send(response.capture());
+        assertEquals(Code.SUCCESS, response.getValue().code);
+        List<SpecialGuestInfo> refreshed = response.getValue().specialGuestList;
+        assertEquals(7, refreshed.size());
+        assertEquals(201, refreshed.getFirst().id);
+        assertTrue(refreshed.subList(0, 4).stream().allMatch(info -> info.btnStatus == 0 && info.orderId == null));
+        assertEquals(Set.of(104, 105, 106), refreshed.subList(1, 4).stream().map(info -> info.id).collect(java.util.stream.Collectors.toSet()));
+        assertTrue(refreshed.subList(4, 7).stream().allMatch(info -> info.btnStatus == 2));
+        assertEquals(orderIds, refreshed.subList(4, 7).stream().map(info -> info.orderId).collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    void paidOrdersRemainListedWithoutChangingPaidButtonRules() {
+        VisitorGenPaidCfg paid = mock(VisitorGenPaidCfg.class);
+        when(paid.getId()).thenReturn(201);
+        when(paid.getCostType()).thenReturn(COST_DIAMOND);
+        data.when(() -> GameDataManager.getVisitorGenPaidCfg(201)).thenReturn(paid);
+        BuySpecialGuestLogInfo order = new BuySpecialGuestLogInfo();
+        order.setPoolId(20);
+        order.setCfgId(201);
+        order.setGuestIds(Set.of("removed"));
+        casino.setSpecialGuestMap(Map.of("paid-order", order));
+        List<SpecialGuestInfo> infos = ReflectionTestUtils.invokeMethod(service, "buildSpecialGuestList", ctx, base);
+        SpecialGuestInfo info = infos.stream().filter(item -> "paid-order".equals(item.orderId)).findFirst().orElseThrow();
+        assertEquals(0, info.btnStatus);
+        assertNull(info.guestCountKVInfo);
+    }
+
+    @Test
     void manualRefreshIncludesAllCurrentQualityPoolsWithoutPaidPoolOrManualSwitch() {
         when(cache.getVisitorTargetListCfg(1, POOL_PAID)).thenReturn(null);
         casino.setSpecialGuestPaidCfgIds(null);
