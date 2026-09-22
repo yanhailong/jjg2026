@@ -3,6 +3,7 @@ package com.jjg.game.sim.service;
 import com.jjg.game.alliance.service.AllianceEventService;
 import com.jjg.game.common.config.NodeConfig;
 import com.jjg.game.common.pb.ItemInfo;
+import com.jjg.game.common.proto.Pair;
 import com.jjg.game.common.utils.HttpUtils;
 import com.jjg.game.common.utils.RandomUtils;
 import com.jjg.game.common.utils.TimeHelper;
@@ -14,6 +15,7 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.dao.RedDotReadDao;
 import com.jjg.game.core.data.*;
+import com.jjg.game.core.listener.GameFunctionListener;
 import com.jjg.game.core.listener.ItemListener;
 import com.jjg.game.core.manager.RedDotManager;
 import com.jjg.game.core.pb.KVInfo;
@@ -59,7 +61,7 @@ import java.util.function.IntSupplier;
  * @date 2026/5/26
  */
 @Service
-public class SimGuestService implements SimPlayerTickListener, ItemListener, SimTaskStateReporter, IRedDotService {
+public class SimGuestService implements SimPlayerTickListener, ItemListener, SimTaskStateReporter, IRedDotService, GameFunctionListener {
     private static final Logger log = LoggerFactory.getLogger(SimGuestService.class);
     private static final List<Integer> RED_DOT_SUBMODULES = List.of(
             SimConstant.SpecialGuest.RED_DOT_FREE_REFRESH,
@@ -627,18 +629,23 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
 
     private void notifyGuestOutputLimit(SimPlayerContext ctx, CasinoStatsSheetCfg cfg, long now) {
         SimBaseData base = ctx.getSimBaseData();
-        long onlineTime = base.accumulateOnlineTime(now);
+        Pair<Long,Boolean> onlineTime = base.accumulateOnlineTime(now);
         if (base.isGuestOutputLimitNotified() || cfg.getVisitorDailyLimit() <= 0
                 || ctx.getPlayerController() == null) {
             return;
         }
         long threshold = cfg.getVisitorDailyLimit() * 60_000L
                 * SimConstant.Common.GUEST_OUTPUT_LIMIT_NOTIFY_PERCENT / 100;
-        if (onlineTime >= threshold) {
+        if (onlineTime.getFirst() >= threshold) {
             NotifyOpenFunction notify = new NotifyOpenFunction();
             notify.functionIdList = List.of(SimConstant.Common.GUEST_OUTPUT_LIMIT_FUNCTION_ID);
             ctx.send(notify);
             base.setGuestOutputLimitNotified(true);
+        }else if(onlineTime.getSecond()){
+            //重置的话要关闭
+            NotifyOpenFunction notify = new NotifyOpenFunction();
+            notify.closeFunctionIdList = List.of(SimConstant.Common.GUEST_OUTPUT_LIMIT_FUNCTION_ID);
+            ctx.send(notify);
         }
     }
 
@@ -820,7 +827,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
     private boolean canGenerateOrdinaryGuestRewards(SimPlayerContext ctx, long now) {
         SimCasinoData casino = ctx.getCurrentCasino();
         CasinoStatsSheetCfg cfg = configCache.getCasinoStatsSheetCfg(casino.getCasinoId(), casino.getCasinoLevel());
-        return cfg != null && ctx.getSimBaseData().accumulateOnlineTime(now) <= cfg.getVisitorDailyLimit() * 60_000L;
+        return cfg != null && ctx.getSimBaseData().accumulateOnlineTime(now).getFirst() <= cfg.getVisitorDailyLimit() * 60_000L;
     }
 
     private List<DestinationInfo> planDestinations(GuestData guest, VisitorQuestCfg cfg, SimCasinoData casino, int rewardedCount,
@@ -1026,7 +1033,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         }
         SimBaseData base = ctx.getSimBaseData();
         ResGuestOutputInfo res = new ResGuestOutputInfo(Code.SUCCESS);
-        res.allTime = (int) (base.accumulateOnlineTime(System.currentTimeMillis()) / 1000);
+        res.allTime = (int) (base.accumulateOnlineTime(System.currentTimeMillis()).getFirst() / 1000);
         res.timeLimit = cfg.getVisitorDailyLimit() * 60;
         res.allRewards = base.getGuestOutputRewards() == null
                 ? Collections.emptyList() : ItemUtils.buildItemInfo(base.getGuestOutputRewards());
@@ -2932,5 +2939,28 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             ctx.getSimBaseData().recordGuestOutputRewards(rewardsMap, System.currentTimeMillis());
             allianceEventService.onBusinessIncome(ctx.playerId(), rewardsMap);
         }
+    }
+
+    @Override
+    public Set<Integer> checkOpenFunction(Player player) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(player.getId());
+        if(ctx == null){
+            return null;
+        }
+        SimBaseData base = ctx.getSimBaseData();
+        long onlineTime = base.accumulateOnlineTime(System.currentTimeMillis()).getFirst();
+
+        //场景配置
+        CasinoStatsSheetCfg casinoCfg = configCache.getCasinoStatsSheetCfg(ctx.getCurrentCasino().getCasinoId(), ctx.getCurrentCasino().getCasinoLevel());
+        if (casinoCfg == null) {
+            return null;
+        }
+
+        long threshold = casinoCfg.getVisitorDailyLimit() * 60_000L
+                * SimConstant.Common.GUEST_OUTPUT_LIMIT_NOTIFY_PERCENT / 100;
+        if (onlineTime >= threshold) {
+            return Set.of(SimConstant.Common.GUEST_OUTPUT_LIMIT_FUNCTION_ID);
+        }
+        return null;
     }
 }

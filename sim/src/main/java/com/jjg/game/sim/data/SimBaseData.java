@@ -1,5 +1,6 @@
 package com.jjg.game.sim.data;
 
+import com.jjg.game.common.proto.Pair;
 import com.jjg.game.common.utils.TimeHelper;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -511,7 +512,8 @@ public class SimBaseData extends AbstractData {
         this.onlineTimeResetTime = onlineTimeResetTime;
     }
 
-    public long accumulateOnlineTime(long now) {
+    public Pair<Long,Boolean> accumulateOnlineTime(long now) {
+        boolean reset = false;
         if (now >= onlineTimeResetTime) {
             dailyOnlineTime = 0;
             normalGuestCount = 0;
@@ -524,12 +526,13 @@ public class SimBaseData extends AbstractData {
             if (loginTime > 0) {
                 loginTime = Math.max(loginTime, TimeHelper.getDaysTime(now, 0));
             }
+            reset = true;
         }
         if (loginTime > 0 && now > loginTime) {
             dailyOnlineTime += now - loginTime;
             loginTime = now;
         }
-        return dailyOnlineTime;
+        return new Pair<>(dailyOnlineTime, reset);
     }
 
     public int getNormalGuestCount() {

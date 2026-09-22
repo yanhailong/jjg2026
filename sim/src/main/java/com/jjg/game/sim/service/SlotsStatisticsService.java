@@ -3,10 +3,7 @@ package com.jjg.game.sim.service;
 import com.jjg.game.common.rpc.ClusterRpcReference;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.pb.KVInfo;
-import com.jjg.game.sampledata.GameDataManager;
-import com.jjg.game.sampledata.bean.GlobalConfigCfg;
 import com.jjg.game.sim.bridge.ToSimBridge;
-import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.dao.SlotsStatisticsDao;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.data.SlotsStatisticsData;
@@ -51,11 +48,6 @@ public class SlotsStatisticsService {
             return res;
         }
 
-        GlobalConfigCfg globalConfigCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.SLOTS_STATISTICS_SHOW);
-        if (globalConfigCfg == null || data.getSpinCount() < globalConfigCfg.getIntValue()) {
-            return res;
-        }
-
         SlotsStatisticsInfo info = new SlotsStatisticsInfo();
         info.spinCount = data.getSpinCount();
         if (data.getBigWinCountMap() != null) {
@@ -72,7 +64,7 @@ public class SlotsStatisticsService {
 
         //总盈利
         long slotsRealWin = data.getAllSpendPowerGetCoin() + data.getAllWinCoin() - data.getAllBetCoin();
-        if (slotsRealWin > ctx.getSimBaseData().getSlotsAthWinCoin()) {
+        if (slotsRealWin >= ctx.getSimBaseData().getSlotsAthWinCoin()) {
             info.ath = true;
             ctx.getSimBaseData().setSlotsAthWinCoin(slotsRealWin);
         }
