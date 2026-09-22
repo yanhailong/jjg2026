@@ -1189,6 +1189,10 @@ public class SimMessageHandler implements GmListener {
                     res.data = "玩家模拟经营数据未加载，无法完成指定引导：" + guideIds;
                 }
                 return res;
+            } else if ("skipGuideGroup".equalsIgnoreCase(gmOrders[0])) {
+                ReqSkipGuideGroup req = new ReqSkipGuideGroup();
+                req.guideGroupId = Integer.parseInt(gmOrders[1]);
+                reqSkipGuideGroup(playerController, req);
             } else if ("jumpTask".equalsIgnoreCase(gmOrders[0])) {
                 if (gmOrders.length < 2 || !gmOrders[1].matches("\\d+")) {
                     res.code = Code.PARAM_ERROR;
@@ -1410,13 +1414,13 @@ public class SimMessageHandler implements GmListener {
             } else if ("unlockAllBuild".equalsIgnoreCase(gmOrders[0])) {
                 SimPlayerContext ctx = this.simPlayerContextRegistry.getContext(playerController.playerId());
                 buildingService.gmUnlockAllBuilds(ctx);
-            } else if("reqActivePassInfo".equalsIgnoreCase(gmOrders[0])){
+            } else if ("reqActivePassInfo".equalsIgnoreCase(gmOrders[0])) {
                 executeActivePass(playerController, SimConstant.MsgBean.REQ_ACTIVE_PASS_INFO, activePassService::info, rpc -> rpc.activePassInfo(playerController.playerId()));
-            }else if("reqMiniShop".equalsIgnoreCase(gmOrders[0])){
+            } else if ("reqMiniShop".equalsIgnoreCase(gmOrders[0])) {
                 ReqMiniShop req = new ReqMiniShop();
                 req.itemId = Integer.parseInt(gmOrders[1]);
                 reqMiniShop(playerController, req);
-            }else {
+            } else {
                 res.code = Code.NOT_FOUND;
             }
         } catch (Exception e) {
