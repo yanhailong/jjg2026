@@ -10,8 +10,10 @@ import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.MailService;
 import com.jjg.game.core.service.RankService;
 import com.jjg.game.core.utils.ItemUtils;
+import com.jjg.game.core.utils.RobotUtil;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.PopularityRankingCfg;
+import com.jjg.game.sampledata.bean.RobotCfg;
 import com.jjg.game.sim.dao.SimCasinoDao;
 import com.jjg.game.sim.pb.res.ResVisitRank;
 import com.jjg.game.sim.pb.res.ResVisitRankRewards;
@@ -54,17 +56,20 @@ public class SimVisitRankService {
     private final SimCasinoDao simCasinoDao;
     private final MailService mailService;
     private final RedissonClient redissonClient;
+    private final RobotUtil robotUtil;
 
     public SimVisitRankService(RankService rankService,
                                CorePlayerService corePlayerService,
                                SimCasinoDao simCasinoDao,
                                MailService mailService,
-                               RedissonClient redissonClient) {
+                               RedissonClient redissonClient,
+                               RobotUtil robotUtil) {
         this.rankService = rankService;
         this.corePlayerService = corePlayerService;
         this.simCasinoDao = simCasinoDao;
         this.mailService = mailService;
         this.redissonClient = redissonClient;
+        this.robotUtil = robotUtil;
     }
 
     public long addPopularity(long playerId, int points) {
@@ -131,12 +136,43 @@ public class SimVisitRankService {
                     ranks.add(info);
                 }
             }
+            appendRobotRanks(ranks);
             cachedTop = new CachedTop(key, List.copyOf(ranks), now + TOP_CACHE_MILLIS);
             return cachedTop.ranks();
         }
     }
 
     private record CachedTop(String key, List<VisitRankInfo> ranks, long expireAt) {
+    }
+
+    /**
+     * 真人不足展示数量时在榜尾补机器人；机器人只存在于返回数据，不写排行榜也不参与结算。
+     */
+    private void appendRobotRanks(List<VisitRankInfo> ranks) {
+        int missing = SHOW_COUNT - ranks.size();
+        if (missing <= 0) {
+            return;
+        }
+        long popularity = ranks.isEmpty() ? missing : Math.max(0, ranks.getLast().popularity - 1);
+        int count = 0;
+        for (RobotCfg cfg : GameDataManager.getRobotCfgList()) {
+            VisitRankInfo info = new VisitRankInfo();
+            info.rank = ranks.size() + 1;
+            info.playerId = robotUtil.getId(cfg.getId());
+            info.playerName = cfg.getNameId();
+            info.headImgId = cfg.getPicture();
+            info.headFrameId = cfg.getFrame();
+            info.casinoLevel = cfg.getPlayerLevel();
+            info.popularity = popularity;
+            Map<Integer, Long> rewards = rewardForRank(info.rank);
+            info.rewards = rewards.isEmpty() ? Collections.emptyList() : ItemUtils.buildItemInfo(rewards);
+            ranks.add(info);
+            popularity = Math.max(0, popularity - 1);
+            count++;
+            if(count >= missing){
+                break;
+            }
+        }
     }
 
     private VisitRankInfo toInfo(RankEntry entry, Map<Long, Player> players,
