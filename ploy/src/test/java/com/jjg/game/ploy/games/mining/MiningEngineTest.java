@@ -36,6 +36,27 @@ class MiningEngineTest {
         assertEquals(1, state.total.grids); assertEquals(2, state.total.tools.get(1024034));
     }
 
+    @Test void everyCellInCurrentTopRowIsConnectedAfterScrolling() {
+        MiningEngine engine = new MiningEngine();
+        MiningState state = MiningFixtures.flat(1, 1001);
+        state.cells.forEach(cell -> cell.row += 141);
+        state.topRow = 142;
+        state.generatedRows = 149;
+
+        for (int column = 1; column <= state.width; column++) {
+            assertTrue(engine.connected(state, state.topRow, column));
+        }
+
+        MiningFixtures.cell(state, 142, 6).hp = 0;
+        MiningFixtures.cell(state, 143, 6).hp = 0;
+        state.connectivityVersion = 4;
+        assertTrue(engine.alignConnectivity(state));
+        assertTrue(MiningFixtures.cell(state, 142, 6).reachable);
+        assertTrue(MiningFixtures.cell(state, 143, 6).reachable);
+        assertTrue(engine.connected(state, 144, 6));
+        assertEquals(5, state.connectivityVersion);
+    }
+
     @Test void legacyFirstScreenClearsCachedDiagonalReachabilityOnLoad() {
         MiningEngine engine = new MiningEngine();
         MiningState state = MiningFixtures.flat(1, 1001);
@@ -46,7 +67,7 @@ class MiningEngineTest {
 
         assertTrue(engine.alignConnectivity(state));
 
-        assertEquals(4, state.connectivityVersion);
+        assertEquals(5, state.connectivityVersion);
         assertTrue(MiningFixtures.cell(state, 1, 5).reachable);
         assertFalse(MiningFixtures.cell(state, 2, 6).reachable);
         assertFalse(engine.connected(state, 2, 4));
@@ -132,7 +153,7 @@ class MiningEngineTest {
         assertTrue(engine.alignConnectivity(state));
         assertTrue(MiningFixtures.cell(state, 330, 3).reachable);
         assertTrue(engine.connected(state, 331, 3));
-        assertEquals(4, state.connectivityVersion);
+        assertEquals(5, state.connectivityVersion);
     }
 
     @Test void disconnectedBottomOpeningDoesNotScrollUntilItJoinsReachableArea() {
@@ -172,7 +193,7 @@ class MiningEngineTest {
         assertTrue(state.cells.stream().noneMatch(c -> c.row == 1));
         assertTrue(state.cells.stream().filter(c -> c.row > 8).allMatch(c -> c.hp > 0));
         assertThrows(MiningException.class, () -> engine.dig(state, 1, 1, 101, 2));
-        assertFalse(engine.connected(state, 2, 1));
+        assertTrue(engine.connected(state, 2, 1));
         assertThrows(MiningException.class, () -> engine.dig(state, 10, 1, 103, 2));
     }
 
@@ -311,7 +332,7 @@ class MiningEngineTest {
         assertTrue(engine.connected(state, 5, 4));
     }
 
-    @Test void migratedScrolledStateDropsDiagonalFlagsAndRetainsHistoricalTopEntrance() {
+    @Test void migratedScrolledStateDropsDiagonalFlagsAndUsesEveryOpenTopCellAsEntrance() {
         MiningEngine engine = new MiningEngine();
         MiningState state = MiningFixtures.flat(1, 1001);
         state.cells.forEach(cell -> cell.row += 20);
@@ -326,7 +347,7 @@ class MiningEngineTest {
         assertTrue(MiningFixtures.cell(state, 22, 3).reachable);
         assertFalse(MiningFixtures.cell(state, 23, 4).reachable);
         assertFalse(MiningFixtures.cell(state, 24, 4).reachable);
-        assertFalse(MiningFixtures.cell(state, 21, 6).reachable);
+        assertTrue(MiningFixtures.cell(state, 21, 6).reachable);
         assertFalse(engine.connected(state, 24, 5));
         assertEquals(21, state.topRow);
         assertEquals(0, MiningFixtures.cell(state, 23, 4).hp);
