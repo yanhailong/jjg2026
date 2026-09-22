@@ -163,6 +163,8 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
     protected Map<Integer, BaseRoomCfg> roomCfgMap;
     //gameMode -> lineId -> cfg
     protected Map<Integer, Map<Integer, BaseLineCfg>> baseLineCfgMap = null;
+    //type -> cfg
+    protected Map<Integer, SpecialModeCfg> specialModeCfgMap = null;
 
     //大奖展示倍数区间
     protected Map<Integer, int[]> bigWinShowMap = null;
@@ -387,42 +389,31 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
     private void notifyGuideAfterEnterGame(PlayerController playerController, T playerGameData) {
         long playerId = playerController.playerId();
         long workId = playerController.getSession().getWorkId();
-        WheelTimerUtil.schedule(() ->
-                        PlayerExecutorGroupDisruptor.getDefaultExecutor().publishWithFallback(
-                                workId, 0, new BaseHandler<String>() {
-                                    @Override
-                                    public void action() {
-                                        if (playerController.getSession() == null
-                                                || playerController.getSession().getReference() != playerController) {
-                                            log.info("跳过已离开SLOT节点的引导场景检查 playerId={}", playerId);
-                                            return;
-                                        }
-                                        CommonResult<List<Integer>> result = slotsRPCLinkManager.enterGuidePath(
-                                                playerGameData, SimConstant.GuidePath.SLOTS);
-                                        if (result == null || !result.success()) {
-                                            log.warn("SLOT进场后检查新手引导失败 playerId={},code={}",
-                                                    playerId, result == null ? null : result.code);
-                                            return;
-                                        }
-                                        if (result.data == null || result.data.isEmpty()) {
-                                            log.info("SLOT进场后没有待触发的新手引导 playerId={}", playerId);
-                                            return;
-                                        }
-                                        NotifyGuideTrigger notify = new NotifyGuideTrigger(Code.SUCCESS);
-                                        notify.guideGroupIds = result.data;
-                                        // NotifyGuideTrigger 属于 SIM 消息类型。SLOT 节点直接构造协议消息，
-                                        // 避免跨模块响应类未进入 MessageUtil 映射时 send(Object) 静默丢弃。
-                                        PFMessage guideMessage = new PFMessage(
-                                                SimConstant.MsgBean.NOTIFY_GUIDE_TRIGGER,
-                                                ProtostuffUtil.serialize(notify));
-                                        playerController.send(guideMessage);
-                                        log.info("玩家进入SLOT游戏后发送新手引导通知 playerId={},groups={},msgId={},gatePath={}",
-                                                playerId, result.data, guideMessage.cmd,
-                                                playerController.getSession().getGatePath());
-                                    }
-                                }.setHandlerParamWithSelf("slots guide after game enter")),
-                SimConstant.GuideTiming.SLOTS_ENTER_TRIGGER_DELAY_MILLIS,
-                TimeUnit.MILLISECONDS);
+        WheelTimerUtil.schedule(() -> PlayerExecutorGroupDisruptor.getDefaultExecutor().publishWithFallback(workId, 0, new BaseHandler<String>() {
+            @Override
+            public void action() {
+                if (playerController.getSession() == null || playerController.getSession().getReference() != playerController) {
+                    log.info("跳过已离开SLOT节点的引导场景检查 playerId={}", playerId);
+                    return;
+                }
+                CommonResult<List<Integer>> result = slotsRPCLinkManager.enterGuidePath(playerGameData, SimConstant.GuidePath.SLOTS);
+                if (result == null || !result.success()) {
+                    log.warn("SLOT进场后检查新手引导失败 playerId={},code={}", playerId, result == null ? null : result.code);
+                    return;
+                }
+                if (result.data == null || result.data.isEmpty()) {
+                    log.info("SLOT进场后没有待触发的新手引导 playerId={}", playerId);
+                    return;
+                }
+                NotifyGuideTrigger notify = new NotifyGuideTrigger(Code.SUCCESS);
+                notify.guideGroupIds = result.data;
+                // NotifyGuideTrigger 属于 SIM 消息类型。SLOT 节点直接构造协议消息，
+                // 避免跨模块响应类未进入 MessageUtil 映射时 send(Object) 静默丢弃。
+                PFMessage guideMessage = new PFMessage(SimConstant.MsgBean.NOTIFY_GUIDE_TRIGGER, ProtostuffUtil.serialize(notify));
+                playerController.send(guideMessage);
+                log.info("玩家进入SLOT游戏后发送新手引导通知 playerId={},groups={},msgId={},gatePath={}", playerId, result.data, guideMessage.cmd, playerController.getSession().getGatePath());
+            }
+        }.setHandlerParamWithSelf("slots guide after game enter")), SimConstant.GuideTiming.SLOTS_ENTER_TRIGGER_DELAY_MILLIS, TimeUnit.MILLISECONDS);
     }
 
     protected void resetFreeState(T gameData) {
@@ -489,8 +480,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         if (coopCode != Code.SUCCESS) {
             return createGameRunInfo(playerController.playerId(), coopCode);
         }
-        CommonResult<VisitTrialSpinPermit> permitResult = slotsRPCLinkManager.prepareVisitTrialSpin(
-                playerGameData, getGameType(), freeMode);
+        CommonResult<VisitTrialSpinPermit> permitResult = slotsRPCLinkManager.prepareVisitTrialSpin(playerGameData, getGameType(), freeMode);
         if (permitResult == null || !permitResult.success()) {
             int code = permitResult == null ? Code.EXCEPTION : permitResult.code;
             return createGameRunInfo(playerController.playerId(), code);
@@ -505,23 +495,18 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         }
         //公共: 旋转成功后通知 sim 联动 (扣能量/加经验/赌场升级/道具掉落), winTimes 取各游戏写入的 allWinTimes
         if (gameRunInfo != null && gameRunInfo.success()) {
-            togetherPlayService.onSpin(
-                    playerGameData, gameRunInfo.getAllWinGold(), gameRunInfo.getAllWinTimes());
+            togetherPlayService.onSpin(playerGameData, gameRunInfo.getAllWinGold(), gameRunInfo.getAllWinTimes());
             boolean freeModeAfter = isFreeMode(playerGameData);
-            SpinStatInfo statInfo = buildSpinStatInfo(
-                    playerGameData, gameRunInfo, freeMode, !freeMode && freeModeAfter);
+            SpinStatInfo statInfo = buildSpinStatInfo(playerGameData, gameRunInfo, freeMode, !freeMode && freeModeAfter);
             long spinId = slotsRPCLinkManager.ensureSpinId(statInfo);
             //新触发的被动匹配从下一次旋转开始计数；已有对局仍正常记录本次旋转
-            boolean passiveMatchStarted = tryPassiveSeasonMatch(
-                    playerController, playerGameData, gameRunInfo.getStake(), freeMode, spinId);
+            boolean passiveMatchStarted = tryPassiveSeasonMatch(playerController, playerGameData, gameRunInfo.getStake(), freeMode, spinId);
             if (!passiveMatchStarted) {
                 playerGameData.recordSeasonMatchSpin(gameRunInfo.getStake());
             }
-            slotsRPCLinkManager.notifySpin(playerGameData, getGameType(), gameRunInfo.getAllWinTimes(),
-                    statInfo, trialPermit);
+            slotsRPCLinkManager.notifySpin(playerGameData, getGameType(), gameRunInfo.getAllWinTimes(), statInfo, trialPermit);
             //协作任务联动: 非免费旋转扣血/共享事件累计/成败判定 (内部吞异常, 不影响旋转主流程)
-            coopRoomManager.onSpin(playerController.playerId(), getGameType(), statusBefore,
-                    freeMode, freeModeAfter, gameRunInfo);
+            coopRoomManager.onSpin(playerController.playerId(), getGameType(), statusBefore, freeMode, freeModeAfter, gameRunInfo);
         } else {
             slotsRPCLinkManager.cancelVisitTrialSpin(playerGameData, trialPermit);
         }
@@ -531,17 +516,14 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
     /**
      * 由本次旋转结果构建上报 sim 的统计明细 (经营信息 SPINE游戏面板)
      */
-    private SpinStatInfo buildSpinStatInfo(T playerGameData, G gameRunInfo,
-                                           boolean freeMode, boolean triggerFree) {
+    private SpinStatInfo buildSpinStatInfo(T playerGameData, G gameRunInfo, boolean freeMode, boolean triggerFree) {
         SpinStatInfo statInfo = new SpinStatInfo();
         statInfo.setFreeMode(freeMode);
         statInfo.setTriggerFree(triggerFree);
         statInfo.setBet(gameRunInfo.getStake());
         statInfo.setWin(gameRunInfo.getAllWinGold());
         WarehouseCfg warehouseCfg = GameDataManager.getWarehouseCfg(playerGameData.getRoomCfgId());
-        statInfo.setTransactionItemId(playerGameData.isSeason()
-                ? SimConstant.Item.ID_SEASON_COIN
-                : warehouseCfg == null ? 0 : warehouseCfg.getTransactionItemId());
+        statInfo.setTransactionItemId(playerGameData.isSeason() ? SimConstant.Item.ID_SEASON_COIN : warehouseCfg == null ? 0 : warehouseCfg.getTransactionItemId());
         statInfo.setMultiple(gameRunInfo.getAllWinTimes());
         statInfo.setBigShowId(gameRunInfo.getBigShowId());
         statInfo.setJackpotCounts(gameRunInfo.getJackpotCounts());
@@ -554,6 +536,13 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
             }
             if (resultLib.getIconArr() != null && resultLib.getIconArr().length > 0) {
                 statInfo.setIcons(Arrays.stream(resultLib.getIconArr()).boxed().toList());
+            }
+        }
+
+        if(statInfo.getSpecialModes() != null && !statInfo.getSpecialModes().isEmpty()) {
+            SpecialModeCfg specialModeCfg = getSpecialModeByType(statInfo.getSpecialModes().getFirst());
+            if(specialModeCfg != null) {
+                statInfo.setTypeNameId(specialModeCfg.getTypeNameId());
             }
         }
         return statInfo;
@@ -772,8 +761,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
             if (result.getRemaining() <= 0) {
                 gameData.setSeasonFreeExhaustedDailyKey(today);
             }
-            log.info("赛季免费局生效, 本次旋转不扣下注额 playerId = {},gameType = {},betValue = {},remaining = {}",
-                    gameData.getPlayerId(), this.gameType, betValue, result.getRemaining());
+            log.info("赛季免费局生效, 本次旋转不扣下注额 playerId = {},gameType = {},betValue = {},remaining = {}", gameData.getPlayerId(), this.gameType, betValue, result.getRemaining());
             return true;
         }
         if (result.getReason() == SeasonFreeSpinResult.REASON_EXHAUSTED) {
@@ -792,8 +780,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
      * 对局从客户端收到匹配通知后的下一次旋转开始计数。
      * 本地冷却只是避免无谓 RPC, 权威冷却仍由 sim 按 SeasonMatch.MatchCD 校验。
      */
-    protected boolean tryPassiveSeasonMatch(PlayerController playerController, T gameData, long stake,
-                                            boolean freeMode, long excludedSpinId) {
+    protected boolean tryPassiveSeasonMatch(PlayerController playerController, T gameData, long stake, boolean freeMode, long excludedSpinId) {
         //免费模式没有真实下注, 不触发按下注额押注的对局
         if (!gameData.isSeason() || gameData.isSeasonMatchActive() || freeMode || stake <= 0) {
             return false;
@@ -806,8 +793,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         if (probCfg == null || !RandomUtils.getRandomBoolean100(probCfg.getIntValue())) {
             return false;
         }
-        ResSeasonMatch res = slotsRPCLinkManager.seasonMatch(
-                gameData, this.gameType, stake, excludedSpinId);
+        ResSeasonMatch res = slotsRPCLinkManager.seasonMatch(gameData, this.gameType, stake, excludedSpinId);
         //开局被拒(冷却中/次数已满/赛季币不足等)时 matchId 为 "0", 静默跳过, 不影响本次旋转
         if (res == null || res.code != Code.SUCCESS || res.matchId == null || "0".equals(res.matchId)) {
             return false;
@@ -816,8 +802,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         gameData.beginSeasonMatch(res.stake, res.expectedSpins);
         gameData.setPassiveMatchTime(now);
         playerController.send(res);
-        log.info("赛季被动匹配触发 playerId = {},gameType = {},stake = {},matchId = {},opponentId = {},excludedSpinId = {}",
-                gameData.getPlayerId(), this.gameType, stake, res.matchId, res.opponentId, excludedSpinId);
+        log.info("赛季被动匹配触发 playerId = {},gameType = {},stake = {},matchId = {},opponentId = {},excludedSpinId = {}", gameData.getPlayerId(), this.gameType, stake, res.matchId, res.opponentId, excludedSpinId);
         return true;
     }
 
@@ -830,8 +815,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         CommonResult<Long> result = slotsRPCLinkManager.deductSeasonCoin(gameData, amount);
         if (result.success() && result.data != null) {
             gameData.setSeasonCoinBalance(result.data);
-            log.info("赛季币结算 type=bet,playerId={},gameType={},roomCfgId={},currency=season,amount={},before={},after={}",
-                    gameData.getPlayerId(), this.gameType, gameData.getRoomCfgId(), amount, before, result.data);
+            log.info("赛季币结算 type=bet,playerId={},gameType={},roomCfgId={},currency=season,amount={},before={},after={}", gameData.getPlayerId(), this.gameType, gameData.getRoomCfgId(), amount, before, result.data);
         }
         return result;
     }
@@ -845,13 +829,11 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         long before = gameData.getSeasonCoinBalance();
         CommonResult<Long> result = slotsRPCLinkManager.addSeasonCoin(gameData, amount);
         if (!result.success() || result.data == null) {
-            log.warn("赛季币发放失败 playerId={},gameType={},roomCfgId={},amount={},code={}",
-                    gameData.getPlayerId(), this.gameType, gameData.getRoomCfgId(), amount, result.code);
+            log.warn("赛季币发放失败 playerId={},gameType={},roomCfgId={},amount={},code={}", gameData.getPlayerId(), this.gameType, gameData.getRoomCfgId(), amount, result.code);
             return false;
         }
         gameData.setSeasonCoinBalance(result.data);
-        log.info("赛季币结算 type=reward,playerId={},gameType={},roomCfgId={},currency=season,amount={},before={},after={}",
-                gameData.getPlayerId(), this.gameType, gameData.getRoomCfgId(), amount, before, result.data);
+        log.info("赛季币结算 type=reward,playerId={},gameType={},roomCfgId={},currency=season,amount={},before={},after={}", gameData.getPlayerId(), this.gameType, gameData.getRoomCfgId(), amount, before, result.data);
         return true;
     }
 
@@ -899,8 +881,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
             Number poolNum = slotsPoolDao.getSmallPoolByRoomCfgId(this.gameType, playerGameData.getRoomCfgId());
             long value = poolNum == null ? 0 : PropUtil.calProp(ratio, poolNum.longValue());
             if (maxMultiple > 0 && stake > 0) {
-                long maxValue = stake > Long.MAX_VALUE / maxMultiple
-                        ? Long.MAX_VALUE : stake * maxMultiple;
+                long maxValue = stake > Long.MAX_VALUE / maxMultiple ? Long.MAX_VALUE : stake * maxMultiple;
                 value = Math.min(value, maxValue);
             }
             if (value < 1 || !seasonReward(playerGameData, value)) {
@@ -910,8 +891,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
             slotsPoolDao.updatePoolCD(poolId);
             return new CommonResult<>(Code.SUCCESS, value);
         }
-        return slotsPoolDao.rewardByRatioFromSmallPool(playerGameData.getPlayerId(), this.gameType,
-                playerGameData.getRoomCfgId(), ratio, poolId, stake, maxMultiple, addType);
+        return slotsPoolDao.rewardByRatioFromSmallPool(playerGameData.getPlayerId(), this.gameType, playerGameData.getRoomCfgId(), ratio, poolId, stake, maxMultiple, addType);
     }
 
     /**
@@ -1143,6 +1123,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         baseLineConfig();
         specialPlayConfig();
         specialAuxiliaryConfig();
+        specialModeConfig();
 
         globalConfig();
         calAllLineStake();
@@ -1305,8 +1286,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         }
 
         Player player = playerGameData.getPlayer();
-        log.info("slots清除老数据 playerId:{} gameType:{} roomConfigId:{} roomId:{}", playerId, playerGameData.getGameType(), playerGameData.getRoomCfgId(),
-                player == null ? "null" : player.getRoomId());
+        log.info("slots清除老数据 playerId:{} gameType:{} roomConfigId:{} roomId:{}", playerId, playerGameData.getGameType(), playerGameData.getRoomCfgId(), player == null ? "null" : player.getRoomId());
         exitPlayerGameData(playerId, playerGameData);
     }
 
@@ -1364,14 +1344,11 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
 
         boolean seasonEntry = enterGameType == EnterGameType.SEASON;
         //客座赌局使用房主研发属性和被访场景羁绊，其他入口使用玩家当前场景羁绊。
-        SimVisitTrialSession visitSession = enterGameType == EnterGameType.VISIT
-                ? simVisitQuotaService.getTrialSession(playerController.playerId()) : null;
-        boolean activeVisit = visitSession != null
-                && visitSession.activeFor(playerController.playerId(), this.gameType, System.currentTimeMillis());
+        SimVisitTrialSession visitSession = enterGameType == EnterGameType.VISIT ? simVisitQuotaService.getTrialSession(playerController.playerId()) : null;
+        boolean activeVisit = visitSession != null && visitSession.activeFor(playerController.playerId(), this.gameType, System.currentTimeMillis());
         long skillOwnerId = activeVisit ? visitSession.getOwnerId() : playerController.playerId();
         int skillCasinoId = activeVisit ? visitSession.getCasinoId() : 0;
-        CommonResult<SlotsEntrySessionData> sessionResult = slotsRPCLinkManager.getSlotsSessionData(
-                skillOwnerId, skillCasinoId, this.gameType, seasonEntry, playerController.ipAddress());
+        CommonResult<SlotsEntrySessionData> sessionResult = slotsRPCLinkManager.getSlotsSessionData(skillOwnerId, skillCasinoId, this.gameType, seasonEntry, playerController.ipAddress());
         SlotsEntrySessionData sessionData;
         if (sessionResult != null && sessionResult.success() && sessionResult.data != null) {
             sessionData = sessionResult.data;
@@ -1388,9 +1365,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
                     sessionData.setResearchSkills(researchSkills);
                 }
             }
-            log.warn("获取 slots 进场快照失败，使用降级快照 playerId={},skillOwnerId={},gameType={},seasonEntry={},code={}",
-                    playerController.playerId(), skillOwnerId, this.gameType, seasonEntry,
-                    sessionResult == null ? null : sessionResult.code);
+            log.warn("获取 slots 进场快照失败，使用降级快照 playerId={},skillOwnerId={},gameType={},seasonEntry={},code={}", playerController.playerId(), skillOwnerId, this.gameType, seasonEntry, sessionResult == null ? null : sessionResult.code);
         }
         //获取sim节点
         ClusterClient simClusterClient = simNodeService.getSimClusterClient(playerController.playerId(), playerController.ipAddress());
@@ -1408,8 +1383,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
             applyEntrySessionData(playerGameData, sessionData, seasonEntry);
             applyVisitSession(playerGameData, activeVisit ? visitSession : null);
             if (!seasonEntry) {
-                playerGameData.setSeasonFreeGameCandidate(seasonFreeGameService.freeGameCandidate(
-                        playerController.playerId(), this.gameType, System.currentTimeMillis()));
+                playerGameData.setSeasonFreeGameCandidate(seasonFreeGameService.freeGameCandidate(playerController.playerId(), this.gameType, System.currentTimeMillis()));
             }
             playerGameData.setSimClient(simClusterClient);
             playerGameData.setEnterType(enterGameType.getValue());
@@ -1453,8 +1427,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         applyEntrySessionData(playerGameData, sessionData, seasonEntry);
         applyVisitSession(playerGameData, activeVisit ? visitSession : null);
         if (!seasonEntry) {
-            playerGameData.setSeasonFreeGameCandidate(seasonFreeGameService.freeGameCandidate(
-                    playerId, this.gameType, System.currentTimeMillis()));
+            playerGameData.setSeasonFreeGameCandidate(seasonFreeGameService.freeGameCandidate(playerId, this.gameType, System.currentTimeMillis()));
         }
         playerGameData.setSimClient(simClusterClient);
         togetherPlayService.onEnter(playerGameData);
@@ -1467,12 +1440,10 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
     /**
      * 将入口类型对应的效果快照写入仅运行时的玩家数据，并清理上一次会话可能遗留的下注解锁缓存。
      */
-    private void applyEntrySessionData(T playerGameData, SlotsEntrySessionData sessionData,
-                                       boolean seasonEntry) {
+    private void applyEntrySessionData(T playerGameData, SlotsEntrySessionData sessionData, boolean seasonEntry) {
         int exhaustedDailyKey = playerGameData.getSeasonSlotsSessionData().getSeasonFreeExhaustedDailyKey();
         SlotsEntrySessionData entryData = sessionData == null ? new SlotsEntrySessionData() : sessionData;
-        SeasonSlotsSessionData seasonData = seasonEntry && entryData.getSeasonData() != null
-                ? entryData.getSeasonData() : new SeasonSlotsSessionData();
+        SeasonSlotsSessionData seasonData = seasonEntry && entryData.getSeasonData() != null ? entryData.getSeasonData() : new SeasonSlotsSessionData();
         // 普通入口也可能是赛季每日免费局候选，因此必须用显式标记区分是否启用赛季币和宝石效果。
         seasonData.setSeasonEnter(seasonEntry);
         // 保留当日已耗尽状态，防止同一天重新进机台后再次发起无意义的跨节点免费次数申请。
@@ -1522,14 +1493,12 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         }
 
         if (playerGameData.isSeason()) {
-            propInfo = slotsSkillService.useSeasonGemLibTypeBonus(
-                    playerGameData.getSeasonSlotsSessionData(), propInfo);
+            propInfo = slotsSkillService.useSeasonGemLibTypeBonus(playerGameData.getSeasonSlotsSessionData(), propInfo);
         } else {
             propInfo = slotsSkillService.useLibTypeSkill(this.gameType, playerGameData.getSkillsMap(), propInfo);
         }
         // VisitorBonds 是两种入口都需要额外叠加的独立技能。
-        propInfo = slotsSkillService.useSkillEffectLibTypeBonus(
-                playerGameData.getVisitorBondsEffect(), propInfo);
+        propInfo = slotsSkillService.useSkillEffectLibTypeBonus(playerGameData.getVisitorBondsEffect(), propInfo);
 
         Integer type = propInfo.getRandKey();
         if (type == null) {
@@ -1570,14 +1539,11 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         }
 
         if (playerGameData.isSeason()) {
-            propInfo = slotsSkillService.useSeasonGemSectionBonus(
-                    playerGameData.getSeasonSlotsSessionData(), propInfo, libType);
+            propInfo = slotsSkillService.useSeasonGemSectionBonus(playerGameData.getSeasonSlotsSessionData(), propInfo, libType);
         } else {
-            propInfo = slotsSkillService.useSectionSkill(
-                    this.gameType, playerGameData.getSkillsMap(), propInfo, libType);
+            propInfo = slotsSkillService.useSectionSkill(this.gameType, playerGameData.getSkillsMap(), propInfo, libType);
         }
-        propInfo = slotsSkillService.useSkillEffectSectionBonus(
-                playerGameData.getVisitorBondsEffect(), propInfo, libType);
+        propInfo = slotsSkillService.useSkillEffectSectionBonus(playerGameData.getVisitorBondsEffect(), propInfo, libType);
 
         Integer index = propInfo.getRandKey();
         if (index == null) {
@@ -1587,7 +1553,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         }
         result.data = index;
         int[] section = getGenerateManager().getSpecialResultLibCacheData().getResultLibSectionMap().get(libType).get(index);
-        if(section == null){
+        if (section == null) {
             result.code = Code.SAMPLE_ERROR;
             return result;
         }
@@ -1815,8 +1781,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
             return;
         }
         BaseInitCfg baseInitCfg = GameDataManager.getBaseInitCfg(this.gameType);
-        if (baseInitCfg == null || baseInitCfg.getPrizePoolIdList() == null
-                || baseInitCfg.getPrizePoolIdList().size() != JACKPOT_TIER_COUNT) {
+        if (baseInitCfg == null || baseInitCfg.getPrizePoolIdList() == null || baseInitCfg.getPrizePoolIdList().size() != JACKPOT_TIER_COUNT) {
             return;
         }
         int index = baseInitCfg.getPrizePoolIdList().indexOf(poolId);
@@ -2097,6 +2062,18 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
 
     }
 
+    protected void specialModeConfig() {
+        Map<Integer, SpecialModeCfg> tmpSpecialModeCfgMap = new HashMap<>();
+
+        for (Map.Entry<Integer, SpecialModeCfg> en : GameDataManager.getSpecialModeCfgMap().entrySet()) {
+            SpecialModeCfg cfg = en.getValue();
+            if (cfg.getGameType() == this.gameType) {
+                tmpSpecialModeCfgMap.put(cfg.getType(), cfg);
+            }
+        }
+        this.specialModeCfgMap = tmpSpecialModeCfgMap;
+    }
+
     protected void globalConfig() {
         Map<Integer, int[]> tmpBigWinShowMap = new HashMap<>();
 
@@ -2171,6 +2148,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         }).addChangeSampleFileObserveWithCallBack(BaseLineCfg.EXCEL_NAME, () -> baseLineConfig())
                 .addChangeSampleFileObserveWithCallBack(GlobalConfigCfg.EXCEL_NAME, () -> globalConfig())
                 .addChangeSampleFileObserveWithCallBack(SpecialPlayCfg.EXCEL_NAME, () -> specialPlayConfig())
+                .addChangeSampleFileObserveWithCallBack(SpecialModeCfg.EXCEL_NAME, () -> specialModeConfig())
                 .addChangeSampleFileObserveWithCallBack(SpecialAuxiliaryCfg.EXCEL_NAME, () -> specialAuxiliaryConfig());
 
     }
@@ -2784,8 +2762,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
 
     protected L getLib(SpecialResultLibCfg specialResultLibCfg, int libType, T playerGameData) {
         //获取倍数区间
-        CommonResult<Integer> resultLibSectionResult = getResultLibSection(playerGameData, specialResultLibCfg.getModelId(), libType, playerGameData.getAllBetScore(),
-                playerGameData.getPlayer().getSvip(), playerGameData.getPlayerAllSlotsData().getAllBetCount(), playerGameData.getPlayerAllSlotsData().getPrizelessCount());
+        CommonResult<Integer> resultLibSectionResult = getResultLibSection(playerGameData, specialResultLibCfg.getModelId(), libType, playerGameData.getAllBetScore(), playerGameData.getPlayer().getSvip(), playerGameData.getPlayerAllSlotsData().getAllBetCount(), playerGameData.getPlayerAllSlotsData().getPrizelessCount());
         if (!resultLibSectionResult.success()) {
             log.warn("获取区间失败 modelId = {},libtype = {}", specialResultLibCfg.getModelId(), libType);
             return null;
@@ -3046,5 +3023,12 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
             return null;
         }
         return playerGameData.getSkillsMap();
+    }
+
+    public SpecialModeCfg getSpecialModeByType(int libtype){
+        if(this.specialModeCfgMap == null || this.specialModeCfgMap.isEmpty()){
+            return null;
+        }
+        return this.specialModeCfgMap.get(libtype);
     }
 }

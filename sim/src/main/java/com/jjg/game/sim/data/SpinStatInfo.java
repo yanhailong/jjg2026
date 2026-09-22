@@ -37,6 +37,8 @@ public class SpinStatInfo {
     private boolean freeMode;
     //是否为触发免费
     private boolean triggerFree;
+    //SpecialMode.typeNameId
+    private int typeNameId;
 
     public SpinStatInfo() {
     }
@@ -135,5 +137,13 @@ public class SpinStatInfo {
 
     public void setTriggerFree(boolean triggerFree) {
         this.triggerFree = triggerFree;
+    }
+
+    public int getTypeNameId() {
+        return typeNameId;
+    }
+
+    public void setTypeNameId(int typeNameId) {
+        this.typeNameId = typeNameId;
     }
 }

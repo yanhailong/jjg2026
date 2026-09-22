@@ -490,21 +490,16 @@ public class SimPlayerContext {
         }
 
         this.slotsStatisticsData.setSpinCount(this.slotsStatisticsData.getSpinCount() + 1);
+
         this.slotsStatisticsData.addBigWinCount(statInfo.getBigShowId());
-        if (statInfo.isTriggerFree()) {
+        if(statInfo.getTypeNameId() == 1){
+
+        }else if(statInfo.getTypeNameId() == 2){
             this.slotsStatisticsData.setFreeCount(this.slotsStatisticsData.getFreeCount() + 1);
-        }
-
-        if (statInfo.getSpecialModes() != null && !statInfo.getSpecialModes().isEmpty()) {
-            for (int libtype : statInfo.getSpecialModes()) {
-                if(libtype > 1){
-                    this.slotsStatisticsData.setSpecialCount(this.slotsStatisticsData.getSpecialCount() + 1);
-                }
-            }
-        }
-
-        if (statInfo.getJackpotCounts() != null && !statInfo.getJackpotCounts().isEmpty()) {
-            this.slotsStatisticsData.setJackpoolCount(statInfo.getJackpotCounts().size());
+        }else if(statInfo.getTypeNameId() == 3){
+            this.slotsStatisticsData.setSpecialCount(this.slotsStatisticsData.getSpecialCount() + 1);
+        }else if(statInfo.getTypeNameId() == 4){
+            this.slotsStatisticsData.setJackpoolCount(this.slotsStatisticsData.getJackpoolCount() + 1);
         }
 
         this.slotsStatisticsData.setAllWinCoin(this.slotsStatisticsData.getAllWinCoin() + statInfo.getWin());
