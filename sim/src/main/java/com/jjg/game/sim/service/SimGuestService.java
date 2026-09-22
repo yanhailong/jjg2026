@@ -146,6 +146,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
 
         int generated = batchGenerateGuest(ctx, casinoCfg.getVisitorSpawnCount(), casinoCfg, now, null);
         allianceEventService.onGuestGenerated(ctx.playerId(), false, generated);
+        notifyGuestOutputLimit(ctx, casinoCfg, now);
     }
 
     private boolean newGuide(SimBaseData simBaseData) {
@@ -621,7 +622,6 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         ctx.getCurrentCasino().setLastGenerateTime(now);
         recordDashboardJourney(ctx.getCurrentCasino(), destinations, now);
         ctx.getSimBaseData().recordGuestGenerated(false, now);
-        notifyGuestOutputLimit(ctx, casinoCfg, now);
         return SimPbConverter.toGuestInfo(guest, destinations, visitorQuestCfg);
     }
 
