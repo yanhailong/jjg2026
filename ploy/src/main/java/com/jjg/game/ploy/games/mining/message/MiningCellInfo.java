@@ -20,4 +20,6 @@ public class MiningCellInfo {
     public boolean connected;
     @ProtoDesc("秘境ID，0无")
     public long secretId;
+    @ProtoDesc("该格挖开后按MiningCellType.Reward配置获得的奖励数量，无奖励为0")
+    public long rewardCount;
 }

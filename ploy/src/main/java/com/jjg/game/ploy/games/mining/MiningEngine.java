@@ -7,7 +7,7 @@ import java.util.*;
 /** 纯地图规则；调用方先在快照计算，再原子提交消耗、奖励和存档。坐标从1开始。 */
 public class MiningEngine {
     private static final int MAX_AUTO_SCROLL_ROWS = 10_000;
-    private static final int CONNECTIVITY_VERSION = 4;
+    private static final int CONNECTIVITY_VERSION = 5;
     private final MiningCatalog catalog;
 
     public MiningEngine() { this(MiningCatalog.live()); }
@@ -28,6 +28,10 @@ public class MiningEngine {
 
     boolean matchesConfig(MiningState state) {
         return state.width == catalog.width() && state.visibleRows == catalog.visibleRows();
+    }
+
+    long cellRewardCount(int cellTypeId) {
+        return catalog.cellRewardCount(cellTypeId);
     }
 
     /** 配置宽高变化时重建地图，并保留旧地图中仍有效坐标的开采状态。 */
@@ -68,18 +72,12 @@ public class MiningEngine {
         return true;
     }
 
-    /**
-     * 首屏从地表重算；滚屏存档只保留顶行历史入口，清除下方八方向传播的旧标记。
-     * 更早版本丢失入口时，沿用当前顶行已打开区域的恢复策略。
-     */
+    /** 当前可视区顶行直接暴露在入口，已打开格从该行开始按上下左右重新传播。 */
     boolean alignConnectivity(MiningState state) {
         if (state.connectivityVersion >= CONNECTIVITY_VERSION) return false;
         if (state.cells == null) state.cells = new ArrayList<>();
-        boolean hasHistoricalReachability = state.connectivityVersion >= 1
-                && state.cells.stream().anyMatch(cell -> cell.hp == 0 && cell.reachable);
         for (MiningState.Cell cell : state.cells) {
-            cell.reachable = cell.hp == 0 && cell.row == state.topRow
-                    && (state.topRow == 1 || !hasHistoricalReachability || cell.reachable);
+            cell.reachable = cell.hp == 0 && cell.row == state.topRow;
         }
         refreshReachability(state);
         state.connectivityVersion = CONNECTIVITY_VERSION;
@@ -180,8 +178,8 @@ public class MiningEngine {
     }
 
     public boolean connected(MiningState state, int row, int column) {
-        // 未挖的第一行直接暴露在地表；其他格必须邻接真正连到地表的开放格。
-        if (row == 1) return true;
+        // 当前可视区第一行直接暴露在入口；其他格必须邻接真正连到入口的开放格。
+        if (row == state.topRow) return true;
         int bottom = Math.addExact(state.topRow, state.visibleRows - 1);
         return state.cells.stream().anyMatch(c -> c.hp == 0 && c.reachable && c.row >= state.topRow
                 && c.row <= bottom
@@ -196,7 +194,7 @@ public class MiningEngine {
         Set<Long> visited = new HashSet<>();
         for (MiningState.Cell cell : state.cells) {
             if (cell.row >= state.topRow && cell.row <= bottom && cell.hp == 0
-                    && (cell.reachable || cell.row == 1)) {
+                    && (cell.reachable || cell.row == state.topRow)) {
                 cell.reachable = true;
                 if (visited.add(cellKey(cell.row, cell.column))) queue.add(cell);
             }

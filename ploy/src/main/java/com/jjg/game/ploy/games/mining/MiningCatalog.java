@@ -108,6 +108,11 @@ final class MiningCatalog {
     }
 
     MiningCellTypeCfg cell(int id) { return cells.get(id); }
+    long cellRewardCount(int id) {
+        MiningCellTypeCfg cfg = cells.get(id);
+        if (cfg == null) return 0;
+        return itemPair(cfg.getReward()).values().stream().findFirst().orElse(0L);
+    }
     MiningToolsCfg tool(int id) { return tools.get(id); }
     List<MiningMapGenerationCfg> stages() { return stages; }
     int pickToolId() { return pickToolId; }
