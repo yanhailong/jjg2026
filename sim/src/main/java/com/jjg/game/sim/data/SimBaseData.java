@@ -196,23 +196,6 @@ public class SimBaseData extends AbstractData {
         return result;
     }
 
-    /**
-     * 最新的引导id
-     * @return
-     */
-    public int maxGuideId() {
-        if (this.completedGuideIds == null) {
-            return 0;
-        }
-        int maxId = 0;
-        for (int id : this.completedGuideIds) {
-            if (id > maxId) {
-                maxId = id;
-            }
-        }
-        return maxId;
-    }
-
     public boolean hasCompletedGuideId(int guideId) {
         if (completedGuideIds == null || completedGuideIds.isEmpty()) {
             return false;

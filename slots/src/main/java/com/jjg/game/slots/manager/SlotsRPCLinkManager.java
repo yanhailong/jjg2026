@@ -9,6 +9,7 @@ import com.jjg.game.common.protostuff.ProtostuffUtil;
 import com.jjg.game.common.rpc.ClusterRpcReference;
 import com.jjg.game.common.rpc.GameRpcContext;
 import com.jjg.game.common.rpc.RpcReqParameterBuilder;
+import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.constant.GameConstant;
 import com.jjg.game.core.data.CommonResult;
@@ -17,19 +18,16 @@ import com.jjg.game.core.service.PlayerStatService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.season.data.SeasonFreeSpinResult;
 import com.jjg.game.season.pb.res.ResSeasonMatch;
-import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.bridge.ToSimBridge;
-import com.jjg.game.sim.data.EnterGameType;
-import com.jjg.game.sim.data.SlotsEntrySessionData;
-import com.jjg.game.sim.data.SlotsSpinResult;
-import com.jjg.game.sim.data.SpinStatInfo;
-import com.jjg.game.sim.data.VisitTrialSpinPermit;
+import com.jjg.game.sim.constant.SimConstant;
+import com.jjg.game.sim.data.*;
 import com.jjg.game.sim.pb.res.NotifyGuideTrigger;
 import com.jjg.game.sim.pb.res.NotifySimTaskUpdate;
 import com.jjg.game.sim.service.SimNodeService;
 import com.jjg.game.slots.data.SlotsPlayerGameData;
 import com.jjg.game.slots.game.wealthgod.WealthGodConstant;
 import com.jjg.game.slots.pb.NotifySimDropItem;
+import com.jjg.game.slots.service.SlotsPlayerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +54,8 @@ public class SlotsRPCLinkManager {
     private SimNodeService simNodeService;
     @Autowired
     private PlayerStatService playerStatService;
+    @Autowired
+    private SlotsPlayerService playerService;
 
     /**
      * 通知玩家所属 SIM 节点已进入指定引导场景，并返回该场景下尚未完成的引导组。
@@ -493,6 +493,7 @@ public class SlotsRPCLinkManager {
         }
 
         if (result.data.getSpendPowerGetCoin() > 0) {
+            playerService.addGold(playerId, result.data.getSpendPowerGetCoin(), AddType.SIM_SPEND_POWER_GET_COIN, false);
             notify.spendPowerGetCoin = result.data.getSpendPowerGetCoin();
         }
 

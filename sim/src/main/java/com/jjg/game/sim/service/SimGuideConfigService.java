@@ -17,7 +17,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Guide.xlsx 的服务端触发索引；步骤链与表现字段由客户端使用。 */
+/**
+ * Guide.xlsx 的服务端触发索引；步骤链与表现字段由客户端使用。
+ */
 @Component
 public class SimGuideConfigService implements ConfigExcelChangeListener {
     private static final Logger log = LoggerFactory.getLogger(SimGuideConfigService.class);
@@ -147,7 +149,9 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
         return triggerGroups.getOrDefault(new TriggerKey(condition, normalized), Collections.emptyList());
     }
 
-    /** 获取指定条件下不高于当前值的全部配置参数，供“达到等级”补扫使用。 */
+    /**
+     * 获取指定条件下不高于当前值的全部配置参数，供“达到等级”补扫使用。
+     */
     public List<Integer> paramsAtOrBelow(int condition, int currentValue) {
         if (currentValue <= 0) return Collections.emptyList();
         List<Integer> params = triggerGroups.keySet().stream()
@@ -163,7 +167,9 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
         return groupConditions.getOrDefault(guideGroupId, 0);
     }
 
-    /** 获取引导组要求的触发场景；空字符串表示不限制场景。 */
+    /**
+     * 获取引导组要求的触发场景；空字符串表示不限制场景。
+     */
     public String pathNameOfGroup(int guideGroupId) {
         return groupPathNames.getOrDefault(guideGroupId, "");
     }
@@ -172,15 +178,18 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
         return groupConditions.containsKey(guideGroupId);
     }
 
-    /** 是否存在指定引导步骤。 */
+    /**
+     * 是否存在指定引导步骤。
+     */
     public boolean containsGuide(int guideId) {
         return guideId > 0 && guideGroups.containsKey(guideId);
     }
 
-    /** 根据步骤ID获取所属引导组。 */
+    /**
+     * 根据步骤ID获取所属引导组。
+     */
     public int groupOfGuide(int guideId) {
         return guideGroups.getOrDefault(guideId, 0);
-
     }
 
     /**
@@ -197,24 +206,63 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
             return 0;
         }
 
-        int maxGuideId = baseData.maxGuideId();
+        //首个引导id
+        Integer firstGuideId = newbieGuideDraw.get(1);
+        if (firstGuideId == null || firstGuideId <= 0) {
+            return 0;
+        }
 
-        boolean match = newbieGuideDraw.stream().anyMatch(guideId -> guideId > maxGuideId);
+        //获取该引导所在的引导组
+        int groupId = groupOfGuide(firstGuideId);
+        if (groupId < 1) {
+            return 0;
+        }
+
+        //未触发或者已经完成该引导组则跳过
+        if(!baseData.hasTriggeredGuideGroup(groupId) || baseData.hasCompletedGuideGroup(groupId)){
+            return 0;
+        }
+
+        //获取指定引导组包含的全部步骤ID
+        List<Integer> allGuideList = guideIdsOfGroup(groupId);
+        if (allGuideList == null || allGuideList.isEmpty()) {
+            return 0;
+        }
+
+        int maxGuideId = 0;
+        for (int id : allGuideList) {
+            if(baseData.hasCompletedGuideId(id) && id > maxGuideId){
+                maxGuideId = id;
+            }
+        }
+
+        if(maxGuideId < 1){
+            return 0;
+        }
+
+        final int finalMaxGuideId = maxGuideId;
+        boolean match = newbieGuideDraw.stream().anyMatch(gid -> gid == finalMaxGuideId);
         return match ? fixedItemId : 0;
     }
 
-    /** 获取指定引导组包含的全部步骤ID。 */
+    /**
+     * 获取指定引导组包含的全部步骤ID。
+     */
     public List<Integer> guideIdsOfGroup(int guideGroupId) {
         return groupGuideIds.getOrDefault(guideGroupId, Collections.emptyList());
 
     }
 
-    /** 获取指定引导组中允许在重新进入大厅时自动完成的步骤ID。 */
+    /**
+     * 获取指定引导组中允许在重新进入大厅时自动完成的步骤ID。
+     */
     public Set<Integer> skipGuideIdsOfGroup(int guideGroupId) {
         return groupSkipGuideIds.getOrDefault(guideGroupId, Collections.emptySet());
     }
 
-    /** 获取配置中的全部引导步骤ID。 */
+    /**
+     * 获取配置中的全部引导步骤ID。
+     */
     public List<Integer> allGuideIds() {
         List<Integer> result = new ArrayList<>(guideGroups.keySet());
 

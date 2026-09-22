@@ -329,6 +329,8 @@ public enum AddType {
     SIM_ONLINE_REWARD(1825),
     //迷你商店
     SIM_MINI_SHOP(1826),
+    //消耗能量获取金币
+    SIM_SPEND_POWER_GET_COIN(1827),
 
     //创建联盟
     ALLIANCE_CREATE(2001),
