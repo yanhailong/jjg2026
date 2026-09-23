@@ -58,11 +58,6 @@ public class BuyOneGetSevenController extends BaseActivityController
 
     @Override
     public AbstractResponse joinActivity(Player player, ActivityData activityData, int detailId, int times) {
-        return redisLock.tryLockAndGet(playerActivityDao.getLockKey(player.getId(), activityData.getId()),
-                () -> purchaseRewards(player, activityData, detailId), new ResBuyOneGetSevenClaimRewards(Code.FAIL));
-    }
-
-    private AbstractResponse purchaseRewards(Player player, ActivityData activityData, int detailId) {
         ResBuyOneGetSevenClaimRewards res = new ResBuyOneGetSevenClaimRewards(Code.FAIL);
         Map<Integer, BuyOneGetSevenCfg> cfgMap = getDetailCfgBean(activityData);
         if (!validConfig(activityData, cfgMap)) {
@@ -113,11 +108,6 @@ public class BuyOneGetSevenController extends BaseActivityController
 
     @Override
     public AbstractResponse claimActivityRewards(Player player, ActivityData activityData, int detailId) {
-        return redisLock.tryLockAndGet(playerActivityDao.getLockKey(player.getId(), activityData.getId()),
-                () -> claimRewards(player, activityData, detailId), new ResBuyOneGetSevenClaimRewards(Code.FAIL));
-    }
-
-    private AbstractResponse claimRewards(Player player, ActivityData activityData, int detailId) {
         ResBuyOneGetSevenClaimRewards res = new ResBuyOneGetSevenClaimRewards(Code.FAIL);
         long now = System.currentTimeMillis();
         if (!activityData.canRun() || now >= activityData.getTimeEnd()) {
