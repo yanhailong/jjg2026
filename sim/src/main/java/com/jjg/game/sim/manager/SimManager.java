@@ -1,5 +1,6 @@
 package com.jjg.game.sim.manager;
 
+import com.alibaba.fastjson.JSONObject;
 import com.jjg.game.alliance.data.AllianceData;
 import com.jjg.game.alliance.service.AllianceCacheService;
 import com.jjg.game.alliance.service.AllianceEventService;
@@ -751,10 +752,10 @@ public class SimManager {
         SimPlayerContext ctx = null;
         long spinId = statInfo == null ? 0 : statInfo.getSpinId();
         try {
-//            log.warn("onSlotsSpin 方法playerId={},gameType={},winTimes={},enterType={},statInfo={},trialPermit={}",
-//                    playerId, gameType, winTimes, enterType,
-//                    statInfo != null ? JSONObject.toJSONString(statInfo) : "null",
-//                    trialPermit != null ? JSONObject.toJSONString(trialPermit) : "null");
+            log.warn("onSlotsSpin 方法playerId={},gameType={},winTimes={},enterType={},statInfo={},trialPermit={}",
+                    playerId, gameType, winTimes, enterType,
+                    statInfo != null ? JSONObject.toJSONString(statInfo) : "null",
+                    trialPermit != null ? JSONObject.toJSONString(trialPermit) : "null");
             boolean visitTrial = trialPermit != null && trialPermit.isTrial();
             ctx = this.simPlayerContextRegistry.getContext(playerId);
             if (ctx == null) {

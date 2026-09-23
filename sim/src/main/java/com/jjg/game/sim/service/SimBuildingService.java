@@ -340,33 +340,36 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                     if (costLanguageId < 1) {
                         log.warn("解锁建筑失败, 资源不足 playerId={},buildingId={},cost={}", ctx.playerId(), buildingId, cfg.getUnlockCost());
                         res.code = Code.NOT_ENOUGH;
-                        return res;
+                        //这里不需要通知到客户端
+                        return null;
                     }
                     Long l = cfg.getUnlockCost().get(ItemUtils.getGoldItemId());
                     if (l == null) {
                         log.warn("解锁建筑失败, 解析金币时获取错误 playerId={},buildingId={},cost={}", ctx.playerId(), buildingId, cfg.getUnlockCost());
                         res.code = Code.NOT_ENOUGH;
-                        return res;
-                    }
-                    tips.add(SimTool.buildTips(costLanguageId, String.valueOf(l)));
-                }
-            } else {
-                boolean has = playerPackService.checkHasItems(ctx.getPlayer(), cfg.getUnlockCost());
-                if (!has) {
-                    if (costLanguageId < 1) {
-                        log.warn("解锁建筑失败, 资源不足 playerId={},buildingId={},cost={}", ctx.playerId(), buildingId, cfg.getUnlockCost());
-                        res.code = Code.NOT_ENOUGH;
-                        return res;
-                    }
-                    Long l = cfg.getUnlockCost().get(ItemUtils.getGoldItemId());
-                    if (l == null) {
-                        log.warn("解锁建筑失败, 解析金币时获取错误1 playerId={},buildingId={},cost={}", ctx.playerId(), buildingId, cfg.getUnlockCost());
-                        res.code = Code.NOT_ENOUGH;
-                        return res;
+                        return null;
                     }
                     tips.add(SimTool.buildTips(costLanguageId, String.valueOf(l)));
                 }
             }
+
+//            else {
+//                boolean has = playerPackService.checkHasItems(ctx.getPlayer(), cfg.getUnlockCost());
+//                if (!has) {
+//                    if (costLanguageId < 1) {
+//                        log.warn("解锁建筑失败, 资源不足1 playerId={},buildingId={},cost={}", ctx.playerId(), buildingId, cfg.getUnlockCost());
+//                        res.code = Code.NOT_ENOUGH;
+//                        return res;
+//                    }
+//                    Long l = cfg.getUnlockCost().get(ItemUtils.getGoldItemId());
+//                    if (l == null) {
+//                        log.warn("解锁建筑失败, 解析金币时获取错误1 playerId={},buildingId={},cost={}", ctx.playerId(), buildingId, cfg.getUnlockCost());
+//                        res.code = Code.NOT_ENOUGH;
+//                        return res;
+//                    }
+//                    tips.add(SimTool.buildTips(costLanguageId, String.valueOf(l)));
+//                }
+//            }
 
             if (!tips.isEmpty()) {
                 NotifyBuildingTips notify = new NotifyBuildingTips();

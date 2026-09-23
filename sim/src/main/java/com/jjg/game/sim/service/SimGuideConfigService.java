@@ -199,44 +199,55 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
      */
     public int newbieFixedDrawItemId(SimBaseData baseData, List<Integer> newbieGuideDraw) {
         if (baseData == null || newbieGuideDraw == null || newbieGuideDraw.size() < 2) {
+            log.warn("baseData={},newbieGuideDraw={},newbieGuideDraw.size()={}", baseData, newbieGuideDraw, newbieGuideDraw == null ? 0 : newbieGuideDraw.size());
             return 0;
         }
-        Integer fixedItemId = newbieGuideDraw.get(0);
+
+        log.warn("newbieGuideDraw={}", newbieGuideDraw);
+
+        Integer fixedItemId = newbieGuideDraw.getFirst();
+        log.warn("fixedItemId={}", fixedItemId);
         if (fixedItemId == null || fixedItemId <= 0) {
             return 0;
         }
 
         //首个引导id
         Integer firstGuideId = newbieGuideDraw.get(1);
+        log.warn("firstGuideId={}", firstGuideId);
         if (firstGuideId == null || firstGuideId <= 0) {
             return 0;
         }
 
         //获取该引导所在的引导组
         int groupId = groupOfGuide(firstGuideId);
+        log.warn("firstGuideId={},groupId={}", firstGuideId, groupId);
         if (groupId < 1) {
             return 0;
         }
 
         //未触发或者已经完成该引导组则跳过
-        if(!baseData.hasTriggeredGuideGroup(groupId) || baseData.hasCompletedGuideGroup(groupId)){
+        log.warn("trigger={},complete={},groupId={}", baseData.hasTriggeredGuideGroup(groupId), baseData.hasCompletedGuideGroup(groupId), groupId);
+        if (!baseData.hasTriggeredGuideGroup(groupId) || baseData.hasCompletedGuideGroup(groupId)) {
             return 0;
         }
 
         //获取指定引导组包含的全部步骤ID
         List<Integer> allGuideList = guideIdsOfGroup(groupId);
+        log.warn("allGuideList={}", allGuideList);
         if (allGuideList == null || allGuideList.isEmpty()) {
             return 0;
         }
 
         int maxGuideId = 0;
         for (int id : allGuideList) {
-            if(baseData.hasCompletedGuideId(id) && id > maxGuideId){
+            log.warn("hasCompletedGuideId={}", baseData.hasCompletedGuideId(id));
+            if (baseData.hasCompletedGuideId(id) && id > maxGuideId) {
                 maxGuideId = id;
             }
         }
 
-        if(maxGuideId < 1){
+        log.warn("maxGuideId={}", maxGuideId);
+        if (maxGuideId < 1) {
             return 0;
         }
 

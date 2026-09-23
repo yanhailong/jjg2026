@@ -64,7 +64,7 @@ public class SimDropService {
         //普通模式扣能量；特殊模式仅在最后一局掉落，不扣能量。
         if (enterType <= 0) {
             boolean normalMode = statInfo.getSpecialModes() != null && statInfo.getSpecialModes().contains(1);
-            if (normalMode || statInfo.getRemainFreeCount() <= 0) {
+            if (normalMode || statInfo.getRemainFreeCount() <= 0 || statInfo.isTriggerFree()) {
                 if (normalMode && base.getPower() < SimConstant.Common.SPIN_COST_POWER) {
                     guideService.triggerItemNotEnough(ctx, SimConstant.Item.ID_POWER);
                     log.info("能量不足, 跳过 slots 掉落联动 playerId={},gameType={},power={}", ctx.playerId(), gameType, base.getPower());
@@ -75,7 +75,7 @@ public class SimDropService {
                 int originalDropResetDay = base.getDropResetDay();
                 Map<Integer, Integer> originalDropCount = base.getDailyDropCount() == null
                         ? null : new HashMap<>(base.getDailyDropCount());
-                if (normalMode) {
+                if (normalMode || statInfo.isTriggerFree()) {
                     base.setPower(base.getPower() - SimConstant.Common.SPIN_COST_POWER);
 
                     //计算因消耗能量所以额外的获得
