@@ -2,6 +2,7 @@ package com.jjg.game.sim.pb;
 
 import com.jjg.game.common.utils.CommonUtil;
 import com.jjg.game.core.pb.KVInfo;
+import com.jjg.game.core.pb.KVLongInfo;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
 import com.jjg.game.sim.constant.BuildingType;
@@ -115,8 +116,8 @@ public final class SimPbConverter {
 
         if (buildingAreaTableCfg.getType() == BuildingType.GAME.code() || buildingAreaTableCfg.getType() == BuildingType.REST.code()) {
             for (BonusInfo bonusInfo : info.bonusInfos) {
-                for (KVInfo bonus : bonusInfo.bonus) {
-                    bonus.value = Math.toIntExact((long) bonus.value * 60);
+                for (KVLongInfo bonus : bonusInfo.bonus) {
+                    bonus.value *= 60L;
                 }
             }
 

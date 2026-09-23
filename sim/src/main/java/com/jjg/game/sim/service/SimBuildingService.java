@@ -17,6 +17,7 @@ import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.data.NoticeTipBuilder;
 import com.jjg.game.core.logger.CoreLogger;
 import com.jjg.game.core.pb.KVInfo;
+import com.jjg.game.core.pb.KVLongInfo;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.core.utils.TipUtils;
@@ -914,10 +915,10 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                 BonusInfo info = new BonusInfo();
                 info.typeValue = en.getKey().getCode();
                 info.bonus = List.of(
-                        new KVInfo(Code.BUILD_BONUS_EMPLOYEE, Math.toIntExact(employee)),
-                        new KVInfo(Code.BUILD_BONUS_MANAGER, Math.toIntExact(manager)),
-                        new KVInfo(Code.BUILD_BONUS_MEDAL, medal),
-                        new KVInfo(Code.BUILD_BONUS_SKILL, Math.toIntExact(skill)));
+                        new KVLongInfo(Code.BUILD_BONUS_EMPLOYEE, employee),
+                        new KVLongInfo(Code.BUILD_BONUS_MANAGER, manager),
+                        new KVLongInfo(Code.BUILD_BONUS_MEDAL, medal),
+                        new KVLongInfo(Code.BUILD_BONUS_SKILL, skill));
                 bonusInfos.add(info);
             }
         }
