@@ -453,6 +453,13 @@ public class GrowthFundController extends BaseActivityController implements Orde
         if (shopRechargeListCfg == null || shopRechargeListCfg.getPrice() == null) {
             return result;
         }
+
+        int tmpCode = tmpOrderHandle(corePlayerService, player, 1001, AddType.ACTIVITY_GROWTH_FUND_BUY, 0);
+        if (tmpCode != Code.SUCCESS) {
+            result.code = tmpCode;
+            return result;
+        }
+
         result.code = Code.SUCCESS;
         result.data = shopRechargeListCfg.getPrice();
         return result;

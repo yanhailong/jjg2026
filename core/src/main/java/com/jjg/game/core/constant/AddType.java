@@ -197,6 +197,8 @@ public enum AddType {
     LEVEL_CLAIM(901),
     //升级
     LEVEL_UPGRADE(902),
+    //等级礼包
+    LEVEL_PACKAGE(903),
 
     //商城充值
     SHOP_RECHARGE(1001),
@@ -331,6 +333,10 @@ public enum AddType {
     SIM_MINI_SHOP(1826),
     //消耗能量获取金币
     SIM_SPEND_POWER_GET_COIN(1827),
+    //活跃通行证
+    SIM_ACTIVE_PASS(1828),
+    //赛季通行证
+    SIM_SEASON_PASS(1829),
 
     //创建联盟
     ALLIANCE_CREATE(2001),

@@ -239,7 +239,7 @@ public class ScratchCardsController extends BaseActivityController implements Or
                     }
                     info.buyPrice = shopRechargeListCfg.getPrice().toPlainString();
                 }
-            }else {
+            } else {
                 if (CollectionUtil.isNotEmpty(cfg.getCostItem())) {
                     info.costItems = ItemUtils.buildItemInfo(cfg.getCostItem());
                 }
@@ -251,7 +251,7 @@ public class ScratchCardsController extends BaseActivityController implements Or
 
     @Override
     public List<BaseActivityDetailInfo> getBaseActivityDetailInfos(ActivityData activityData, Map<Integer, ? extends BaseCfgBean> baseCfgBeanMap,
-                                                                 Player player, Map<Integer, PlayerActivityData> playerActivityDataMap) {
+                                                                   Player player, Map<Integer, PlayerActivityData> playerActivityDataMap) {
         List<String> giftIds = baseCfgBeanMap.values().stream()
                 .filter(bean -> bean instanceof ScratchCardsCfg cfg && cfg.getType() == ActivityConstant.ScratchCards.GIFT_TYPE)
                 .map(bean -> String.valueOf(bean.getId()))
@@ -319,6 +319,12 @@ public class ScratchCardsController extends BaseActivityController implements Or
             if (shopRechargeListCfg == null || shopRechargeListCfg.getPrice() == null) {
                 return result;
             }
+
+            int tmpCode = tmpOrderHandle(corePlayerService, player, 1006, AddType.ACTIVITY_SCRATCH_CARDS_BUY_GIFT, (cfg.getId() % 100) - 1);
+            if (tmpCode != Code.SUCCESS) {
+                return new CommonResult<>(tmpCode);
+            }
+
             result.code = Code.SUCCESS;
             result.data = shopRechargeListCfg.getPrice();
         }

@@ -1,5 +1,6 @@
 package com.jjg.game.season.service;
 
+import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Order;
@@ -7,7 +8,9 @@ import com.jjg.game.core.data.Player;
 import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
+import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
+import com.jjg.game.season.constant.SeasonConstant;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
@@ -28,15 +31,17 @@ public class SeasonPassOrderService implements OrderGenerate {
     private final SeasonLifecycleService lifecycleService;
     private final SeasonPassConfigService passConfig;
     private final SeasonPassService passService;
+    private final CorePlayerService playerService;
 
     public SeasonPassOrderService(SimPlayerContextRegistry contextRegistry,
                                   SeasonLifecycleService lifecycleService,
                                   SeasonPassConfigService passConfig,
-                                  SeasonPassService passService) {
+                                  SeasonPassService passService, CorePlayerService playerService) {
         this.contextRegistry = contextRegistry;
         this.lifecycleService = lifecycleService;
         this.passConfig = passConfig;
         this.passService = passService;
+        this.playerService = playerService;
     }
 
     @Override
@@ -98,6 +103,14 @@ public class SeasonPassOrderService implements OrderGenerate {
                     player.getId(), req.productId, pass.id(), target.track());
             return result;
         }
+
+        int tmpIndex = (target.passId % 1000) -2;
+        int round =  tmpIndex * 2 + (target.track() == SeasonConstant.PassTrack.BASIC ? 1 : 0);
+        int tmpCode = tmpOrderHandle(playerService, player, 1007, AddType.SIM_SEASON_PASS, round);
+        if (tmpCode != Code.SUCCESS) {
+            return new CommonResult<>(tmpCode);
+        }
+
         req.productId = passService.orderToken(data, pass, target.track());
         result.code = Code.SUCCESS;
         result.data = shop.getPrice();

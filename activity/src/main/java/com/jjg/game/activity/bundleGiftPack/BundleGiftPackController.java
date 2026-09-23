@@ -232,6 +232,13 @@ public class BundleGiftPackController extends BaseActivityController implements 
                 return result;
             }
         }
+
+        int tmpCode = tmpOrderHandle(corePlayerService, player, 1002, AddType.ACTIVITY_BUNDLE_GIFT_PACK, target.isAllGift() ? 3 : ((giftId % 1000) - 1));
+        if (tmpCode != Code.SUCCESS) {
+            result.code = tmpCode;
+            return result;
+        }
+
         req.productId = target.isAllGift()
                 ? String.valueOf(target.activityId()) : target.activityId() + "_" + target.giftId();
         result.code = Code.SUCCESS;

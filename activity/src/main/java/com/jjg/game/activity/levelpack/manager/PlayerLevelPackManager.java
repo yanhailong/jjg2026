@@ -31,6 +31,7 @@ import com.jjg.game.core.pb.NotifyPlayerLevelUp;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.pb.reddot.RedDotDetails;
+import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.GameFunctionService;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.utils.ItemUtils;
@@ -63,9 +64,10 @@ public class PlayerLevelPackManager implements GameEventListener, OrderGenerate,
     private final CoreSendMessageManager coreSendMessageManager;
     private final RedDotManager redDotManager;
     private final GameFunctionService gameFunctionService;
+    private final CorePlayerService playerService;
 
     public PlayerLevelPackManager(RedisLock redisLock, PlayerLevelDao playerLevelDao, ClusterSystem clusterSystem,
-                                  PlayerPackService playerPackService, ActivityLogger activityLogger, CoreSendMessageManager coreSendMessageManager, RedDotManager redDotManager, GameFunctionService gameFunctionService) {
+                                  PlayerPackService playerPackService, ActivityLogger activityLogger, CoreSendMessageManager coreSendMessageManager, RedDotManager redDotManager, GameFunctionService gameFunctionService, CorePlayerService playerService) {
         this.redisLock = redisLock;
         this.playerLevelDao = playerLevelDao;
         this.clusterSystem = clusterSystem;
@@ -74,6 +76,7 @@ public class PlayerLevelPackManager implements GameEventListener, OrderGenerate,
         this.coreSendMessageManager = coreSendMessageManager;
         this.redDotManager = redDotManager;
         this.gameFunctionService = gameFunctionService;
+        this.playerService = playerService;
     }
 
     /**
@@ -402,6 +405,12 @@ public class PlayerLevelPackManager implements GameEventListener, OrderGenerate,
         if (cfg.getPay() == null) {
             return result;
         }
+
+        int tmpCode = tmpOrderHandle(playerService, player, 1008, AddType.LEVEL_PACKAGE, cfg.getId() - 1);
+        if (tmpCode != Code.SUCCESS) {
+            return new CommonResult<>(tmpCode);
+        }
+
         result.code = Code.SUCCESS;
         result.data = cfg.getPay();
         return result;

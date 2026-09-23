@@ -323,6 +323,13 @@ public class BuyOneGetSevenController extends BaseActivityController
                     activityData.getChannelCommodity());
             return result;
         }
+
+        int tmpCode = tmpOrderHandle(corePlayerService, player, 1003, AddType.ACTIVITY_BUY_ONE_GET_SEVEN_BUY, 0);
+        if (tmpCode != Code.SUCCESS) {
+            result.code = tmpCode;
+            return result;
+        }
+
         result.code = Code.SUCCESS;
         result.data = shopCfg.getPrice();
         return result;

@@ -274,6 +274,12 @@ public class DailyRechargeController extends BaseActivityController implements O
             if (cfg.getCost() == null) {
                 return result;
             }
+
+            int tmpCode = tmpOrderHandle(corePlayerService, player, 1009, AddType.ACTIVITY_DAILY_RECHARGE_GIFT, cfg.getId() - 1);
+            if (tmpCode != Code.SUCCESS) {
+                return new CommonResult<>(tmpCode);
+            }
+
             result.code = Code.SUCCESS;
             result.data = cfg.getCost();
         }

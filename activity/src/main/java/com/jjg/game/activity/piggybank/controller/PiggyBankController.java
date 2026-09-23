@@ -56,7 +56,9 @@ public class PiggyBankController extends BaseActivityController implements Order
         return com.jjg.game.core.pb.reddot.RedDotDetails.RedDotType.COUNT;
     }
 
-    /** 只统计已满且可领取的罐子，不改变原有购买/领取规则。 */
+    /**
+     * 只统计已满且可领取的罐子，不改变原有购买/领取规则。
+     */
     @Override
     public long getRedDotCount(long playerId, ActivityData data) {
         Map<Integer, PiggyBankData> states = playerActivityDao.getPlayerActivityData(playerId, data.getType(), data.getId());
@@ -185,7 +187,7 @@ public class PiggyBankController extends BaseActivityController implements Order
                         .divide(GameConstant.TEN_THOUSAND_BD, RoundingMode.DOWN)
                         .longValue();
 
-                if(addValue < 1){
+                if (addValue < 1) {
                     continue;
                 }
 
@@ -449,6 +451,12 @@ public class PiggyBankController extends BaseActivityController implements Order
             if (cfg.getPay() == null) {
                 return result;
             }
+
+            int tmpCode = tmpOrderHandle(corePlayerService, player, 1005, AddType.ACTIVITY_PIGGY_BANK_REWARDS, cfg.getId() - 1);
+            if (tmpCode != Code.SUCCESS) {
+                return new CommonResult<>(tmpCode);
+            }
+
             result.code = Code.SUCCESS;
             result.data = cfg.getPay();
         }
