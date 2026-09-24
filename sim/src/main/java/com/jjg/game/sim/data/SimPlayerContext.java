@@ -1,12 +1,10 @@
 package com.jjg.game.sim.data;
 
 import com.alibaba.fastjson.JSONObject;
-import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PlayerController;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.sim.constant.BuildingOutputType;
-import com.jjg.game.sim.constant.SimConstant;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,8 +50,6 @@ public class SimPlayerContext {
     //成就徽章固定值加成缓存 (BuildingOutputType -> 固定值; 登录/成就完成后刷新; 内存态不落库)
     private Map<BuildingOutputType, Integer> medalBuffMap = new EnumMap<>(BuildingOutputType.class);
 
-    //近期已处理的旋转 RPC 幂等 id (内存态; 防 slots 超时重试双计, 同玩家 RPC 串行执行无需加锁)
-    private final LinkedHashMap<Long, CommonResult<SlotsSpinResult>> recentSpinResults = new LinkedHashMap<>();
     private static final int RECENT_SPIN_RESULT_MAX = 16;
 
     //赛季币结算幂等账本 (txnId -> 结算后余额; 内存态; 防扣/发赛季币的超时重试重复应用, 同玩家 RPC 串行无需加锁)
@@ -324,28 +320,6 @@ public class SimPlayerContext {
     }
 
     /**
-     * 返回近期同一旋转 RPC 已提交的结果；spinId=0 不参与幂等。
-     */
-    public CommonResult<SlotsSpinResult> spinResult(long spinId) {
-        return spinId == 0 ? null : recentSpinResults.get(spinId);
-    }
-
-    /**
-     * 记录旋转 RPC 的最终结果，供 slots 超时重试时原样返回。
-     */
-    public void recordSpinResult(long spinId, CommonResult<SlotsSpinResult> result) {
-        if (spinId == 0 || result == null) {
-            return;
-        }
-        recentSpinResults.put(spinId, result);
-        if (recentSpinResults.size() > RECENT_SPIN_RESULT_MAX) {
-            Iterator<Long> it = recentSpinResults.keySet().iterator();
-            it.next();
-            it.remove();
-        }
-    }
-
-    /**
      * 赛季币结算幂等: 命中则返回该 txnId 已提交后的余额, 未命中(含 txnId=0)返回 null。
      * 供 slots 超时重试同一 txnId 时避免重复扣/发。
      */
@@ -492,13 +466,13 @@ public class SimPlayerContext {
         this.slotsStatisticsData.setSpinCount(this.slotsStatisticsData.getSpinCount() + 1);
 
         this.slotsStatisticsData.addBigWinCount(statInfo.getBigShowId());
-        if(statInfo.getTypeNameId() == 1){
+        if (statInfo.getTypeNameId() == 1) {
 
-        }else if(statInfo.getTypeNameId() == 2){
+        } else if (statInfo.getTypeNameId() == 2) {
             this.slotsStatisticsData.setFreeCount(this.slotsStatisticsData.getFreeCount() + 1);
-        }else if(statInfo.getTypeNameId() == 3){
+        } else if (statInfo.getTypeNameId() == 3) {
             this.slotsStatisticsData.setSpecialCount(this.slotsStatisticsData.getSpecialCount() + 1);
-        }else if(statInfo.getTypeNameId() == 4){
+        } else if (statInfo.getTypeNameId() == 4) {
             this.slotsStatisticsData.setJackpoolCount(this.slotsStatisticsData.getJackpoolCount() + 1);
         }
 
@@ -506,7 +480,7 @@ public class SimPlayerContext {
         this.slotsStatisticsData.setAllBetCoin(this.slotsStatisticsData.getAllBetCoin() + statInfo.getBet());
 
         if (slotsSpinResult != null) {
-            this.slotsStatisticsData.setAllSpendPower(this.slotsStatisticsData.getAllSpendPower() + SimConstant.Common.SPIN_COST_POWER);
+            this.slotsStatisticsData.setAllSpendPower(this.slotsStatisticsData.getAllSpendPower() + slotsSpinResult.getCostPower());
             this.slotsStatisticsData.setAllSpendPowerGetCoin(this.slotsStatisticsData.getAllSpendPowerGetCoin() + slotsSpinResult.getSpendPowerGetCoin());
         }
     }

@@ -767,16 +767,6 @@ public class SimManager {
                 }
             }
 
-            CommonResult<SlotsSpinResult> cachedResult = ctx.spinResult(spinId);
-            if (cachedResult != null) {
-                log.warn("slots 联动重复投递, 返回原结果 playerId={},gameType={},spinId={}", playerId, gameType, spinId);
-                return cachedResult;
-            }
-
-            boolean normalMode = statInfo != null && statInfo.getSpecialModes() != null
-                    && statInfo.getSpecialModes().contains(1);
-            //仅普通模式且普通入口消耗体力，与 SimDropService 的实际扣能条件一致。
-            int configuredSpinCostPower = normalMode && enterType <= 0 ? SimConstant.Common.SPIN_COST_POWER : 0;
             //普通旋转沿用原语义：即使掉落失败也计入统计。试玩需要先通过 permit 幂等结算，避免 RPC 重试重复计数。
             if (!visitTrial) {
                 simStatsService.recordSpin(ctx.getSimBaseData(), gameType, statInfo);
@@ -788,7 +778,7 @@ public class SimManager {
             //slots的统计信息
             ctx.slotsStatistics(statInfo, result.data);
 
-            int actualSpinCostPower = result.success() ? configuredSpinCostPower : 0;
+            int actualSpinCostPower = result.success() ? result.data.getCostPower() : 0;
             //须在掉落结算后构造: 本次到账的道具要计入 itemGains, 12202 等按道具计数的条件才能推进
             GameConditionEvent conditionEvent = SimConditionEventFactory.fromSpin(
                     gameType, winTimes, actualSpinCostPower, statInfo,
@@ -796,9 +786,7 @@ public class SimManager {
                     enterType == EnterGameType.SEASON.getValue());
             if (!result.success()) {
 //                log.warn("slots 联动失败, onSpin执行失败 playerId={},gameType={},winTimes={},code={}", playerId, gameType, winTimes, result.code);
-                //试玩失败意味着 permit 已失效(重复投递等), 本次上报不可信, 不推进任何进度
                 if (visitTrial) {
-                    ctx.recordSpinResult(spinId, result);
                     return result;
                 }
             } else if (visitTrial) {
@@ -849,16 +837,11 @@ public class SimManager {
                 }
                 result.data.setGuideGroupIds(slotGuideGroups);
             }
-            ctx.recordSpinResult(spinId, result);
             return result;
         } catch (Exception e) {
             log.error("slots 联动处理异常 playerId={},gameType={},winTimes={},spinId={}",
                     playerId, gameType, winTimes, spinId, e);
-            CommonResult<SlotsSpinResult> result = new CommonResult<>(Code.EXCEPTION);
-            if (ctx != null) {
-                ctx.recordSpinResult(spinId, result);
-            }
-            return result;
+            return new CommonResult<>(Code.EXCEPTION);
         }
     }
 

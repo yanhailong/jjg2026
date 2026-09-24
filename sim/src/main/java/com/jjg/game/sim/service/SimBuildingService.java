@@ -504,10 +504,10 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                 return;
             }
 
-            boolean remove = playerPackService.removeItems(ctx.getPlayer(), currentCfg.getUpgradeCost(), AddType.SIM_BUILDING_UPGRADE, null).success();
-            if (!remove) {
-                log.warn("升级建筑失败, 资源不足 playerId={},buildingId={},cost={}", ctx.playerId(), buildingId, currentCfg.getUpgradeCost());
-                res.code = Code.NOT_ENOUGH;
+            CommonResult<ItemOperationResult> commonResult = playerPackService.removeItems(ctx.getPlayer(), currentCfg.getUpgradeCost(), AddType.SIM_BUILDING_UPGRADE, null);
+            if (!commonResult.success()) {
+                log.warn("升级建筑失败, 资源不足 playerId={},buildingId={},cost={},code={}", ctx.playerId(), buildingId, currentCfg.getUpgradeCost(),commonResult.code);
+                res.code = commonResult.code;
                 ctx.send(res);
                 return;
             }

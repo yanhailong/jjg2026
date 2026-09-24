@@ -1,6 +1,7 @@
 package com.jjg.game.sim.data;
 
 import com.jjg.game.core.task.pb.Task;
+import org.springframework.data.annotation.Transient;
 
 import java.util.HashMap;
 import java.util.List;
@@ -22,6 +23,9 @@ public class SlotsSpinResult {
     private List<Integer> guideGroupIds;
     //因为消耗能量所以额外获取的货币
     private long spendPowerGetCoin;
+    //扣除的能量
+    @Transient
+    private transient int costPower;
 
     public Map<Integer, Long> getItemsMap() {
         return itemsMap;
@@ -90,5 +94,13 @@ public class SlotsSpinResult {
 
     public void setSpendPowerGetCoin(long spendPowerGetCoin) {
         this.spendPowerGetCoin = spendPowerGetCoin;
+    }
+
+    public int getCostPower() {
+        return costPower;
+    }
+
+    public void setCostPower(int costPower) {
+        this.costPower = costPower;
     }
 }

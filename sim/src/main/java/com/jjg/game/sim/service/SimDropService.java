@@ -63,55 +63,66 @@ public class SimDropService {
 
         //普通模式扣能量；特殊模式仅在最后一局掉落，不扣能量。
         if (enterType <= 0) {
-            boolean normalMode = statInfo.getSpecialModes() != null && statInfo.getSpecialModes().contains(1);
-            if (normalMode || statInfo.getRemainFreeCount() <= 0 || statInfo.isTriggerFree()) {
-                if (normalMode && base.getPower() < SimConstant.Common.SPIN_COST_POWER) {
+            Map<Integer, Long> dropResult = null;
+
+            int originalPower = base.getPower();
+            int originalDropResetDay = base.getDropResetDay();
+            Map<Integer, Integer> originalDropCount = base.getDailyDropCount() == null ? null : new HashMap<>(base.getDailyDropCount());
+
+            if (statInfo.isFreeMode()) {
+                if (statInfo.getRemainFreeCount() > 0) {
+                    result.code = Code.FAIL;
+                    //免费模式不扣除能量，也不掉落
+                    return result;
+                }
+
+                //免费模式最后一局有特殊掉落
+                dropResult = specialRollDrop(base, gameType, winTimes);
+            } else {
+                //检查能量余额是否足够
+                if (base.getPower() < SimConstant.Common.SPIN_COST_POWER) {
                     guideService.triggerItemNotEnough(ctx, SimConstant.Item.ID_POWER);
                     log.info("能量不足, 跳过 slots 掉落联动 playerId={},gameType={},power={}", ctx.playerId(), gameType, base.getPower());
                     result.code = Code.FAIL;
                     return result;
                 }
-                int originalPower = base.getPower();
-                int originalDropResetDay = base.getDropResetDay();
-                Map<Integer, Integer> originalDropCount = base.getDailyDropCount() == null
-                        ? null : new HashMap<>(base.getDailyDropCount());
-                if (normalMode || statInfo.isTriggerFree()) {
-                    base.setPower(base.getPower() - SimConstant.Common.SPIN_COST_POWER);
 
-                    //计算因消耗能量所以额外的获得
-                    if (statInfo.getWin() > 0) {
-                        GlobalConfigCfg globalConfigCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.EXTRA_COIN);
-                        if (globalConfigCfg != null && globalConfigCfg.getIntValue() > 0) {
-                            slotsSpinResult.setSpendPowerGetCoin(statInfo.getWin() * globalConfigCfg.getIntValue() / 10000);
-                        }
+                //扣除能量
+                base.setPower(base.getPower() - SimConstant.Common.SPIN_COST_POWER);
+                slotsSpinResult.setCostPower(SimConstant.Common.SPIN_COST_POWER);
+
+                //计算因消耗能量所以额外的获得
+                if (statInfo.getWin() > 0) {
+                    GlobalConfigCfg globalConfigCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.EXTRA_COIN);
+                    if (globalConfigCfg != null && globalConfigCfg.getIntValue() > 0) {
+                        slotsSpinResult.setSpendPowerGetCoin(statInfo.getWin() * globalConfigCfg.getIntValue() / 10000);
                     }
                 }
+                //道具掉落
+                dropResult = normalRollDrop(base, gameType, winTimes);
 
-                Map<Integer, Long> dropResult;
-                try {
-                    //掉落
-                    dropResult = normalMode ? normalRollDrop(base, gameType, winTimes)
-                            : specialRollDrop(base, gameType, winTimes);
-
-                    //入账 (掉落可能含能量/知名度等特殊资源, 统一走 addItems 路由)
-                    if (!dropResult.isEmpty()) {
-                        CommonResult<ItemOperationResult> addResult = playerPackService.addItems(
-                                ctx.playerId(), dropResult, AddType.SIM_SLOTS_DROP, null, false);
-                        if (addResult == null || !addResult.success()) {
-                            restoreSpinState(base, originalPower, originalDropResetDay, originalDropCount);
-                            int code = addResult == null ? Code.FAIL : addResult.code;
-                            log.info("slots 掉落失败 playerId={},gameType={},winTimes={},code={}",
-                                    ctx.playerId(), gameType, winTimes, code);
-                            result.code = code;
-                            return result;
-                        }
-                    }
-                } catch (RuntimeException e) {
-                    restoreSpinState(base, originalPower, originalDropResetDay, originalDropCount);
-                    throw e;
-                }
-                slotsSpinResult.setItemsMap(dropResult);
+                log.info("扣除能量 playerId={},costPower={},spendPowerGetCoin={},dropResult={}", base.getPlayerId(), slotsSpinResult.getCostPower(), slotsSpinResult.getSpendPowerGetCoin(), dropResult);
             }
+
+            try {
+                //入账
+                if (dropResult != null && !dropResult.isEmpty()) {
+                    CommonResult<ItemOperationResult> addResult = playerPackService.addItems(
+                            ctx.playerId(), dropResult, AddType.SIM_SLOTS_DROP, null, false);
+                    if (addResult == null || !addResult.success()) {
+                        restoreSpinState(base, originalPower, originalDropResetDay, originalDropCount);
+                        int code = addResult == null ? Code.FAIL : addResult.code;
+                        log.info("slots 掉落失败 playerId={},gameType={},winTimes={},code={}",
+                                ctx.playerId(), gameType, winTimes, code);
+                        result.code = code;
+                        return result;
+                    }
+                }
+            } catch (RuntimeException e) {
+                restoreSpinState(base, originalPower, originalDropResetDay, originalDropCount);
+                throw e;
+            }
+            slotsSpinResult.setItemsMap(dropResult);
         }
 
         slotsSpinResult.setPower(base.getPower());
