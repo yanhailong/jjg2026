@@ -408,6 +408,7 @@ public class PlayerLevelPackManager implements GameEventListener, OrderGenerate,
 
         int tmpCode = tmpOrderHandle(playerService, player, 1008, AddType.LEVEL_PACKAGE, cfg.getId() - 1);
         if (tmpCode != Code.SUCCESS) {
+            log.warn("等级礼包临时钻石购买失败 playerId={},round={}", player.getId(), cfg.getId() - 1);
             return new CommonResult<>(tmpCode);
         }
 

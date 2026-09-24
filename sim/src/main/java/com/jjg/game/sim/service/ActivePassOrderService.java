@@ -2,6 +2,7 @@ package com.jjg.game.sim.service;
 
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.service.CorePlayerService;
+import com.jjg.game.season.service.SeasonPassOrderService;
 import com.jjg.game.sim.data.ActivePassPurchase;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.*;
@@ -12,6 +13,8 @@ import com.jjg.game.core.service.OrderService;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -23,6 +26,8 @@ import static com.jjg.game.sim.constant.SimConstant.ActivePass.*;
  */
 @Service
 public class ActivePassOrderService implements OrderGenerate {
+    private static final Logger log = LoggerFactory.getLogger(ActivePassOrderService.class);
+
     private final ActivePassService service;
     private final ActivePassConfigService config;
     private final ActivePassRouter router;
@@ -61,6 +66,7 @@ public class ActivePassOrderService implements OrderGenerate {
 
         int tmpCode = tmpOrderHandle(playerService, player, 1004, AddType.SIM_ACTIVE_PASS, target[1] == BASIC ? 0 : 1);
         if (tmpCode != Code.SUCCESS) {
+            log.warn("活跃通行证临时钻石购买失败 playerId={},round={}", player.getId(), target[1] == BASIC ? 0 : 1);
             return new CommonResult<>(tmpCode);
         }
         return new CommonResult<>(Code.SUCCESS, result.price);

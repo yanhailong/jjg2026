@@ -277,6 +277,7 @@ public class DailyRechargeController extends BaseActivityController implements O
 
             int tmpCode = tmpOrderHandle(corePlayerService, player, 1009, AddType.ACTIVITY_DAILY_RECHARGE_GIFT, cfg.getId() - 1);
             if (tmpCode != Code.SUCCESS) {
+                log.warn("每日充值临时钻石购买失败 playerId={},round={}", player.getId(), cfg.getId() - 1);
                 return new CommonResult<>(tmpCode);
             }
 

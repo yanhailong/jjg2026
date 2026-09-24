@@ -43,6 +43,7 @@ import com.jjg.game.core.utils.TipUtils;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.BaseCfgBean;
 import com.jjg.game.sampledata.bean.GameFunctionCfg;
+import com.jjg.game.sampledata.bean.ItemCfg;
 import com.jjg.game.sampledata.container.BaseCfgContainer;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -196,6 +197,11 @@ public class CoreMessageHandler {
                 return;
             }
 
+            if ("addAllItem".equalsIgnoreCase(cmd)) {
+                addAllItem(res, playerController, arr);
+                return;
+            }
+
             if ("playerWinMarquee".equalsIgnoreCase(cmd)) {
                 marqueeManager.playerWinMarquee("shiyi", 17001, 100100026, 500000, false);
                 return;
@@ -210,7 +216,6 @@ public class CoreMessageHandler {
                 playerController.send(res);
                 return;
             }
-
 
             if ("bindThird".equalsIgnoreCase(cmd)) {
                 bindThirdAccount(res, playerController, arr);
@@ -427,6 +432,39 @@ public class CoreMessageHandler {
 //        resCoreGetPack.packItemInfos = playerPackService.getPlayerPack(playerController.playerId());
 //        playerController.send(resCoreGetPack);
         log.debug("添加道具成功 playerId = {},orders = {}", playerController.playerId(), orders);
+    }
+
+    private void addAllItem(ResGm res, PlayerController playerController, String[] orders) throws Exception {
+        if (orders.length < 2) {
+            res.code = Code.PARAM_ERROR;
+            log.debug("orders 为空，使用gm失败 playerId = {},orders = {}", playerController.playerId(), orders);
+            playerController.send(res);
+            return;
+        }
+
+        Long count = Long.parseLong(orders[1]);
+        if (count > Integer.MAX_VALUE) {
+            res.code = Code.PARAM_ERROR;
+            log.debug("使用gm添加所有道具失败，count超过限制 playerId = {},orders = {}", playerController.playerId(), orders);
+            playerController.send(res);
+            return;
+        }
+
+        Map<Integer, Long> itemsMap = new HashMap<>();
+
+        for (ItemCfg item : GameDataManager.getItemCfgList()) {
+            itemsMap.put(item.getId(), count);
+        }
+
+        CommonResult<ItemOperationResult> result = playerPackService.addItems(playerController.playerId(), itemsMap, AddType.GM_OPERATOR, true);
+        if (!result.success()) {
+            res.code = result.code;
+            log.debug("使用gm失败 playerId = {},orders = {}", playerController.playerId(), orders);
+            playerController.send(res);
+            return;
+        }
+        playerController.send(res);
+        log.debug("添加所有道具成功 playerId = {},orders = {}", playerController.playerId(), orders);
     }
 
     private void bindThirdAccount(ResGm res, PlayerController playerController, String[] orders) {

@@ -39,6 +39,8 @@ public class VisitorQuestCfg extends BaseCfgBean {
   protected int Resource;
   /** 服务能力 */
   protected int ServiceCapacity;
+  /** 新获得是否显示全身图像信息 */
+  protected boolean ShowNewGetIcon;
   /** 特殊交互建筑与概率 */
   protected Map<Integer,Integer> SpecialInteraction;
   /** 指定区域 */
@@ -98,6 +100,11 @@ public class VisitorQuestCfg extends BaseCfgBean {
   /** 返回服务能力 */
   public int getServiceCapacity() {
     return ServiceCapacity;
+  }
+
+  /** 返回新获得是否显示全身图像信息 */
+  public boolean getShowNewGetIcon() {
+    return ShowNewGetIcon;
   }
 
   /** 返回特殊交互建筑与概率 */

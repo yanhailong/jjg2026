@@ -119,7 +119,7 @@ public class AdsRewardController extends BaseActivityController {
             }
 
             CommonResult<ItemOperationResult> added = playerPackService.addItems(
-                    playerId, cfg.getRewards(), AddType.ACTIVITY_ADS_REWARD, false);
+                    playerId, cfg.getRewards(), AddType.ACTIVITY_ADS_REWARD, true);
             if (!added.success()) {
                 res.code = added.code;
                 return res;

@@ -29,6 +29,8 @@ public class EmployeeProfileCfg extends BaseCfgBean {
   protected int ProfessionID;
   /** 序列ID */
   protected int SequenceID;
+  /** 新获得是否显示全身图像信息 */
+  protected boolean ShowNewGetIcon;
   /** 技能 */
   protected List<Integer> SkillIdList;
   /** 雇员描述多语言 */
@@ -57,6 +59,11 @@ public class EmployeeProfileCfg extends BaseCfgBean {
   /** 返回序列ID */
   public int getSequenceID() {
     return SequenceID;
+  }
+
+  /** 返回新获得是否显示全身图像信息 */
+  public boolean getShowNewGetIcon() {
+    return ShowNewGetIcon;
   }
 
   /** 返回技能 */

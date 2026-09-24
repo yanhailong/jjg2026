@@ -236,6 +236,7 @@ public class BundleGiftPackController extends BaseActivityController implements 
         int tmpCode = tmpOrderHandle(corePlayerService, player, 1002, AddType.ACTIVITY_BUNDLE_GIFT_PACK, target.isAllGift() ? 3 : ((giftId % 1000) - 1));
         if (tmpCode != Code.SUCCESS) {
             result.code = tmpCode;
+            log.warn("集合礼包临时钻石购买失败 playerId={},round={}", player.getId(), target.isAllGift() ? 3 : ((giftId % 1000) - 1));
             return result;
         }
 

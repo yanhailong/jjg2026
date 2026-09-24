@@ -322,6 +322,7 @@ public class ScratchCardsController extends BaseActivityController implements Or
 
             int tmpCode = tmpOrderHandle(corePlayerService, player, 1006, AddType.ACTIVITY_SCRATCH_CARDS_BUY_GIFT, (cfg.getId() % 100) - 1);
             if (tmpCode != Code.SUCCESS) {
+                log.warn("刮刮卡临时钻石购买失败 playerId={},round={}", player.getId(), (cfg.getId() % 100) - 1);
                 return new CommonResult<>(tmpCode);
             }
 

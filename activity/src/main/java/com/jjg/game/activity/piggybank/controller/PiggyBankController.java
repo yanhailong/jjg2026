@@ -454,6 +454,7 @@ public class PiggyBankController extends BaseActivityController implements Order
 
             int tmpCode = tmpOrderHandle(corePlayerService, player, 1005, AddType.ACTIVITY_PIGGY_BANK_REWARDS, cfg.getId() - 1);
             if (tmpCode != Code.SUCCESS) {
+                log.warn("储钱罐临时钻石购买失败 playerId={},round={}", player.getId(), cfg.getId() - 1);
                 return new CommonResult<>(tmpCode);
             }
 
