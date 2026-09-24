@@ -169,6 +169,8 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
 
             res.buildingInfo = SimPbConverter.toBuildingInfo(ctx, configCache, buildingData, buildingUpgradeCfg,
                     areaCfg.getUnlockGameId(), now);
+            res.shareHelp = buildingData.isUpgrading(now)
+                    && allianceHelpService.hasValidBuildingHelpOrder(ctx.playerId(), buildingId, now);
             //观看广告次数限制
             res.watchAdLimit = GameDataManager.getGlobalConfigCfg(SimConstant.Global.ID_WATCH_AD_LIMIT).getIntValue();
             //主管id
@@ -1361,6 +1363,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         data.setCdEndTime(0);
         data.setAdClearCount(0);
         data.setProgress(0);
+        allianceHelpService.removeBuildingHelpOrders(ctx.playerId(), data.getId());
         simCasinoService.addCasinoExp(ctx, 0);
         allianceEventService.onBuildingUpgrade(ctx.playerId(), data.getId(), data.getLevel());
 

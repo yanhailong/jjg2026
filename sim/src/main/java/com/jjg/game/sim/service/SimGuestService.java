@@ -1676,9 +1676,6 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         int dailyCount = specialGuestDailyCountService.getPaidCount(ctx.playerId(), poolCfg.getPoolType(), cfgId);
         if (dailyLimit > 0 && dailyCount >= dailyLimit) {
             res.code = Code.TODAY_CLIAM_LIMIT;
-        } else if (isSpecialGuestPurchaseLimitReached(
-                ctx.getCurrentCasino().getSpecialGuestPurchaseCounts().getOrDefault(specialGuestPurchaseKey(poolCfg.getId(), cfgId), 0))) {
-            res.code = Code.FAIL;
         } else if (costType == SimConstant.SpecialGuest.COST_DIAMOND) {
             buySpecialGuestWithDiamond(ctx, poolCfg, cfgId, priceValue, invite, res);
         } else if (costType == SimConstant.SpecialGuest.COST_CASH) {

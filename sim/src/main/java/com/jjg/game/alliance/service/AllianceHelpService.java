@@ -116,6 +116,7 @@ public class AllianceHelpService {
         }
         AlliancePlayerData playerData = alliancePlayerDao.getOrEmpty(playerId);
         int today = TimeHelper.getDayNumerical();
+        long now = System.currentTimeMillis();
         //每日求助限额按类型独立: 任务=固定值, 建筑加速(分享)=global 249
         boolean speedup = type == AllianceConst.HelpType.BUILD_SPEEDUP;
         int seekLimit = speedup
@@ -141,7 +142,7 @@ public class AllianceHelpService {
             //目标必须是本人正在升级CD中的建筑: 否则帮助只会累计到一个不会被消费的 key,
             //白扣帮助者次数且无任何效果
             BuildingData building = findBuildingData(playerId, targetId);
-            if (building == null || !building.isUpgrading(System.currentTimeMillis())) {
+            if (building == null || !building.isUpgrading(now)) {
                 res.code = Code.NOT_FOUND;
                 log.warn("发起联盟求助失败,目标建筑不在升级CD中 playerId={},targetId={}", playerId, targetId);
                 return res;
@@ -151,7 +152,8 @@ public class AllianceHelpService {
         }
         //同目标重复求助拦截 (扫当前订单, 订单量有界)
         for (AllianceHelpOrder order : alliance.getHelpOrders().values()) {
-            if (order.getOwnerId() == playerId && order.getType() == type && order.getTargetId() == targetId) {
+            if (order.getOwnerId() == playerId && order.getType() == type && order.getTargetId() == targetId
+                    && (!speedup || (!expired(order, now) && !order.full()))) {
                 res.code = Code.BUILDING_SHARE_LIMIT;
                 log.warn("发起联盟求助失败,同目标已有求助订单 playerId={},type={},targetId={},orderId={}", playerId, type, targetId, order.getOrderId());
                 return res;
@@ -164,7 +166,7 @@ public class AllianceHelpService {
         order.setOwnerId(playerId);
         order.setTargetId(targetId);
         order.setTargetName(targetName == null ? "" : targetName);
-        order.setCreateTime(System.currentTimeMillis());
+        order.setCreateTime(now);
         order.setMaxHelp(maxHelp);
         order.setHelpCount(0);
         boolean consumed = speedup
@@ -514,6 +516,41 @@ public class AllianceHelpService {
                 dailyHelpLimit,
                 Math.max(0, dailyShareLimit - playerData.speedupSeekCountOf(today)),
                 dailyShareLimit);
+    }
+
+    public boolean hasValidBuildingHelpOrder(long playerId, int buildingId, long now) {
+        long allianceId = cacheService.getAllianceId(playerId);
+        if (allianceId <= 0) {
+            return false;
+        }
+        AllianceData alliance = allianceDao.findById(allianceId).orElse(null);
+        if (alliance == null) {
+            return false;
+        }
+        return alliance.getHelpOrders().values().stream().anyMatch(order ->
+                order.getType() == AllianceConst.HelpType.BUILD_SPEEDUP
+                        && order.getOwnerId() == playerId && order.getTargetId() == buildingId
+                        && !expired(order, now) && !order.full());
+    }
+
+    public void removeBuildingHelpOrders(long playerId, int buildingId) {
+        long allianceId = cacheService.getAllianceId(playerId);
+        if (allianceId <= 0) {
+            return;
+        }
+        AllianceData alliance = allianceDao.findById(allianceId).orElse(null);
+        if (alliance == null) {
+            return;
+        }
+        List<Long> orderIds = alliance.getHelpOrders().values().stream()
+                .filter(order -> order.getType() == AllianceConst.HelpType.BUILD_SPEEDUP
+                        && order.getOwnerId() == playerId && order.getTargetId() == buildingId)
+                .map(AllianceHelpOrder::getOrderId)
+                .toList();
+        if (!orderIds.isEmpty()) {
+            allianceDao.removeHelpOrders(allianceId, orderIds);
+            cacheService.publishInvalidate(allianceId);
+        }
     }
 
     // =====================================================================

@@ -24,6 +24,8 @@ public class ResBuildingInfo extends AbstractResponse {
     public int managerLevel;
     @ProtoDesc("是否有雇员可设置为主管")
     public boolean canSetManager;
+    @ProtoDesc("是否分享过联盟求助")
+    public boolean shareHelp;
 
     public ResBuildingInfo(int code) {
         super(code);
