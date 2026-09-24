@@ -42,6 +42,8 @@ public class SimOnlineRewardService {
     private AllianceEventService allianceEventService;
     @Autowired
     private CoreLogger coreLogger;
+    @Autowired
+    private SimOnlineRewardRedDotService redDotService;
 
     public ResSimOnlineReward getInfo(SimPlayerContext ctx) {
         return getInfo(ctx, configCache.getOnlineRewardDiamondCosts(), globalInt(SimConstant.Global.ONLINE_REWARD_AD_CD));
@@ -148,6 +150,9 @@ public class SimOnlineRewardService {
         }
         res.rewards = buildingService.buildRewardInfos(rewards);
         fillClaimState(res.info, base, costs, System.currentTimeMillis());
+        if (watchAd) {
+            redDotService.refresh(ctx);
+        }
         return res;
     }
 

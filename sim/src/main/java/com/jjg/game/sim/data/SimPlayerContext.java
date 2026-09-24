@@ -90,6 +90,9 @@ public class SimPlayerContext {
     private long dashboardWarningCheckTime;
     private Boolean dashboardWarningSnapshot;
 
+    // 获取资源广告入口红点会话快照；冷却和每日次数变化时由 tick 更新。
+    private Boolean onlineRewardAdRedDotSnapshot;
+
     //是否在模拟游戏场景中
     private AtomicBoolean inCasino = new AtomicBoolean(true);
     //slots统计信息
@@ -141,6 +144,14 @@ public class SimPlayerContext {
 
     public void setDashboardWarningSnapshot(Boolean dashboardWarningSnapshot) {
         this.dashboardWarningSnapshot = dashboardWarningSnapshot;
+    }
+
+    public Boolean getOnlineRewardAdRedDotSnapshot() {
+        return onlineRewardAdRedDotSnapshot;
+    }
+
+    public void setOnlineRewardAdRedDotSnapshot(Boolean value) {
+        onlineRewardAdRedDotSnapshot = value;
     }
 
     //联盟免费捐献红点已检查的自然日 (内存态)
