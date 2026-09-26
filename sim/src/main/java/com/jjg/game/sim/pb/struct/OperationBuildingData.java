@@ -49,4 +49,6 @@ public class OperationBuildingData {
     public int warningLanguageId;
     @ProtoDesc("当前交互人数是否超过爆红阈值")
     public boolean capacityOverloaded;
+    @ProtoDesc("运营部Service展示值，对应当前曝光度；非运营部为0")
+    public long serviceCapacity;
 }
