@@ -81,6 +81,7 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         ActivePassConfigService.Period period = index.active(now);
         ActivePassData data = ctx.getActivePassData();
         boolean reset = false;
+        List<ActivePassTaskInfo> addedTasks = new ArrayList<>();
         if (data != null && (period == null || data.getPassId() != period.id())) {
             settle(data);
             // 历史到账按期读取文档；切换前确保旧期快照已写完。
@@ -113,23 +114,32 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
             if (data.getDay() != today) {
                 data.setDay(today);
                 data.getDailyTasks().clear();
+                reset = true;
+            }
+            if (data.getDailyTasks().size() < index.daily().size()) {
                 int allLevel = ctx.getSimBaseData().getAllLevel();
                 for (var entry : index.daily().entrySet()) {
+                    if (data.getDailyTasks().containsKey(entry.getKey())) {
+                        continue;
+                    }
                     List<ActivePassConfigService.TaskDefinition> candidates = entry.getValue().stream()
                             .filter(task -> allLevel > task.config().getCasinoLevelMin()).toList();
                     if (!candidates.isEmpty()) {
                         var chosen = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
-                        data.getDailyTasks().put(entry.getKey(), newTask(chosen.config().getId()));
+                        ActivePassTask task = newTask(chosen.config().getId());
+                        data.getDailyTasks().put(entry.getKey(), task);
+                        addedTasks.add(taskInfo(task));
                     }
                 }
-                reset = true;
             }
-            if (reset) {
+            if (reset || !addedTasks.isEmpty()) {
                 saves.enqueueSave(data);
             }
         }
         if (reset) {
             notifyUpdate(ctx, true, taskInfos(data));
+        } else if (!addedTasks.isEmpty()) {
+            notifyUpdate(ctx, false, addedTasks);
         }
         return data;
     }
