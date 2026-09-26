@@ -1,6 +1,7 @@
 package com.jjg.game.sim.data;
 
 import com.alibaba.fastjson.JSONObject;
+import com.jjg.game.common.proto.Pair;
 import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PlayerController;
 import com.jjg.game.season.data.SeasonPlayerData;
@@ -97,6 +98,8 @@ public class SimPlayerContext {
     private AtomicBoolean inCasino = new AtomicBoolean(true);
     //slots统计信息
     private SlotsStatisticsData slotsStatisticsData;
+
+    private Pair<Long,SlotsSpinResult> lastSpinResult;
 
     public boolean isBuildingRedDotDirty() {
         return buildingRedDotDirty;
@@ -494,5 +497,13 @@ public class SimPlayerContext {
             this.slotsStatisticsData.setAllSpendPower(this.slotsStatisticsData.getAllSpendPower() + slotsSpinResult.getCostPower());
             this.slotsStatisticsData.setAllSpendPowerGetCoin(this.slotsStatisticsData.getAllSpendPowerGetCoin() + slotsSpinResult.getSpendPowerGetCoin());
         }
+    }
+
+    public Pair<Long, SlotsSpinResult> getLastSpinResult() {
+        return lastSpinResult;
+    }
+
+    public void setLastSpinResult(Pair<Long, SlotsSpinResult> lastSpinResult) {
+        this.lastSpinResult = lastSpinResult;
     }
 }

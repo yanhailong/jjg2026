@@ -162,7 +162,7 @@ public class SlotsRPCLinkManager {
             GameRpcContext rpcContext = GameRpcContext.getContext();
             RpcReqParameterBuilder previousBuilder = rpcContext.getReqParameterBuilder();
             try {
-                rpcContext.withReqParameterBuilder(RpcReqParameterBuilder.create().addClusterClient(client).setTryMillisPerClient(1000));
+                rpcContext.withReqParameterBuilder(RpcReqParameterBuilder.create().addClusterClient(client).setTryMillisPerClient(8000));
                 boolean finalChangeNode = changeNode;
                 rpcContext.asyncCall(() -> toSimBridge.onSlotsSpin(
                                 playerId, gameType, winTimes, finalChangeNode, statInfo, trialPermit, playerGameData.getEnterType()))
