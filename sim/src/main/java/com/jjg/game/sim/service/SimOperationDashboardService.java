@@ -178,6 +178,8 @@ public class SimOperationDashboardService implements IRedDotService, SimPlayerTi
         Map<Integer, Integer> expectedLevels = expectedBuildingLevels(casino);
         int receptionBuildingId = configCache.getCasinoManageBuildId(
                 casino.getCasinoId(), ServerBuildingType.WELCOME);
+        int operationBuildingId = configCache.getCasinoManageBuildId(
+                casino.getCasinoId(), ServerBuildingType.OPERATIONS);
         List<OperationBuildingData> result = new ArrayList<>();
         if (casino.getBuildingData() == null || casino.getBuildingData().isEmpty()) {
             return result;
@@ -225,6 +227,8 @@ public class SimOperationDashboardService implements IRedDotService, SimPlayerTi
             data.interactionCount = receptionBuilding ? building.getReceptCount() : 0;
             data.exposure = values.getOrDefault(BuildingOutputType.EXPOSURE, 0L);
             data.awareness = values.getOrDefault(BuildingOutputType.AWARENESS, 0L);
+            // 客户端运营部沿用 Service 展示项；它对应运营部用于获客计算的曝光度。
+            data.serviceCapacity = building.getId() == operationBuildingId ? data.exposure : 0L;
 
             if (receptionBuilding) {
                 data.satisfactionRate = overview.satisfactionRate;
