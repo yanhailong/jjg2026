@@ -7,7 +7,6 @@ import com.jjg.game.alliance.service.AllianceEventService;
 import com.jjg.game.common.cluster.ClusterSystem;
 import com.jjg.game.common.concurrent.BaseHandler;
 import com.jjg.game.common.concurrent.PlayerExecutorGroupDisruptor;
-import com.jjg.game.common.proto.Pair;
 import com.jjg.game.common.utils.WheelTimerUtil;
 import com.jjg.game.core.base.condition.numeric.ActionConditionEvent;
 import com.jjg.game.core.base.condition.numeric.GameConditionEvent;
@@ -715,6 +714,7 @@ public class SimManager {
                     if (!isCurrentContext(ctx)) {
                         return;
                     }
+                    ctx.cleanUpSpinResults();
                     for (SimPlayerTickListener handler : tickHandlers) {
                         try {
                             handler.onTick(ctx, now);
@@ -768,9 +768,9 @@ public class SimManager {
                 }
             }
 
-            Pair<Long, SlotsSpinResult> lastSpinResult = ctx.getLastSpinResult();
-            if (lastSpinResult != null && lastSpinResult.getFirst() == spinId) {
-                return new CommonResult<>(Code.SUCCESS, lastSpinResult.getSecond());
+            CommonResult<SlotsSpinResult> cachedResult = ctx.spinResult(spinId);
+            if (cachedResult != null) {
+                return cachedResult;
             }
 
             //普通旋转沿用原语义：即使掉落失败也计入统计。试玩需要先通过 permit 幂等结算，避免 RPC 重试重复计数。
@@ -793,7 +793,7 @@ public class SimManager {
             if (!result.success()) {
 //                log.warn("slots 联动失败, onSpin执行失败 playerId={},gameType={},winTimes={},code={}", playerId, gameType, winTimes, result.code);
                 if (visitTrial) {
-                    ctx.setLastSpinResult(new Pair<>(spinId, result.data));
+                    ctx.recordSpinResult(spinId, result);
                     return result;
                 }
             } else if (visitTrial) {
@@ -844,12 +844,17 @@ public class SimManager {
                 }
                 result.data.setGuideGroupIds(slotGuideGroups);
             }
-            ctx.setLastSpinResult(new Pair<>(spinId, result.data));
+            ctx.recordSpinResult(spinId, result);
             return result;
         } catch (Exception e) {
             log.error("slots 联动处理异常 playerId={},gameType={},winTimes={},spinId={}",
                     playerId, gameType, winTimes, spinId, e);
-            return new CommonResult<>(Code.EXCEPTION);
+            CommonResult<SlotsSpinResult> result = new CommonResult<>(Code.EXCEPTION);
+            if (ctx != null) {
+                //可能已完成部分扣除/掉落；重放同一请求不能再次执行这些副作用。
+                ctx.recordSpinResult(spinId, result);
+            }
+            return result;
         }
     }
 
