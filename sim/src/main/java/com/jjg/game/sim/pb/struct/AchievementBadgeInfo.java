@@ -13,7 +13,7 @@ public class AchievementBadgeInfo {
     public int buildingId;
     @ProtoDesc("所属游戏ID(BuildingAreaTable.UnlockGameId)，0表示全局徽章")
     public int gameId;
-    @ProtoDesc("已完成任务数")
+    @ProtoDesc("已领取奖励的任务数")
     public int completedTaskCount;
     @ProtoDesc("任务总数")
     public int totalTaskCount;

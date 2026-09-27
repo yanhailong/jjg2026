@@ -48,7 +48,7 @@ public class SimPlayerContext {
         activePassData = data;
     }
 
-    //成就徽章固定值加成缓存 (BuildingOutputType -> 固定值; 登录/成就完成后刷新; 内存态不落库)
+    //成就徽章固定值加成缓存 (BuildingOutputType -> 固定值; 登录/成就领奖后刷新; 内存态不落库)
     private Map<BuildingOutputType, Integer> medalBuffMap = new EnumMap<>(BuildingOutputType.class);
 
     private static final int RECENT_SPIN_RESULT_MAX = 16;
