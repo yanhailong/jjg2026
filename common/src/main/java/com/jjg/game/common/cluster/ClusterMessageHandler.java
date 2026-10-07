@@ -143,10 +143,19 @@ public class ClusterMessageHandler {
     public void sessionKickout(Connect<ClusterMessage> connect, SessionKickout sessionKickout) {
         String sessionId = sessionKickout.sessionId;
         long playerId = sessionKickout.playerId;
-        log.info("用户被顶号下线，sessionId={}，playerId={}", sessionId, playerId);
-        GateSession gateSession = GateSession.getGateSessionMap().get(sessionId);
-        if (gateSession != null) {
-            gateSession.onKickout();
+
+        if (sessionKickout.removeSession) {
+            log.info("用户被移除session，sessionId={}，playerId={}", sessionId, playerId);
+            GateSession gateSession = GateSession.getGateSessionMap().get(sessionId);
+            if (gateSession != null) {
+                gateSession.close();
+            }
+        } else {
+            log.info("用户被顶号下线，sessionId={}，playerId={}", sessionId, playerId);
+            GateSession gateSession = GateSession.getGateSessionMap().get(sessionId);
+            if (gateSession != null) {
+                gateSession.onKickout();
+            }
         }
     }
 
