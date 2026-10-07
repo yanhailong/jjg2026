@@ -812,8 +812,12 @@ public class SharePromoteController extends BaseActivityController {
                 return;
             }
             List<ActivityData> data = dataMap.values().stream().filter(ActivityData::canRun).toList();
+            if (data.isEmpty()) {
+                log.info("没有开启的推广分享活动，跳过周榜奖励发放 configuredSize:{}", dataMap.size());
+                return;
+            }
             if (data.size() != 1) {
-                log.error("存在多个开启的推广分享活动 size:{}", dataMap.size());
+                log.error("存在多个开启的推广分享活动 size:{},activityIds:{}",data.size(), data.stream().map(ActivityData::getId).toList());
             }
             ActivityData activityData = data.getFirst();
             Map<Integer, SharePromoteCfg> baseCfgBeanMap = getDetailCfgBean(activityData);

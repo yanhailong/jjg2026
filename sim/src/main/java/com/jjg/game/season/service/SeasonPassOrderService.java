@@ -105,7 +105,7 @@ public class SeasonPassOrderService implements OrderGenerate {
         }
 
         int tmpIndex = (target.passId % 1000) -2;
-        int round =  tmpIndex * 2 + (target.track() == SeasonConstant.PassTrack.BASIC ? 1 : 0);
+        int round =  tmpIndex * 2 + (target.track() == SeasonConstant.PassTrack.BASIC ? 0 : 1);
         int tmpCode = tmpOrderHandle(playerService, player, 1007, AddType.SIM_SEASON_PASS, round);
         if (tmpCode != Code.SUCCESS) {
             log.warn("赛季通行证临时钻石购买失败 playerId={},round={}", player.getId(), round);
