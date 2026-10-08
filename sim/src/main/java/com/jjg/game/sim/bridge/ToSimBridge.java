@@ -22,16 +22,24 @@ import java.util.Map;
  * @date 2026/5/25
  */
 public interface ToSimBridge extends IGameRpc {
-    /** 在玩家所属 SIM 节点购买迷你商店商品。 */
+    /**
+     * 在玩家所属 SIM 节点购买迷你商店商品。
+     */
     ResBuyMiniShop buyMiniShop(long playerId, String productId);
 
-    /** 在玩家所属 SIM 节点请求本轮 slots 统计。 */
+    /**
+     * 在玩家所属 SIM 节点请求本轮 slots 统计。
+     */
     ResSlotsStatistics requestSlotsStatistics(long playerId);
 
-    /** 在玩家所属 SIM 节点完成一个新手引导步骤。 */
+    /**
+     * 在玩家所属 SIM 节点完成一个新手引导步骤。
+     */
     FinishGuideRpcResult finishGuide(long playerId, int guideId);
 
-    /** 在玩家所属 SIM 节点跳过整个新手引导组。 */
+    /**
+     * 在玩家所属 SIM 节点跳过整个新手引导组。
+     */
     SkipGuideGroupRpcResult skipGuideGroup(long playerId, int guideGroupId);
 
     /**
@@ -49,12 +57,12 @@ public interface ToSimBridge extends IGameRpc {
      * 赛季入口包含 SeasonGem + VisitorBonds。
      *
      * @param skillOwnerId 技能归属玩家（客座赌局为房主）
-     * @param casinoId   羁绊所属场景；0 表示玩家当前场景
-     * @param gameType   游戏类型
-     * @param seasonEntry 是否从赛季入口进入
+     * @param casinoId     羁绊所属场景；0 表示玩家当前场景
+     * @param gameType     游戏类型
+     * @param seasonEntry  是否从赛季入口进入
      */
     CommonResult<SlotsEntrySessionData> getSlotsSessionData(long skillOwnerId, int casinoId,
-                                                             int gameType, boolean seasonEntry);
+                                                            int gameType, boolean seasonEntry);
 
     /**
      * slots spin
@@ -74,16 +82,24 @@ public interface ToSimBridge extends IGameRpc {
      */
     ResSimTaskReward claimSimTaskReward(long playerId, int taskId);
 
-    /** 在玩家所属 SIM 节点执行指定赌场拜访。 */
+    /**
+     * 在玩家所属 SIM 节点执行指定赌场拜访。
+     */
     ResVisitCasino visitCasino(long playerId, long targetPlayerId, int casinoId);
 
-    /** 斗仙牌完成一次大结算后，批量推进真人玩家当前已接取的对应任务。 */
+    /**
+     * 斗仙牌完成一次大结算后，批量推进真人玩家当前已接取的对应任务。
+     */
     CommonResult<Boolean> onDouXianSettled(List<Long> playerIds);
 
-    /** 挖矿兑换成功：按本次消耗的兑换物 ID 和兑换次数推进已接取任务。 */
+    /**
+     * 挖矿兑换成功：按本次消耗的兑换物 ID 和兑换次数推进已接取任务。
+     */
     CommonResult<Boolean> onMiningExchange(long playerId, int itemId, long count);
 
-    /** 批量上报斗仙牌单回合中实际净赢为正的真人玩家。 */
+    /**
+     * 批量上报斗仙牌单回合中实际净赢为正的真人玩家。
+     */
     CommonResult<Boolean> onDouXianWins(int transactionItemId, Map<Long, Long> playerWins);
 
     /**
@@ -121,13 +137,13 @@ public interface ToSimBridge extends IGameRpc {
      * 从赛季进入的 slots 下注: 扣除玩家赛季币。按 transactionId 幂等 (超时重试同一 id 不重复扣)。
      * 余额不足返回 {@link com.jjg.game.core.constant.Code#NOT_ENOUGH}; 成功时 data 为扣除后的最新余额。
      */
-    CommonResult<Long> deductSeasonCoin(long playerId, long amount, long transactionId);
+    CommonResult<Long> deductSeasonCoin(long playerId, long amount, long transactionId, AddType addType, String desc);
 
     /**
      * 从赛季进入的 slots 中奖: 给玩家增加赛季币 (仅加余额, 不计入段位累计)。
      * 按 transactionId 幂等 (超时重试同一 id 不重复发); 成功时 data 为增加后的最新余额。
      */
-    CommonResult<Long> addSeasonCoin(long playerId, long amount, long transactionId);
+    CommonResult<Long> addSeasonCoin(long playerId, long amount, long transactionId, AddType addType, String desc);
 
     /**
      * 客座赌局每次旋转前授权；普通旋转由 slots 本地直接跳过该 RPC。
@@ -157,7 +173,9 @@ public interface ToSimBridge extends IGameRpc {
      */
     int getCombatPower(long playerId);
 
-    /** 获取模拟经营总等级，优先读取所属 Hall 内存，无上下文时读取数据库。 */
+    /**
+     * 获取模拟经营总等级，优先读取所属 Hall 内存，无上下文时读取数据库。
+     */
     int getSimAllLevel(long playerId);
 
     /**
@@ -219,10 +237,15 @@ public interface ToSimBridge extends IGameRpc {
 
     interface ActivePassBridge extends IGameRpc {
         ResActivePass activePassInfo(long playerId);
+
         ResActivePass claimActivePassTask(long playerId, int passId, int taskId, int day);
+
         ResActivePass claimActivePassRewards(long playerId, int passId, int rewardId, int track);
+
         ResActivePass buyActivePassPoints(long playerId, int passId, int count, int expectedPurchasedPoints);
+
         ActivePassPurchase prepareActivePassOrder(long playerId, int passId, int track);
+
         boolean receiveActivePassOrder(long playerId, String orderId);
     }
 }

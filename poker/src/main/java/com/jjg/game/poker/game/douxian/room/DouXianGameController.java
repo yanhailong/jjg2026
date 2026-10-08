@@ -270,7 +270,7 @@ public class DouXianGameController extends BasePokerGameController<DouXianGameDa
                     playerId, num, gameDataVo.getRoomCfg().getId());
             return Code.FAIL;
         }
-        CommonResult<Long> result = getPokerRPCLinkManager().deductSeasonCoin(account, num);
+        CommonResult<Long> result = getPokerRPCLinkManager().deductSeasonCoin(account, num, AddType.GAME_BET, null);
         log.info("斗仙牌赛季币扣除 playerId:{} amount:{} code:{} balance:{}",
                 playerId, num, result.code, account.getBalance());
         return result.code;
@@ -296,7 +296,7 @@ public class DouXianGameController extends BasePokerGameController<DouXianGameDa
                     playerId, num, gameDataVo.getRoomCfg().getId());
             return Code.FAIL;
         }
-        CommonResult<Long> result = getPokerRPCLinkManager().addSeasonCoin(account, num);
+        CommonResult<Long> result = getPokerRPCLinkManager().addSeasonCoin(account, num, AddType.GAME_SETTLEMENT, null);
         log.info("斗仙牌赛季币增加 playerId:{} amount:{} code:{} balance:{}",
                 playerId, num, result.code, account.getBalance());
         return result.code;
@@ -410,9 +410,9 @@ public class DouXianGameController extends BasePokerGameController<DouXianGameDa
         // 填充，这时候只能从seatInfo(坐下即有，不等开局)拿座上玩家，否则等待准备的房间列表会是空的
         List<Long> playerIdsForInfo = baseInfo.phase == EGamePhase.WAIT_READY
                 ? gameDataVo.getSeatInfo().values().stream()
-                        .filter(SeatInfo::isSeatDown)
-                        .map(SeatInfo::getPlayerId)
-                        .toList()
+                .filter(SeatInfo::isSeatDown)
+                .map(SeatInfo::getPlayerId)
+                .toList()
                 : gameDataVo.getActivePlayerIds();
         for (Long playerId : playerIdsForInfo) {
             // 重连/进房推送要按接收方视角脱敏：别人本回合还没结算亮牌的摆牌不能让重连玩家看到，见DESIGN.md 8.8
@@ -862,7 +862,9 @@ public class DouXianGameController extends BasePokerGameController<DouXianGameDa
         tryStartNextGame();
     }
 
-    /** 只统计本局实际开局的真人玩家；认输仍属于完成了本局结算。 */
+    /**
+     * 只统计本局实际开局的真人玩家；认输仍属于完成了本局结算。
+     */
     private void notifySettledPlayers() {
         Map<Long, String> players = new HashMap<>();
         for (Long playerId : new ArrayList<>(gameDataVo.getGameStartBalance().keySet())) {
@@ -879,7 +881,9 @@ public class DouXianGameController extends BasePokerGameController<DouXianGameDa
         }
     }
 
-    /** 每回合仅上报真人玩家的实际正向净赢；同一回合的亏损不抵扣此前已经累计的任务进度。 */
+    /**
+     * 每回合仅上报真人玩家的实际正向净赢；同一回合的亏损不抵扣此前已经累计的任务进度。
+     */
     public void notifyRoundWins(Map<Long, Long> roundChanges) {
         if (roundChanges == null || roundChanges.isEmpty()) {
             return;
@@ -904,7 +908,9 @@ public class DouXianGameController extends BasePokerGameController<DouXianGameDa
         }
     }
 
-    /** 按本回合真人玩家的实际净输赢更新斗仙牌水池。 */
+    /**
+     * 按本回合真人玩家的实际净输赢更新斗仙牌水池。
+     */
     public void updateCardLibPool(Map<Long, Long> roundChanges) {
         if (roundChanges == null || roundChanges.isEmpty()) {
             return;
@@ -918,7 +924,9 @@ public class DouXianGameController extends BasePokerGameController<DouXianGameDa
         }
     }
 
-    /** 大结算时按整局真人净输赢更新跨房间连续胜负次数。 */
+    /**
+     * 大结算时按整局真人净输赢更新跨房间连续胜负次数。
+     */
     private void updateCardLibWinStreak() {
         try {
             DouXianCardLibManager cardLibManager = CommonUtil.getContext().getBean(DouXianCardLibManager.class);
@@ -1155,7 +1163,9 @@ public class DouXianGameController extends BasePokerGameController<DouXianGameDa
         return result;
     }
 
-    /** GM强制当前玩家在本回合结算时触发得证大道或隐忍渡劫，仅覆盖特殊规则判定，不修改真实输赢。 */
+    /**
+     * GM强制当前玩家在本回合结算时触发得证大道或隐忍渡劫，仅覆盖特殊规则判定，不修改真实输赢。
+     */
     public CommonResult<String> gmForceSpecialRule(long playerId, int ruleType) {
         CommonResult<String> result = new CommonResult<>(Code.SUCCESS);
         if (ruleType != 1 && ruleType != 2) {
@@ -1234,7 +1244,9 @@ public class DouXianGameController extends BasePokerGameController<DouXianGameDa
         return null;
     }
 
-    /** GM换牌可能交换了其他玩家或场上牌，统一按每个接收者视角重新发送脱敏房间快照。 */
+    /**
+     * GM换牌可能交换了其他玩家或场上牌，统一按每个接收者视角重新发送脱敏房间快照。
+     */
     private void refreshPlayerSnapshotsAfterGm() {
         for (SeatInfo seatInfo : gameDataVo.getSeatInfo().values()) {
             PlayerController playerController = getRoomController().getPlayerController(seatInfo.getPlayerId());

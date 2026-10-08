@@ -1922,10 +1922,12 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                 return;
             }
 
+            Set<Integer> itemSet = new HashSet<>(itemIds);
+
             SimCasinoData casino = ctx.getCurrentCasino();
             Map<Integer, Long> inviteItems = new LinkedHashMap<>();
             Map<Integer, Integer> invitedGuests = new LinkedHashMap<>();
-            for (int itemId : itemIds) {
+            for (int itemId : itemSet) {
                 ItemCfg itemCfg = GameDataManager.getItemCfg(itemId);
                 long itemCount = casino.getSpecialGuestItemCounts().getOrDefault(itemId, 0L);
                 if (itemCount < 1) {
@@ -1941,7 +1943,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             }
             if (inviteItems.isEmpty()) {
                 log.warn("邀请特殊游客失败，当前场景未持有所选游客 playerId={},casinoId={},itemIds={}",
-                        ctx.playerId(), casino.getCasinoId(), itemIds);
+                        ctx.playerId(), casino.getCasinoId(), itemSet);
                 res.code = Code.NOT_ENOUGH_ITEM;
                 ctx.send(res);
                 return;

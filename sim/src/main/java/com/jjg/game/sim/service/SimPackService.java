@@ -6,9 +6,11 @@ import com.jjg.game.common.rpc.ClusterRpcReference;
 import com.jjg.game.common.rpc.GameRpcContext;
 import com.jjg.game.common.rpc.RpcReqParameterBuilder;
 import com.jjg.game.core.constant.AddType;
+import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.constant.GameConstant;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Item;
+import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.listener.SpecialItemListener;
 import com.jjg.game.core.logger.CoreLogger;
 import com.jjg.game.core.manager.RedDotManager;
@@ -130,7 +132,7 @@ public class SimPackService implements SpecialItemListener {
     }
 
     @Override
-    public boolean addItems(long playerId, List<Item> items, AddType addType, String desc, boolean notify) {
+    public CommonResult<ItemOperationResult> addItems(long playerId, List<Item> items, AddType addType, String desc, boolean notify) {
         ClusterClient owner = findRemoteSimNode(playerId);
         Map<Integer, Long> addedItems = mergeItems(items, false);
         Map<Integer, Long> beforeBalances = getCurrentBalances(owner, playerId, addedItems.keySet());
@@ -141,14 +143,23 @@ public class SimPackService implements SpecialItemListener {
         } else {
             added = addItemsHere(playerId, items, addType);
         }
-        if (added) {
-            if (!addedItems.isEmpty()) {
-                Map<Integer, Long> afterBalances = getCurrentBalances(owner, playerId, addedItems.keySet());
-                coreLogger.addItems(playerId, beforeBalances, addedItems, afterBalances, addType, desc);
-            }
-            notifyCurrentBalances(owner, playerId, items);
+
+        if(!added){
+            return new CommonResult(Code.FAIL);
         }
-        return added;
+
+        Map<Integer, Long> afterBalances = getCurrentBalances(owner, playerId, addedItems.keySet());
+        if (!addedItems.isEmpty()) {
+            coreLogger.addItems(playerId, beforeBalances, addedItems, afterBalances, addType, desc);
+        }
+        notifyCurrentBalances(owner, playerId, items);
+
+        CommonResult<ItemOperationResult> result = new CommonResult<>();
+        result.code = Code.SUCCESS;
+        result.data = new ItemOperationResult();
+        result.data.setChangeBeforeItemNum(beforeBalances);
+        result.data.setChangeEndItemNum(afterBalances);
+        return result;
     }
 
     /**
@@ -417,7 +428,7 @@ public class SimPackService implements SpecialItemListener {
      * 扣除也必须支持，否则离线发的混合奖励一旦背包侧失败就补偿不回来。
      */
     @Override
-    public boolean removeItems(long playerId, List<Item> items, AddType addType, String desc) {
+    public CommonResult<ItemOperationResult> removeItems(long playerId, List<Item> items, AddType addType, String desc) {
         ClusterClient owner = findRemoteSimNode(playerId);
         Map<Integer, Long> removedItems = mergeItems(items, true);
         Map<Integer, Long> beforeBalances = getCurrentBalances(owner, playerId, removedItems.keySet());
@@ -428,14 +439,23 @@ public class SimPackService implements SpecialItemListener {
         } else {
             removed = removeItemsHere(playerId, items, addType);
         }
-        if (removed) {
-            if (!removedItems.isEmpty()) {
-                Map<Integer, Long> afterBalances = getCurrentBalances(owner, playerId, removedItems.keySet());
-                coreLogger.consumeItem(playerId, beforeBalances, removedItems, afterBalances, addType);
-            }
-            notifyCurrentBalances(owner, playerId, items);
+
+        if(!removed){
+            return new CommonResult(Code.NOT_ENOUGH);
         }
-        return removed;
+
+        Map<Integer, Long> afterBalances = getCurrentBalances(owner, playerId, removedItems.keySet());
+        if (!removedItems.isEmpty()) {
+            coreLogger.consumeItem(playerId, beforeBalances, removedItems, afterBalances, addType);
+        }
+        notifyCurrentBalances(owner, playerId, items);
+
+        CommonResult<ItemOperationResult> result = new CommonResult<>();
+        result.code = Code.SUCCESS;
+        result.data = new ItemOperationResult();
+        result.data.setChangeBeforeItemNum(beforeBalances);
+        result.data.setChangeEndItemNum(afterBalances);
+        return result;
     }
 
     private Map<Integer, Long> mergeItems(List<Item> items, boolean removableOnly) {

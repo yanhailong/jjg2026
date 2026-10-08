@@ -10,11 +10,9 @@ import com.jjg.game.common.concurrent.PlayerExecutorGroupDisruptor;
 import com.jjg.game.common.utils.WheelTimerUtil;
 import com.jjg.game.core.base.condition.numeric.ActionConditionEvent;
 import com.jjg.game.core.base.condition.numeric.GameConditionEvent;
+import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
-import com.jjg.game.core.data.CommonResult;
-import com.jjg.game.core.data.ExitType;
-import com.jjg.game.core.data.Player;
-import com.jjg.game.core.data.PlayerController;
+import com.jjg.game.core.data.*;
 import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.GameFunctionService;
 import com.jjg.game.core.service.PlayerPackService;
@@ -938,7 +936,7 @@ public class SimManager {
         }
     }
 
-    public CommonResult<Long> deductSeasonCoin(long playerId, long amount, long transactionId) {
+    public CommonResult<Long> deductSeasonCoin(long playerId, long amount, long transactionId, AddType addType, String desc) {
         try {
             SimPlayerContext ctx = this.simPlayerContextRegistry.getContext(playerId);
             if (ctx == null) {
@@ -947,26 +945,40 @@ public class SimManager {
             if (ctx == null || ctx.getSeasonPlayerData() == null) {
                 return new CommonResult<>(Code.NOT_FOUND);
             }
+
+            if (ctx.getPlayer() == null) {
+                Player player = corePlayerService.get(playerId);
+                PlayerController playerController = new PlayerController(null, player);
+                ctx.setPlayerController(playerController);
+            }
+
             //幂等: 超时重试同一 txnId 直接返回已提交的余额, 不重复扣
             Long done = ctx.seasonTxnResult(transactionId);
             if (done != null) {
                 return new CommonResult<>(Code.SUCCESS, done);
             }
-            long balance = economyService.spendForSlots(ctx.getSeasonPlayerData(), amount);
-            if (balance < 0) {
-                return new CommonResult<>(Code.NOT_ENOUGH);
+
+            CommonResult<ItemOperationResult> commonResult = playerPackService.removeItem(ctx.getPlayer(), new Item(SimConstant.Item.ID_SEASON_COIN, amount), addType);
+            if (!commonResult.success()) {
+                log.warn("扣除赛季币失败 playerId={},amount={},addType={}", playerId, amount, addType);
+                return new CommonResult<>(commonResult.code);
+            }
+
+            long afterBalance = 0;
+            if (commonResult.data != null && commonResult.data.getChangeEndItemNum() != null && !commonResult.data.getChangeEndItemNum().isEmpty()) {
+                afterBalance = commonResult.data.getChangeEndItemNum().getOrDefault(SimConstant.Item.ID_SEASON_COIN, 0l);
             }
             //先记账本再落库: 内存态为准, 落库 best-effort (异常不回滚内存、不影响返回)
-            ctx.recordSeasonTxn(transactionId, balance);
+            ctx.recordSeasonTxn(transactionId, afterBalance);
             bestEffortSave(ctx.getSeasonPlayerData());
-            return new CommonResult<>(Code.SUCCESS, balance);
+            return new CommonResult<>(Code.SUCCESS, afterBalance);
         } catch (Exception e) {
             log.error("赛季币扣除失败 playerId={},amount={},txnId={}", playerId, amount, transactionId, e);
             return new CommonResult<>(Code.EXCEPTION);
         }
     }
 
-    public CommonResult<Long> addSeasonCoin(long playerId, long amount, long transactionId) {
+    public CommonResult<Long> addSeasonCoin(long playerId, long amount, long transactionId, AddType addType, String desc) {
         try {
             SimPlayerContext ctx = this.simPlayerContextRegistry.getContext(playerId);
             if (ctx == null) {
@@ -980,10 +992,18 @@ public class SimManager {
             if (done != null) {
                 return new CommonResult<>(Code.SUCCESS, done);
             }
-            long balance = economyService.addBalance(ctx.getSeasonPlayerData(), amount);
-            ctx.recordSeasonTxn(transactionId, balance);
+            CommonResult<ItemOperationResult> commonResult = playerPackService.addItem(playerId, SimConstant.Item.ID_SEASON_COIN, amount, addType);
+            if (!commonResult.success()) {
+                log.warn("添加赛季币失败 playerId={},amount={},addType={}", playerId, amount, addType);
+                return new CommonResult<>(commonResult.code);
+            }
+            long afterBalance = 0;
+            if (commonResult.data != null && commonResult.data.getChangeEndItemNum() != null && !commonResult.data.getChangeEndItemNum().isEmpty()) {
+                afterBalance = commonResult.data.getChangeEndItemNum().getOrDefault(SimConstant.Item.ID_SEASON_COIN, 0l);
+            }
+            ctx.recordSeasonTxn(transactionId, afterBalance);
             bestEffortSave(ctx.getSeasonPlayerData());
-            return new CommonResult<>(Code.SUCCESS, balance);
+            return new CommonResult<>(Code.SUCCESS, afterBalance);
         } catch (Exception e) {
             log.error("赛季币增加失败 playerId={},amount={},txnId={}", playerId, amount, transactionId, e);
             return new CommonResult<>(Code.EXCEPTION);

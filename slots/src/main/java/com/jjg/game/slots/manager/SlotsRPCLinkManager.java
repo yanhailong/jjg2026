@@ -281,15 +281,10 @@ public class SlotsRPCLinkManager {
      * (若首次已提交, 重试凭 txnId 幂等返回已扣余额, 避免超时误判导致丢币)。
      * 成功时 data 为最新余额; 余额不足返回 {@link Code#NOT_ENOUGH}。
      */
-    public CommonResult<Long> deductSeasonCoin(SlotsPlayerGameData playerGameData, long amount) {
+    public CommonResult<Long> deductSeasonCoin(SlotsPlayerGameData playerGameData, long amount, AddType addType, String desc) {
         long txnId = nextTxnId();
-        CommonResult<Long> result = seasonCoinCall(playerGameData,
-                t -> toSimBridge.deductSeasonCoin(playerGameData.getPlayerId(), amount, t), txnId, "扣除");
-        if (result.code != Code.EXCEPTION) {
-            return result;
-        }
         return seasonCoinCall(playerGameData,
-                t -> toSimBridge.deductSeasonCoin(playerGameData.getPlayerId(), amount, t), txnId, "扣除重试");
+                t -> toSimBridge.deductSeasonCoin(playerGameData.getPlayerId(), amount, t, addType, desc), txnId, "扣除");
     }
 
     /**
@@ -297,15 +292,10 @@ public class SlotsRPCLinkManager {
      * (若首次已提交, 重试凭 txnId 幂等确认, 避免超时误判导致漏发或凭空回补池)。
      * 成功时 data 为最新余额。
      */
-    public CommonResult<Long> addSeasonCoin(SlotsPlayerGameData playerGameData, long amount) {
+    public CommonResult<Long> addSeasonCoin(SlotsPlayerGameData playerGameData, long amount, AddType addType, String desc) {
         long txnId = nextTxnId();
-        CommonResult<Long> result = seasonCoinCall(playerGameData,
-                t -> toSimBridge.addSeasonCoin(playerGameData.getPlayerId(), amount, t), txnId, "增加");
-        if (result.code != Code.EXCEPTION) {
-            return result;
-        }
         return seasonCoinCall(playerGameData,
-                t -> toSimBridge.addSeasonCoin(playerGameData.getPlayerId(), amount, t), txnId, "增加重试");
+                t -> toSimBridge.addSeasonCoin(playerGameData.getPlayerId(), amount, t, addType, desc), txnId, "增加");
     }
 
     /**
