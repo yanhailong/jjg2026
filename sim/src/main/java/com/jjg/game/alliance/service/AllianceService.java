@@ -22,6 +22,7 @@ import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.AllianceLevelCfg;
 import com.jjg.game.sampledata.bean.GlobalConfigCfg;
+import com.jjg.game.sim.dao.SimPlayerGameDao;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import com.jjg.game.sim.service.SimConfigCacheService;
@@ -34,6 +35,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -78,6 +80,8 @@ public class AllianceService {
     private AllianceIdDao allianceIdDao;
     @Autowired
     private SimPlayerContextRegistry simPlayerContextRegistry;
+    @Autowired
+    private SimPlayerGameDao simPlayerGameDao;
     @Autowired
     private AllianceRedDotService allianceRedDotService;
 
@@ -173,6 +177,21 @@ public class AllianceService {
         Map<Long, PlayerSessionInfo> sessionMap = statusService.infosOf(memberIds);
         Map<Long, AlliancePlayerData> allianceDataMap = alliancePlayerDao.multiGet(memberIds);
 
+        //总场景等级优先读本地上下文，其余成员批量读取落库快照。
+        Map<Long, Integer> allLevels = new HashMap<>(playerMap.size());
+        List<Long> unloadedIds = new ArrayList<>();
+        for (Long pid : playerMap.keySet()) {
+            SimPlayerContext ctx = simPlayerContextRegistry.getContext(pid);
+            if (ctx == null) {
+                unloadedIds.add(pid);
+            } else {
+                allLevels.put(pid, ctx.getSimBaseData().getAllLevel());
+            }
+        }
+        if (!unloadedIds.isEmpty()) {
+            allLevels.putAll(simPlayerGameDao.findAllLevelsByIds(unloadedIds));
+        }
+
         for (Map.Entry<Long, AllianceMember> en : alliance.getMembers().entrySet()) {
             long pid = en.getKey();
             Player player = playerMap.get(pid);
@@ -184,7 +203,7 @@ public class AllianceService {
             info.nick = player.getNickName();
             info.headImg = player.getHeadImgId();
             info.headFrame = player.getHeadFrameId();
-            info.level = player.getLevel();
+            info.level = allLevels.getOrDefault(pid, 0);
             info.position = alliance.isLeader(pid) ? AllianceConst.Position.LEADER : AllianceConst.Position.MEMBER;
             info.status = statusService.statusOf(sessionMap.get(pid));
             info.joinTime = en.getValue().getJoinTime();

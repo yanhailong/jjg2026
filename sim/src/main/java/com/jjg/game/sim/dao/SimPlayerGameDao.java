@@ -13,7 +13,9 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author 11
@@ -67,6 +69,22 @@ public class SimPlayerGameDao extends MongoBaseDao<SimBaseData, Long> {
         query.fields().include("allLevel");
         SimBaseData data = mongoTemplate.findOne(query, SimBaseData.class);
         return data == null ? 0 : data.getAllLevel();
+    }
+
+    /**
+     * 批量读取玩家总场景等级，只投影 allLevel（默认保留 _id）。
+     */
+    public Map<Long, Integer> findAllLevelsByIds(Collection<Long> playerIds) {
+        if (playerIds == null || playerIds.isEmpty()) {
+            return Map.of();
+        }
+        Query query = Query.query(Criteria.where("_id").in(playerIds));
+        query.fields().include("allLevel");
+        Map<Long, Integer> levels = new HashMap<>(playerIds.size());
+        for (SimBaseData data : mongoTemplate.find(query, SimBaseData.class)) {
+            levels.put(data.getPlayerId(), data.getAllLevel());
+        }
+        return levels;
     }
 
     /**
