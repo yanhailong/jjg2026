@@ -1,25 +1,24 @@
 package com.jjg.game.sim.service;
 
 import com.jjg.game.core.constant.AddType;
-import com.jjg.game.core.service.CorePlayerService;
-import com.jjg.game.season.service.SeasonPassOrderService;
-import com.jjg.game.sim.data.ActivePassPurchase;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
+import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.OrderService;
 import com.jjg.game.sampledata.GameDataManager;
+import com.jjg.game.sim.data.ActivePassPurchase;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-
-import static com.jjg.game.sim.constant.SimConstant.ActivePass.*;
+import static com.jjg.game.sim.constant.SimConstant.ActivePass.BASIC;
+import static com.jjg.game.sim.constant.SimConstant.ActivePass.PREMIUM;
 
 /**
  * 复用通用预下单与充值回调；预下单productId为ActivePass.id_轨道(2初级/4高级)。
@@ -51,7 +50,7 @@ public class ActivePassOrderService implements OrderGenerate {
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
         int[] target = parse(req.productId);
         if (target == null) {
             return new CommonResult<>(Code.PARAM_ERROR);
@@ -69,7 +68,10 @@ public class ActivePassOrderService implements OrderGenerate {
             log.warn("活跃通行证临时钻石购买失败 playerId={},round={}", player.getId(), target[1] == BASIC ? 0 : 1);
             return new CommonResult<>(tmpCode);
         }
-        return new CommonResult<>(Code.SUCCESS, result.price);
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(result.price);
+        return new CommonResult<>(Code.SUCCESS, preGenerateOrderData);
     }
 
     public ActivePassPurchase prepare(SimPlayerContext ctx, int passId, int track) {

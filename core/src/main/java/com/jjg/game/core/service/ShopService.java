@@ -14,6 +14,7 @@ import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.logger.CoreLogger;
 import com.jjg.game.core.pb.NotifyPayCallBack;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.utils.ConditionUtil;
@@ -215,8 +216,8 @@ public class ShopService implements OrderGenerate {
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         long shopProductId = Long.parseLong(req.productId);
         ShopProduct shopProduct = shopProductMap.get(shopProductId);
         if (shopProduct == null) {
@@ -242,7 +243,10 @@ public class ShopService implements OrderGenerate {
             return result;
         }
         result.code = Code.SUCCESS;
-        result.data = shopProduct.getMoney();
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(shopProduct.getMoney());
+        result.data = preGenerateOrderData;
         return result;
     }
 

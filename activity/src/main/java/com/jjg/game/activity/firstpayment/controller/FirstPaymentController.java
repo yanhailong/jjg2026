@@ -19,7 +19,9 @@ import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.data.Order;
 import com.jjg.game.core.data.Player;
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.utils.ItemUtils;
@@ -246,8 +248,8 @@ public class FirstPaymentController extends BaseActivityController implements Or
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         BaseCfgBean cfgBean = getOrderGenerateBean(player, req.productId);
         if (cfgBean instanceof FirstpaymentCfg cfg) {
             String channelCommodity = cfg.getChannelCommodity().get(player.getChannel().getValue());
@@ -258,7 +260,10 @@ public class FirstPaymentController extends BaseActivityController implements Or
                 return result;
             }
             result.code = Code.SUCCESS;
-            result.data = cfg.getMoney();
+            PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+            preGenerateOrderData.setType(RechargeCfgType.MONEY);
+            preGenerateOrderData.setPrice(cfg.getMoney());
+            result.data = preGenerateOrderData;
         }
         return result;
     }

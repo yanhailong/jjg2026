@@ -53,7 +53,6 @@ import org.springframework.stereotype.Component;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -97,8 +96,7 @@ public class CoreMessageHandler {
 
     private Map<RechargeType, OrderGenerate> orderGenerateMap = new HashMap<>();
     //奖池本地缓存
-    private final Cache<String, Class<? extends BaseCfgBean>> configCache = Caffeine.newBuilder()
-            .build();
+    private final Cache<String, Class<? extends BaseCfgBean>> configCache = Caffeine.newBuilder().build();
 
     public void init() {
         chooseWareListenerMap = CommonUtil.getContext().getBeansOfType(ChooseWareListener.class);
@@ -210,8 +208,7 @@ public class CoreMessageHandler {
             if ("bet".equals(cmd)) {
                 log.debug("收到添加经验的gm命令 playerId = {},gmOrders = {}", playerController.playerId(), arr);
                 long num = Long.parseLong(params);
-                CommonResult<Pair<Player, Long>> result =
-                        playerService.betDeductGold(playerController.playerId(), num, true, true, AddType.GM_TEST);
+                CommonResult<Pair<Player, Long>> result = playerService.betDeductGold(playerController.playerId(), num, true, true, AddType.GM_TEST);
                 res.code = result.code;
                 playerController.send(res);
                 return;
@@ -373,8 +370,7 @@ public class CoreMessageHandler {
         CommonResult<Player> result = playerService.setVip(playerController.playerId(), num, AddType.GM_OPERATOR, null);
         if (!result.success()) {
             res.code = result.code;
-            log.debug("使用gm失败 playerId = {},order = {},code = {},params = {}", playerController.playerId(), order,
-                    result.code, params);
+            log.debug("使用gm失败 playerId = {},order = {},code = {},params = {}", playerController.playerId(), order, result.code, params);
             playerController.send(res);
             return;
         }
@@ -537,8 +533,7 @@ public class CoreMessageHandler {
     }
 
     @Command(MessageConst.CoreMessage.REQ_MARK_RED_DOT_READ)
-    public void markRedDotRead(PlayerController playerController,
-                               com.jjg.game.core.pb.reddot.ReqMarkRedDotRead req) {
+    public void markRedDotRead(PlayerController playerController, com.jjg.game.core.pb.reddot.ReqMarkRedDotRead req) {
         redDotManager.markRead(playerController, req.module, req.submodule, req.entityIds);
     }
 
@@ -606,39 +601,57 @@ public class CoreMessageHandler {
                 return;
             }
 
-            CommonResult<BigDecimal> priceResult = matchedGenerate.generateOrderDetailInfo(playerController.getPlayer(), req);
-            if (!priceResult.success()) {
+            CommonResult<PreGenerateOrderData> preOrderResult = matchedGenerate.generateOrderDetailInfo(playerController.getPlayer(), req);
+            if (!preOrderResult.success()) {
                 notifyOrderCreationFailed(matchedGenerate, playerController, req);
-                log.debug("预下单失败 playerId = {},code={},req = {}", playerController.playerId(), priceResult.code, JSON.toJSONString(req));
-                res.code = priceResult.code;
+                log.debug("预下单失败 playerId = {},code={},req = {}", playerController.playerId(), preOrderResult.code, JSON.toJSONString(req));
+                res.code = preOrderResult.code;
                 playerController.send(res);
                 return;
             }
-            Order order = orderService.generateOrder(playerController.getPlayer(), payType, req.productId, priceResult.data, rechargeType, req.desc);
-            if (order == null) {
-                notifyOrderCreationFailed(matchedGenerate, playerController, req);
-                log.debug("预下单失败11 playerId = {},req = {}", playerController.playerId(), JSON.toJSONString(req));
-                res.code = Code.FAIL;
-                playerController.send(res);
-                return;
-            }
-            orderCreated = true;
 
-            if (payType == PayType.IOS) {
-                res.orderId = order.getUuid();
-            } else {
-                res.orderId = order.getId();
-            }
-            log.debug("玩家预下单 req = {},resp = {}", JSON.toJSONString(req), JSON.toJSONString(res));
-            //如果有测试充值url直接调用
-            if (StringUtils.isNotEmpty(nodeConfig.getTestRechargeUrl())) {
-                log.debug("测试充值玩家预下单调用 req = {},resp = {}", JSON.toJSONString(req), JSON.toJSONString(res));
-                HttpUtils.HttpResponse httpResponse = HttpUtils.doPostWithJSON(nodeConfig.getTestRechargeUrl() + order.getId(), "");
-                if (!httpResponse.isOk()) {
-                    log.debug("测试充值玩家预下单调用失败 req = {},resp = {}", JSON.toJSONString(req), JSON.toJSONString(res));
+            //真实下单
+            if (preOrderResult.data.getType() == RechargeCfgType.MONEY) {
+                Order order = orderService.generateOrder(playerController.getPlayer(), payType, req.productId, preOrderResult.data.getPrice(), rechargeType, req.desc);
+                if (order == null) {
+                    notifyOrderCreationFailed(matchedGenerate, playerController, req);
+                    log.debug("预下单失败11 playerId = {},req = {}", playerController.playerId(), JSON.toJSONString(req));
                     res.code = Code.FAIL;
                     playerController.send(res);
+                    return;
                 }
+                orderCreated = true;
+
+                if (payType == PayType.IOS) {
+                    res.orderId = order.getUuid();
+                } else {
+                    res.orderId = order.getId();
+                }
+                log.debug("玩家预下单 playerId={},payType = {},rechargeType={},productId={},desc={},orderId = {}", playerController.playerId(), req.payType, req.rechargeType, req.productId, req.desc, res.orderId);
+                //如果有测试充值url直接调用
+                if (StringUtils.isNotEmpty(nodeConfig.getTestRechargeUrl())) {
+                    log.debug("测试充值玩家预下单调用 req = {},resp = {}", JSON.toJSONString(req), JSON.toJSONString(res));
+                    HttpUtils.HttpResponse httpResponse = HttpUtils.doPostWithJSON(nodeConfig.getTestRechargeUrl() + order.getId(), "");
+                    if (!httpResponse.isOk()) {
+                        log.debug("测试充值玩家预下单调用失败 req = {},resp = {}", JSON.toJSONString(req), JSON.toJSONString(res));
+                        res.code = Code.FAIL;
+                        playerController.send(res);
+                    }
+                }
+            } else {
+                preOrderResult.data.setPayType(req.payType);
+                preOrderResult.data.setProductId(req.productId);
+                preOrderResult.data.setDesc(req.desc);
+                boolean success = matchedGenerate.onReceivedRecharge(playerController.getPlayer(), preOrderResult.data);
+                if (!success) {
+                    res.code = Code.FAIL;
+                    playerController.send(res);
+                    log.warn("下单失败 playerId={},preOrderResult.data={}", playerController.playerId(), JSON.toJSONString(preOrderResult.data));
+                    return;
+                }
+                res.code = Code.SUCCESS;
+                playerController.send(res);
+                log.debug("玩家下单成功 req = {},resp = {}", JSON.toJSONString(req), JSON.toJSONString(res));
             }
         } catch (Exception e) {
             if (!orderCreated) {

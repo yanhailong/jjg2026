@@ -23,6 +23,7 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.utils.ItemUtils;
@@ -307,8 +308,8 @@ public class ScratchCardsController extends BaseActivityController implements Or
 
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         BaseCfgBean cfgBean = getOrderGenerateBean(player, req.productId);
         if (cfgBean instanceof ScratchCardsCfg cfg && cfg.getType() == ActivityConstant.ScratchCards.GIFT_TYPE
                 && cfg.getChannelCommodity() > 0 && CollectionUtil.isNotEmpty(cfg.getGetItem())) {
@@ -327,7 +328,10 @@ public class ScratchCardsController extends BaseActivityController implements Or
             }
 
             result.code = Code.SUCCESS;
-            result.data = shopRechargeListCfg.getPrice();
+            PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+            preGenerateOrderData.setType(RechargeCfgType.MONEY);
+            preGenerateOrderData.setPrice(shopRechargeListCfg.getPrice());
+            result.data = preGenerateOrderData;
         }
         return result;
     }

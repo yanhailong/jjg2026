@@ -13,6 +13,8 @@ import java.util.List;
 public class ResGoldTreasure extends AbstractResponse {
     @ProtoDesc("活动列表信息")
     public List<GoldTreasureDetailInfo> activityData;
+    @ProtoDesc("结束时间")
+    public long endTime;
 
     public ResGoldTreasure(int code) {
         super(code);

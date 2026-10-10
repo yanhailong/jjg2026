@@ -13,12 +13,9 @@ import com.jjg.game.activity.constant.ActivityConstant;
 import com.jjg.game.common.pb.AbstractResponse;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
-import com.jjg.game.core.data.ChannelType;
-import com.jjg.game.core.data.CommonResult;
-import com.jjg.game.core.data.ItemOperationResult;
-import com.jjg.game.core.data.Order;
-import com.jjg.game.core.data.Player;
+import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.utils.ItemUtils;
@@ -29,12 +26,7 @@ import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 集合礼包
@@ -190,8 +182,8 @@ public class BundleGiftPackController extends BaseActivityController implements 
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         Integer giftId = parseRequestedGiftId(req.productId);
         if (giftId == null) {
             log.warn("集合礼包下单时获取数据失败 playerId={},productId={}", player.getId(), req.productId);
@@ -243,7 +235,11 @@ public class BundleGiftPackController extends BaseActivityController implements 
         req.productId = target.isAllGift()
                 ? String.valueOf(target.activityId()) : target.activityId() + "_" + target.giftId();
         result.code = Code.SUCCESS;
-        result.data = shopCfg.getPrice();
+
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(shopCfg.getPrice());
+        result.data = preGenerateOrderData;
         return result;
     }
 

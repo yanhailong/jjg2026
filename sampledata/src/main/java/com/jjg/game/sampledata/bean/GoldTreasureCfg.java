@@ -19,21 +19,14 @@ public class GoldTreasureCfg extends BaseCfgBean {
   /** 配置表工作薄名 */
   public static final String SHEET_NAME = "GoldTreasure";
 
-  /** 累奖达成条 */
-  protected Map<Integer,Long> Condition;
   /** 渠道商品ID */
   protected int PayId;
   /** 奖励 */
   protected Map<Integer,Long> getItem;
-  /** 解锁前置ID */
-  protected int previousId;
   /** 奖励类型 */
   protected int rewardType;
-
-  /** 返回累奖达成条 */
-  public Map<Integer,Long> getCondition() {
-    return Condition;
-  }
+  /** 超值 */
+  protected int value;
 
   /** 返回渠道商品ID */
   public int getPayId() {
@@ -45,14 +38,14 @@ public class GoldTreasureCfg extends BaseCfgBean {
     return getItem;
   }
 
-  /** 返回解锁前置ID */
-  public int getPreviousId() {
-    return previousId;
-  }
-
   /** 返回奖励类型 */
   public int getRewardType() {
     return rewardType;
+  }
+
+  /** 返回超值 */
+  public int getValue() {
+    return value;
   }
 
   @Override

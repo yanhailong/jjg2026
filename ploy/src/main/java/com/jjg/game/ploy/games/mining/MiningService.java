@@ -540,7 +540,7 @@ public class MiningService implements OrderGenerate, StandalonePloyGame {
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder request) {
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder request) {
         // 现在通过ReqMiningAction按表扣道具。保留回调接口仅用于旧版本已创建订单的履约/释放。
         return new CommonResult<>(Code.FORBID);
     }

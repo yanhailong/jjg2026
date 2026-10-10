@@ -5,7 +5,9 @@ import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Order;
 import com.jjg.game.core.data.Player;
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.CorePlayerService;
@@ -17,8 +19,6 @@ import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
 
 /**
  * 通行证订单适配器。预下单 productId 使用 passId_track，创建订单时转换为带赛季范围的业务标识。
@@ -45,8 +45,8 @@ public class SeasonPassOrderService implements OrderGenerate {
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         SimPlayerContext ctx = contextRegistry.getContext(player.getId());
         if (ctx == null) {
             log.warn("通行证下单失败，获取玩家ctx失败 playerId={},productId={}", player.getId(), req.productId);
@@ -104,8 +104,8 @@ public class SeasonPassOrderService implements OrderGenerate {
             return result;
         }
 
-        int tmpIndex = (target.passId % 1000) -2;
-        int round =  tmpIndex * 2 + (target.track() == SeasonConstant.PassTrack.BASIC ? 0 : 1);
+        int tmpIndex = (target.passId % 1000) - 2;
+        int round = tmpIndex * 2 + (target.track() == SeasonConstant.PassTrack.BASIC ? 0 : 1);
         int tmpCode = tmpOrderHandle(playerService, player, 1007, AddType.SIM_SEASON_PASS, round);
         if (tmpCode != Code.SUCCESS) {
             log.warn("赛季通行证临时钻石购买失败 playerId={},round={}", player.getId(), round);
@@ -114,7 +114,10 @@ public class SeasonPassOrderService implements OrderGenerate {
 
         req.productId = passService.orderToken(data, pass, target.track());
         result.code = Code.SUCCESS;
-        result.data = shop.getPrice();
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(shop.getPrice());
+        result.data = preGenerateOrderData;
         return result;
     }
 

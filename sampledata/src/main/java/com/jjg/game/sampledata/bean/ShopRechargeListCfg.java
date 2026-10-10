@@ -23,14 +23,23 @@ public class ShopRechargeListCfg extends BaseCfgBean {
 
   /** 金额 */
   protected BigDecimal Price;
+  /** 兑换所需道具 */
+  protected Map<Integer,Long> Redeem;
   /** google渠道商城ID */
   protected String googleShopId;
   /** ios渠道商城ID */
   protected String iosShopId;
+  /** 类型 */
+  protected int type;
 
   /** 返回金额 */
   public BigDecimal getPrice() {
     return Price;
+  }
+
+  /** 返回兑换所需道具 */
+  public Map<Integer,Long> getRedeem() {
+    return Redeem;
   }
 
   /** 返回google渠道商城ID */
@@ -41,6 +50,11 @@ public class ShopRechargeListCfg extends BaseCfgBean {
   /** 返回ios渠道商城ID */
   public String getIosShopId() {
     return iosShopId;
+  }
+
+  /** 返回类型 */
+  public int getType() {
+    return type;
   }
 
   @Override

@@ -6,7 +6,9 @@ import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.data.Order;
 import com.jjg.game.core.data.Player;
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.PlayerPackService;
@@ -46,8 +48,11 @@ public class BackendRechargeManager implements OrderGenerate {
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        return new CommonResult<>(Code.SUCCESS, BigDecimal.ZERO);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(BigDecimal.ZERO);
+        return new CommonResult<>(Code.SUCCESS, preGenerateOrderData);
     }
 
     @Override

@@ -13,12 +13,15 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.ChannelType;
 import com.jjg.game.core.data.CommonResult;
+import com.jjg.game.core.data.Item;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.data.Mail;
 import com.jjg.game.core.data.Order;
 import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PlayerPack;
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.core.manager.ConditionManager;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.CorePlayerService;
@@ -39,7 +42,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.BiPredicate;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,13 +55,15 @@ class GoldTreasureControllerTest {
     private static final int FREE = 1001;
     private static final int PAID = 1002;
     private static final int NEXT = 1003;
-    private static final int CUMULATIVE = 1004;
-    private static final int OTHER_CUMULATIVE = 1005;
+    private static final int EXCHANGE = 1004;
+    private static final int AFTER_EXCHANGE = 1005;
     private static final int OUTSIDE = 9001;
-    private static final int PAY_ID = 77;
+    private static final int FREE_PAY_ID = 76;
+    private static final int CASH_PAY_ID = 77;
+    private static final int EXCHANGE_PAY_ID = 78;
     private static final int STAR_ITEM = 1022511;
     private static final Map<Integer, Long> REWARDS = Map.of(120001, 10L);
-    private static final Map<Integer, Long> CONDITION = Map.of(STAR_ITEM, 3L);
+    private static final Map<Integer, Long> REDEEM = Map.of(STAR_ITEM, 3L);
     private static final BigDecimal PRICE = new BigDecimal("1.25");
 
     private final PlayerActivityDao dao = mock(PlayerActivityDao.class);
@@ -75,6 +79,7 @@ class GoldTreasureControllerTest {
     private final ActivityData activity = new ActivityData();
     private final Map<Integer, PlayerActivityData> saved = new HashMap<>();
     private final Map<Integer, GoldTreasureCfg> cfgs = new LinkedHashMap<>();
+    private final Map<Integer, ShopRechargeListCfg> shops = new HashMap<>();
     private MockedStatic<GameDataManager> gameData;
     private TestController controller;
 
@@ -90,30 +95,29 @@ class GoldTreasureControllerTest {
         activity.setTimeStart(System.currentTimeMillis() - 60_000);
         activity.setTimeEnd(System.currentTimeMillis() + 600_000);
         activity.setCondition("");
-        activity.setValue(List.of(FREE, PAID, NEXT, CUMULATIVE, OTHER_CUMULATIVE));
-        addConfig(FREE, 1, 0, 0, Map.of());
-        addConfig(PAID, 1, FREE, PAY_ID, Map.of());
-        addConfig(NEXT, 1, PAID, 0, Map.of());
-        addConfig(CUMULATIVE, 2, 0, 0, CONDITION);
-        addConfig(OTHER_CUMULATIVE, 2, 0, 0, Map.of(STAR_ITEM, 6L));
-        addConfig(OUTSIDE, 1, 0, PAY_ID, Map.of());
+        activity.setValue(List.of(EXCHANGE, AFTER_EXCHANGE, NEXT, PAID, FREE));
+        addConfig(FREE, 1, FREE_PAY_ID);
+        addConfig(OUTSIDE, 1, CASH_PAY_ID);
+        addConfig(PAID, 1, CASH_PAY_ID);
+        addConfig(NEXT, 1, FREE_PAY_ID);
+        addConfig(EXCHANGE, 2, EXCHANGE_PAY_ID);
+        addConfig(AFTER_EXCHANGE, 1, FREE_PAY_ID);
+        addShop(FREE_PAY_ID, 4, null, Map.of());
+        addShop(CASH_PAY_ID, 1, PRICE, Map.of());
+        addShop(EXCHANGE_PAY_ID, 2, null, REDEEM);
 
         gameData = mockStatic(GameDataManager.class);
         gameData.when(GameDataManager::getGoldTreasureCfgMap).thenReturn(cfgs);
         gameData.when(GameDataManager::getGoldTreasureCfgList).thenReturn(List.copyOf(cfgs.values()));
         gameData.when(() -> GameDataManager.getGoldTreasureCfg(anyInt()))
                 .thenAnswer(invocation -> cfgs.get(invocation.getArgument(0)));
+        gameData.when(() -> GameDataManager.getShopRechargeListCfg(anyInt()))
+                .thenAnswer(invocation -> shops.get(invocation.getArgument(0)));
         when(functionCfg.getId()).thenReturn(5018);
         when(functionCfg.getIsOpen()).thenReturn(true);
         when(functionCfg.getFunctionType()).thenReturn(17);
         when(functionCfg.getCondition()).thenReturn("");
         gameData.when(() -> GameDataManager.getGameFunctionCfg(5018)).thenReturn(functionCfg);
-        ShopRechargeListCfg shopCfg = mock(ShopRechargeListCfg.class);
-        when(shopCfg.getId()).thenReturn(PAY_ID);
-        when(shopCfg.getPrice()).thenReturn(PRICE);
-        when(shopCfg.getIosShopId()).thenReturn("gold.apple");
-        when(shopCfg.getGoogleShopId()).thenReturn("gold.google");
-        gameData.when(() -> GameDataManager.getShopRechargeListCfg(PAY_ID)).thenReturn(shopCfg);
 
         when(activities.getOpenActivityData(player, ActivityType.GOLD_TREASURE)).thenReturn(activity);
         when(activities.getActivityData()).thenReturn(Map.of(ACTIVITY_ID, activity));
@@ -124,10 +128,11 @@ class GoldTreasureControllerTest {
         when(conditions.isAchievement(eq(player), anyString(), anyString())).thenReturn(true);
         when(pack.addItems(eq(PLAYER_ID), anyMap(), eq(AddType.ACTIVITY_GOLD_TREASURE_REWARDS)))
                 .thenReturn(new CommonResult<>(Code.SUCCESS, new ItemOperationResult()));
-        when(pack.checkHasItems(player, CONDITION)).thenReturn(true);
-        when(pack.findSatisfiedItemRequirements(eq(player), anyList())).thenAnswer(invocation ->
-                ((List<?>) invocation.getArgument(1)).isEmpty() ? Set.of() : Set.of(0));
+        when(pack.useItem(eq(player), eq(STAR_ITEM), eq(3L), eq(REWARDS), eq(AddType.ACTIVITY_GOLD_TREASURE_REWARDS)))
+                .thenReturn(new CommonResult<>(Code.SUCCESS, new ItemOperationResult()));
+        when(pack.checkHasItems(player, REDEEM)).thenReturn(true);
         when(pack.getFromAllDB(PLAYER_ID)).thenReturn(playerPack);
+        when(playerPack.checkHasItems(anyList())).thenReturn(true);
         when(pack.removeItems(eq(player), anyMap(), eq(AddType.ACTIVITY_GOLD_TREASURE_REWARDS)))
                 .thenReturn(new CommonResult<>(Code.SUCCESS, new ItemOperationResult()));
         when(mails.addCfgMail(eq(PLAYER_ID), eq(50), anyList(),
@@ -157,31 +162,35 @@ class GoldTreasureControllerTest {
     }
 
     @Test
-    void detailsUseOnlyActivityValueAndExposeConfiguredPaymentAndConditions() {
+    void informationPreservesConfigListOrderAndMapsEveryPaymentType() {
         ResGoldTreasure response = info();
-        assertEquals(Code.SUCCESS, response.code);
-        assertEquals(List.of(FREE, PAID, NEXT, CUMULATIVE, OTHER_CUMULATIVE),
-                response.activityData.stream().map(detail -> detail.detailId).toList());
-        GoldTreasureDetailInfo paid = detail(response, PAID);
-        assertEquals(PAY_ID, paid.payId);
-        assertEquals(PRICE.toPlainString(), paid.price);
-        assertEquals("gold.apple", paid.channelProductId);
-        assertEquals(1, paid.rewardType);
-        assertEquals(10L, paid.rewardItems.getFirst().count);
-        assertEquals(2, detail(response, CUMULATIVE).rewardType);
-        assertEquals(3L, detail(response, CUMULATIVE).condition.getFirst().count);
         assertEquals(activity.getTimeEnd(), response.endTime);
+        assertEquals(List.of(FREE, PAID, NEXT, EXCHANGE, AFTER_EXCHANGE),
+                response.activityData.stream().map(detail -> detail.detailId).toList());
+        assertEquals(ActivityConstant.ClaimStatus.CAN_CLAIM, detail(response, FREE).claimStatus);
+        assertEquals(ActivityConstant.ClaimStatus.NOT_CLAIM, detail(response, PAID).claimStatus);
+        assertEquals(ActivityConstant.ClaimStatus.NOT_CLAIM, detail(response, EXCHANGE).claimStatus);
+        assertEquals(4, detail(response, FREE).rechargeInfo.type);
+        assertEquals(1, detail(response, PAID).rechargeInfo.type);
+        assertEquals(PRICE.toPlainString(), detail(response, PAID).rechargeInfo.price);
+        assertEquals("gold.apple", detail(response, PAID).rechargeInfo.channelProductId);
+        assertEquals(2, detail(response, EXCHANGE).rechargeInfo.type);
+        assertEquals(STAR_ITEM, detail(response, EXCHANGE).rechargeInfo.redeem.getFirst().itemId);
+        assertEquals(3L, detail(response, EXCHANGE).rechargeInfo.redeem.getFirst().count);
+        verify(pack, never()).checkHasItems(any(Player.class), anyMap());
+        verify(dao, never()).savePlayerActivityData(anyLong(), any(), anyLong(), anyMap());
     }
 
     @Test
-    void informationChecksAllCumulativeConditionsInOneBackpackRead() {
-        ResGoldTreasure response = info();
-        assertEquals(ActivityConstant.ClaimStatus.CAN_CLAIM, detail(response, CUMULATIVE).claimStatus);
-        assertEquals(ActivityConstant.ClaimStatus.NOT_CLAIM, detail(response, OTHER_CUMULATIVE).claimStatus);
-        verify(pack).findSatisfiedItemRequirements(eq(player), argThat(requirements ->
-                requirements.equals(List.of(CONDITION, Map.of(STAR_ITEM, 6L)))));
-        verify(pack, never()).checkHasItems(any(Player.class), anyMap());
-        verify(dao, never()).savePlayerActivityData(anyLong(), any(), anyLong(), anyMap());
+    void unlockingUsesExistingListOrderWithoutSortingIds() {
+        gameData.when(GameDataManager::getGoldTreasureCfgList).thenReturn(List.of(
+                cfgs.get(NEXT), cfgs.get(PAID), cfgs.get(FREE), cfgs.get(EXCHANGE), cfgs.get(AFTER_EXCHANGE), cfgs.get(OUTSIDE)));
+        assertEquals(List.of(NEXT, PAID, FREE, EXCHANGE, AFTER_EXCHANGE),
+                info().activityData.stream().map(detail -> detail.detailId).toList());
+        assertEquals(ActivityConstant.ClaimStatus.CAN_CLAIM, detail(info(), NEXT).claimStatus);
+        assertNotEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, FREE).code);
+        assertEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, NEXT).code);
+        assertTrue(controller.generateOrderDetailInfo(player, request(PAID)).success());
     }
 
     @Test
@@ -194,12 +203,28 @@ class GoldTreasureControllerTest {
     }
 
     @Test
-    void paidNodeCannotBeOrderedOrClaimedBeforePreviousRewardIsClaimed() {
+    void paymentTypeComesFromShopInsteadOfRewardType() {
+        when(cfgs.get(FREE).getRewardType()).thenReturn(2);
+        when(cfgs.get(PAID).getRewardType()).thenReturn(2);
+        when(cfgs.get(EXCHANGE).getRewardType()).thenReturn(1);
+        assertEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, FREE).code);
+        assertTrue(controller.generateOrderDetailInfo(player, request(PAID)).success());
+        assertTrue(controller.onReceivedRecharge(player, order(PAID)));
+        assertEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, PAID).code);
+        saved.put(NEXT, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
+        assertEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, EXCHANGE).code);
+        verify(pack).useItem(player, STAR_ITEM, 3L, REWARDS, AddType.ACTIVITY_GOLD_TREASURE_REWARDS);
+    }
+
+    @Test
+    void laterNodesCannotSkipTheFirstUnclaimedReward() {
+        saved.put(PAID, data(ROUND, ActivityConstant.ClaimStatus.CAN_CLAIM));
         assertFalse(controller.generateOrderDetailInfo(player, request(PAID)).success());
         assertNotEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, PAID).code);
-        saved.put(PAID, data(ROUND, ActivityConstant.ClaimStatus.CAN_CLAIM));
-        assertNotEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, PAID).code);
+        assertNotEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, NEXT).code);
+        assertNotEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, EXCHANGE).code);
         verify(pack, never()).addItems(anyLong(), anyMap(), any(AddType.class));
+        verify(pack, never()).useItem(any(Player.class), anyInt(), anyLong(), anyMap(), any(AddType.class));
     }
 
     @Test
@@ -212,7 +237,7 @@ class GoldTreasureControllerTest {
     }
 
     @Test
-    void paidRewardRequiresPaymentAndCannotBeOrderedAgainAfterPaymentOrClaim() {
+    void cashRewardRequiresPaymentAndCannotBeOrderedAgainAfterPaymentOrClaim() {
         saved.put(FREE, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
         assertNotEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, PAID).code);
         saved.put(PAID, data(ROUND, ActivityConstant.ClaimStatus.CAN_CLAIM));
@@ -224,19 +249,50 @@ class GoldTreasureControllerTest {
     }
 
     @Test
-    void cumulativeRewardUsesCurrentInventoryWithoutConsumingConditionItems() {
-        assertEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, CUMULATIVE).code);
-        verify(pack).checkHasItems(player, CONDITION);
-        verify(pack).addItems(PLAYER_ID, REWARDS, AddType.ACTIVITY_GOLD_TREASURE_REWARDS);
-        verifyNoMoreInteractionsAfterRewardChecks();
+    void exchangeRewardUsesShopRedeemAndUnlocksTheNextReward() {
+        unlockExchange();
+        assertEquals(ActivityConstant.ClaimStatus.CAN_CLAIM, detail(info(), EXCHANGE).claimStatus);
+        assertEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, EXCHANGE).code);
+        verify(pack).useItem(player, STAR_ITEM, 3L, REWARDS, AddType.ACTIVITY_GOLD_TREASURE_REWARDS);
+        verify(pack, never()).addItems(anyLong(), anyMap(), any(AddType.class));
+        assertEquals(ActivityConstant.ClaimStatus.CLAIMED, saved.get(EXCHANGE).getClaimStatus());
+        assertEquals(ActivityConstant.ClaimStatus.CAN_CLAIM, detail(info(), AFTER_EXCHANGE).claimStatus);
+        assertEquals(Code.REPEAT_OP, controller.claimActivityRewards(player, activity, EXCHANGE).code);
     }
 
     @Test
-    void cumulativeRewardRejectsInsufficientInventory() {
-        when(pack.checkHasItems(player, CONDITION)).thenReturn(false);
-        assertNotEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, CUMULATIVE).code);
-        assertTrue(saved.isEmpty());
-        verify(pack, never()).addItems(anyLong(), anyMap(), any(AddType.class));
+    void exchangeRewardRejectsInsufficientInventory() {
+        unlockExchange();
+        when(pack.checkHasItems(player, REDEEM)).thenReturn(false);
+        when(pack.useItem(player, STAR_ITEM, 3L, REWARDS, AddType.ACTIVITY_GOLD_TREASURE_REWARDS))
+                .thenReturn(new CommonResult<>(Code.NOT_ENOUGH_ITEM));
+        assertEquals(ActivityConstant.ClaimStatus.NOT_CLAIM, detail(info(), EXCHANGE).claimStatus);
+        assertNotEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, EXCHANGE).code);
+        assertFalse(saved.containsKey(EXCHANGE));
+        assertEquals(ActivityConstant.ClaimStatus.NOT_CLAIM, detail(info(), AFTER_EXCHANGE).claimStatus);
+    }
+
+    @Test
+    void exchangeFailureRestoresStateAndUsesTheExistingServiceForRetry() {
+        unlockExchange();
+        when(pack.useItem(player, STAR_ITEM, 3L, REWARDS, AddType.ACTIVITY_GOLD_TREASURE_REWARDS))
+                .thenReturn(new CommonResult<>(Code.FAIL), new CommonResult<>(Code.SUCCESS, new ItemOperationResult()));
+        assertEquals(Code.FAIL, controller.claimActivityRewards(player, activity, EXCHANGE).code);
+        assertFalse(saved.containsKey(EXCHANGE));
+        assertEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, EXCHANGE).code);
+        verify(pack, times(2)).useItem(player, STAR_ITEM, 3L, REWARDS, AddType.ACTIVITY_GOLD_TREASURE_REWARDS);
+        verify(pack, never()).removeItems(any(Player.class), anyMap(), any(AddType.class));
+    }
+
+    @Test
+    void exchangeStateIsDurableBeforeUsingItems() {
+        unlockExchange();
+        when(pack.useItem(player, STAR_ITEM, 3L, REWARDS, AddType.ACTIVITY_GOLD_TREASURE_REWARDS))
+                .thenAnswer(invocation -> {
+                    assertEquals(ActivityConstant.ClaimStatus.CLAIMED, saved.get(EXCHANGE).getClaimStatus());
+                    return new CommonResult<>(Code.SUCCESS, new ItemOperationResult());
+                });
+        assertEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, EXCHANGE).code);
     }
 
     @Test
@@ -262,22 +318,25 @@ class GoldTreasureControllerTest {
     void orderUsesShopPriceAndKeepsDetailIdAsProductId() {
         saved.put(FREE, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
         ReqGenerateOrder request = request(PAID);
-        CommonResult<BigDecimal> result = controller.generateOrderDetailInfo(player, request);
+        CommonResult<PreGenerateOrderData> result = controller.generateOrderDetailInfo(player, request);
         assertTrue(result.success());
-        assertEquals(PRICE, result.data);
+        assertEquals(RechargeCfgType.MONEY.getType(), result.data.getType());
+        assertEquals(PRICE, result.data.getPrice());
         assertEquals(String.valueOf(PAID), request.productId);
         verify(pack, never()).addItems(anyLong(), anyMap(), any(AddType.class));
         verify(dao, never()).savePlayerActivityData(anyLong(), any(), anyLong(), anyMap());
     }
 
     @Test
-    void invalidAndUnboundClientProductIdsCannotGenerateOrders() {
+    void onlyCashPaymentCanUseTheOrderFlow() {
         ReqGenerateOrder request = request(PAID);
         request.productId = ACTIVITY_ID + "_" + ROUND + "_" + PAID;
         assertFalse(controller.generateOrderDetailInfo(player, request).success());
         request.productId = "invalid";
         assertFalse(controller.generateOrderDetailInfo(player, request).success());
         assertFalse(controller.generateOrderDetailInfo(player, request(FREE)).success());
+        unlockExchange();
+        assertFalse(controller.generateOrderDetailInfo(player, request(EXCHANGE)).success());
     }
 
     @Test
@@ -294,9 +353,11 @@ class GoldTreasureControllerTest {
     }
 
     @Test
-    void callbacksRejectUnavailableActivityInvalidDetailAndWrongPlayer() {
+    void callbacksRejectUnavailableActivityInvalidDetailAndNonCashPayment() {
         saved.put(FREE, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
         assertFalse(controller.onReceivedRecharge(player, order(OUTSIDE)));
+        assertFalse(controller.onReceivedRecharge(player, order(FREE)));
+        assertFalse(controller.onReceivedRecharge(player, order(EXCHANGE)));
         Order wrongPlayer = order(PAID);
         wrongPlayer.setPlayerId(PLAYER_ID + 1);
         assertFalse(controller.onReceivedRecharge(player, wrongPlayer));
@@ -340,8 +401,10 @@ class GoldTreasureControllerTest {
         when(dao.savePlayerActivityData(eq(PLAYER_ID), eq(ActivityType.GOLD_TREASURE), eq(ACTIVITY_ID), anyMap()))
                 .thenReturn(false);
         assertNotEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, FREE).code);
-        assertTrue(saved.isEmpty());
+        unlockExchange();
+        assertNotEquals(Code.SUCCESS, controller.claimActivityRewards(player, activity, EXCHANGE).code);
         verify(pack, never()).addItems(anyLong(), anyMap(), any(AddType.class));
+        verify(pack, never()).useItem(any(Player.class), anyInt(), anyLong(), anyMap(), any(AddType.class));
     }
 
     @Test
@@ -376,12 +439,11 @@ class GoldTreasureControllerTest {
     }
 
     @Test
-    void activityEndMailsOnlyUnlockedPaidRewardsAndFiltersStarsBeforeClearing() {
+    void activityEndMailsUnlockedPaidRewardAndFiltersOnlyActivityStars() {
         saved.put(FREE, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
         saved.put(PAID, data(ROUND, ActivityConstant.ClaimStatus.CAN_CLAIM));
         when(cfgs.get(PAID).getGetItem()).thenReturn(Map.of(STAR_ITEM, 3L, 120001, 10L, 120003, 2L));
         when(playerPack.getItemCount(STAR_ITEM)).thenReturn(7L);
-        addConfig(OUTSIDE, 2, 0, 0, Map.of(1022599, 1L));
         when(playerPack.getItemCount(1022599)).thenReturn(99L);
 
         controller.onActivityEnd(activity);
@@ -394,7 +456,6 @@ class GoldTreasureControllerTest {
         verifyNoMoreInteractions(mails);
         verify(pack).removeItems(player, Map.of(STAR_ITEM, 7L), AddType.ACTIVITY_GOLD_TREASURE_REWARDS);
         verify(pack).getFromAllDB(PLAYER_ID);
-        verify(pack, never()).findSatisfiedItemRequirements(any(), anyList());
         assertTrue(saved.isEmpty());
     }
 
@@ -411,24 +472,33 @@ class GoldTreasureControllerTest {
     }
 
     @Test
-    void activityEndChecksCumulativeConditionsAgainstLoadedBackpack() {
-        saved.put(FREE, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
-        when(playerPack.checkHasItems(anyList())).thenAnswer(invocation -> {
-            List<com.jjg.game.core.data.Item> requirements = invocation.getArgument(0);
-            return requirements.getFirst().getItemCount() <= 3;
-        });
+    void activityEndChecksExchangeCostAgainstLoadedBackpack() {
+        unlockExchange();
         when(playerPack.getItemCount(STAR_ITEM)).thenReturn(3L);
         controller.onActivityEnd(activity);
         verify(mails).addCfgMail(eq(PLAYER_ID), eq(50), anyList(),
                 eq(AddType.ACTIVITY_GOLD_TREASURE_REWARDS), isNull());
         verifyNoMoreInteractions(mails);
+        verify(playerPack).checkHasItems(argThat((List<Item> items) -> items.size() == 1
+                && items.getFirst().getId() == STAR_ITEM && items.getFirst().getItemCount() == 3L));
         verify(pack).getFromAllDB(PLAYER_ID);
-        verify(pack, never()).findSatisfiedItemRequirements(any(), anyList());
         verify(pack, never()).checkHasItems(any(Player.class), anyMap());
+        verify(pack, never()).useItem(any(Player.class), anyInt(), anyLong(), anyMap(), any(AddType.class));
     }
 
     @Test
-    void activityEndCleanupFailureRetainsClaimedRewards() {
+    void activityEndCannotMailExchangeRewardWithoutEnoughItems() {
+        unlockExchange();
+        when(playerPack.checkHasItems(anyList())).thenReturn(false);
+        when(playerPack.getItemCount(STAR_ITEM)).thenReturn(2L);
+        controller.onActivityEnd(activity);
+        verifyNoInteractions(mails);
+        verify(pack).removeItems(player, Map.of(STAR_ITEM, 2L), AddType.ACTIVITY_GOLD_TREASURE_REWARDS);
+        assertTrue(saved.isEmpty());
+    }
+
+    @Test
+    void activityEndCleanupFailureRetainsClaimedRewardState() {
         saved.put(FREE, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
         saved.put(PAID, data(ROUND, ActivityConstant.ClaimStatus.CAN_CLAIM));
         when(playerPack.getItemCount(STAR_ITEM)).thenReturn(7L);
@@ -438,7 +508,6 @@ class GoldTreasureControllerTest {
         assertEquals(ActivityConstant.ClaimStatus.CLAIMED, saved.get(PAID).getClaimStatus());
         verify(mails).addCfgMail(eq(PLAYER_ID), eq(50), anyList(),
                 eq(AddType.ACTIVITY_GOLD_TREASURE_REWARDS), isNull());
-        verify(pack).removeItems(player, Map.of(STAR_ITEM, 7L), AddType.ACTIVITY_GOLD_TREASURE_REWARDS);
     }
 
     @Test
@@ -465,9 +534,8 @@ class GoldTreasureControllerTest {
     }
 
     @Test
-    void activityEndDoesNotAutoClaimTheEntireUnlockedChain() {
-        saved.put(CUMULATIVE, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
-        saved.put(OTHER_CUMULATIVE, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
+    void activityEndDoesNotAutoClaimTheEntireChain() {
+        saved.put(AFTER_EXCHANGE, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
         controller.onActivityEnd(activity);
         verify(mails).addCfgMail(eq(PLAYER_ID), eq(50), anyList(),
                 eq(AddType.ACTIVITY_GOLD_TREASURE_REWARDS), isNull());
@@ -486,17 +554,18 @@ class GoldTreasureControllerTest {
         verify(pack, never()).removeItems(any(Player.class), anyMap(), any(AddType.class));
     }
 
+    private void unlockExchange() {
+        for (int id : List.of(FREE, PAID, NEXT)) {
+            saved.put(id, data(ROUND, ActivityConstant.ClaimStatus.CLAIMED));
+        }
+    }
+
     private ResGoldTreasure info() {
         return (ResGoldTreasure) controller.getPlayerActivityInfoByType(player, ActivityType.GOLD_TREASURE);
     }
 
     private GoldTreasureDetailInfo detail(ResGoldTreasure response, int detailId) {
         return response.activityData.stream().filter(info -> info.detailId == detailId).findFirst().orElseThrow();
-    }
-
-    private void verifyNoMoreInteractionsAfterRewardChecks() {
-        verify(pack, atMostOnce()).findSatisfiedItemRequirements(eq(player), anyList());
-        verifyNoMoreInteractions(pack);
     }
 
     private ReqGenerateOrder request(int detailId) {
@@ -530,15 +599,24 @@ class GoldTreasureControllerTest {
         return snapshot;
     }
 
-    private void addConfig(int id, int rewardType, int previousId, int payId, Map<Integer, Long> condition) {
+    private void addConfig(int id, int rewardType, int payId) {
         GoldTreasureCfg cfg = mock(GoldTreasureCfg.class);
         when(cfg.getId()).thenReturn(id);
         when(cfg.getRewardType()).thenReturn(rewardType);
-        when(cfg.getPreviousId()).thenReturn(previousId);
         when(cfg.getPayId()).thenReturn(payId);
         when(cfg.getGetItem()).thenReturn(REWARDS);
-        when(cfg.getCondition()).thenReturn(condition);
         cfgs.put(id, cfg);
+    }
+
+    private void addShop(int id, int type, BigDecimal price, Map<Integer, Long> redeem) {
+        ShopRechargeListCfg shop = mock(ShopRechargeListCfg.class);
+        when(shop.getId()).thenReturn(id);
+        when(shop.getType()).thenReturn(type);
+        when(shop.getPrice()).thenReturn(price);
+        when(shop.getRedeem()).thenReturn(redeem);
+        when(shop.getIosShopId()).thenReturn("gold.apple");
+        when(shop.getGoogleShopId()).thenReturn("gold.google");
+        shops.put(id, shop);
     }
 
     private static class TestController extends GoldTreasureController {

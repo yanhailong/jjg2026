@@ -248,6 +248,7 @@ public class GameDataManager {
     containerMap.put(SpecialModeCfg.class, new SpecialModeCfgContainer());
     containerMap.put(SpecialPlayCfg.class, new SpecialPlayCfgContainer());
     containerMap.put(SpecialResultLibCfg.class, new SpecialResultLibCfgContainer());
+    containerMap.put(StarterPackCfg.class, new StarterPackCfgContainer());
     containerMap.put(StatusCfg.class, new StatusCfgContainer());
     containerMap.put(TaskCfg.class, new TaskCfgContainer());
     containerMap.put(TexasCfg.class, new TexasCfgContainer());
@@ -2226,6 +2227,18 @@ public class GameDataManager {
 
   public static List<SpecialResultLibCfg> getSpecialResultLibCfgList() {
     return getInstance().getCfgContainer(SpecialResultLibCfg.class).getCfgBeanList();
+  }
+
+  public static StarterPackCfg getStarterPackCfg(int key) {
+    return getInstance().getCfgContainer(StarterPackCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, StarterPackCfg> getStarterPackCfgMap() {
+    return getInstance().getCfgContainer(StarterPackCfg.class).getCfgBeanMap();
+  }
+
+  public static List<StarterPackCfg> getStarterPackCfgList() {
+    return getInstance().getCfgContainer(StarterPackCfg.class).getCfgBeanList();
   }
 
   public static StatusCfg getStatusCfg(int key) {

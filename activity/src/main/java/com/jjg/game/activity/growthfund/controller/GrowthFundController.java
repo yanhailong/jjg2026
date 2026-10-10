@@ -23,6 +23,7 @@ import com.jjg.game.core.dao.CountDao;
 import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.listener.SimPlayerContextListener;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.utils.ItemUtils;
@@ -36,7 +37,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -442,8 +442,8 @@ public class GrowthFundController extends BaseActivityController implements Orde
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         long activityId = Long.parseLong(req.productId);
         ActivityData activityData = activityManager.getActivityData().get(activityId);
         if (activityData == null || !checkPlayerCanJoinActivity(player, activityData)) {
@@ -461,7 +461,10 @@ public class GrowthFundController extends BaseActivityController implements Orde
         }
 
         result.code = Code.SUCCESS;
-        result.data = shopRechargeListCfg.getPrice();
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(shopRechargeListCfg.getPrice());
+        result.data = preGenerateOrderData;
         return result;
     }
 

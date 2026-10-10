@@ -23,7 +23,9 @@ import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.data.Order;
 import com.jjg.game.core.data.Player;
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.MailService;
@@ -263,8 +265,8 @@ public class DailyRechargeController extends BaseActivityController implements O
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         BaseCfgBean cfgBean = getOrderGenerateBean(player, req.productId);
         if (cfgBean instanceof DailyRechargeCfg cfg && cfg.getType() == ActivityConstant.DailyRecharge.GIFT) {
             String channelCommodity = cfg.getChannelCommodity().get(player.getChannel().getValue());
@@ -282,7 +284,10 @@ public class DailyRechargeController extends BaseActivityController implements O
             }
 
             result.code = Code.SUCCESS;
-            result.data = cfg.getCost();
+            PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+            preGenerateOrderData.setType(RechargeCfgType.MONEY);
+            preGenerateOrderData.setPrice(cfg.getCost());
+            result.data = preGenerateOrderData;
         }
         return result;
     }

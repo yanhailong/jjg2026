@@ -6,14 +6,13 @@ import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Order;
 import com.jjg.game.core.data.Player;
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.GlobalConfigCfg;
 import org.apache.commons.lang3.StringUtils;
-
-import java.math.BigDecimal;
 
 /**
  * @author lm
@@ -27,7 +26,7 @@ public interface OrderGenerate extends IGameSysFuncInterface {
      * @param req    请求
      * @return 商品id,配置价格
      */
-    CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req);
+    CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req);
 
     /**
      * 预下单业务校验成功、但订单最终未创建时的补偿回调。
@@ -52,6 +51,10 @@ public interface OrderGenerate extends IGameSysFuncInterface {
      * @return `true` 表示处理成功，`false` 表示处理失败
      */
     boolean onReceivedRecharge(Player player, Order order);
+
+    default boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        return false;
+    }
 
 
     /**

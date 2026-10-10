@@ -44,7 +44,9 @@ import com.jjg.game.common.pb.ItemInfo;
 import com.jjg.game.common.protostuff.Command;
 import com.jjg.game.common.protostuff.MessageType;
 import com.jjg.game.core.constant.Code;
+import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.PlayerController;
+import com.jjg.game.core.listener.GmListener;
 import com.jjg.game.core.service.GameFunctionService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
@@ -62,7 +64,7 @@ import java.util.Map;
  */
 @Component
 @MessageType(value = MessageConst.MessageTypeDef.ACTIVITY)
-public class ActivityMessageHandler {
+public class ActivityMessageHandler implements GmListener {
     private static final Logger log = LoggerFactory.getLogger(ActivityMessageHandler.class);
     private final ActivityManager activityManager;
     private final CashCowController cashCowController;
@@ -148,7 +150,7 @@ public class ActivityMessageHandler {
 
     @Command(ActivityConstant.MsgBean.REQ_BUY_ONE_GET_SEVEN_CLAIM_REWARDS)
     public void reqBuyOneGetSevenClaimRewards(PlayerController playerController,
-                                               ReqBuyOneGetSevenClaimRewards req) {
+                                              ReqBuyOneGetSevenClaimRewards req) {
         ActivityData data = activityManager.getOpenActivityData(
                 playerController.getPlayer(), ActivityType.BUY_ONE_GET_SEVEN);
         if (data == null || !(ActivityType.BUY_ONE_GET_SEVEN.getController() instanceof BuyOneGetSevenController controller)) {
@@ -495,5 +497,23 @@ public class ActivityMessageHandler {
                 playerController.send(grandRouletteController.reqGrandRouletteHistory(playerController.getPlayer(), req));
             }
         }
+    }
+
+    @Override
+    public CommonResult<String> gm(PlayerController playerController, String[] gmOrders) {
+        CommonResult<String> res = new CommonResult<>(Code.SUCCESS);
+        try {
+            if ("activityType".equalsIgnoreCase(gmOrders[0])) {
+                ReqActivityInfoByType req = new ReqActivityInfoByType();
+                req.activityType = Integer.parseInt(gmOrders[1]);
+                reqActivityInfoByType(playerController, req);
+            } else {
+                res.code = Code.NOT_FOUND;
+            }
+        } catch (Exception e) {
+            log.error("", e);
+            res.code = Code.EXCEPTION;
+        }
+        return res;
     }
 }

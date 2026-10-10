@@ -28,6 +28,7 @@ import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.manager.CoreSendMessageManager;
 import com.jjg.game.core.manager.RedDotManager;
 import com.jjg.game.core.pb.NotifyPlayerLevelUp;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.pb.reddot.RedDotDetails;
@@ -42,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -391,8 +391,8 @@ public class PlayerLevelPackManager implements GameEventListener, OrderGenerate,
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         int id = Integer.parseInt(req.productId);
         PlayerLevelPackCfg cfg = GameDataManager.getPlayerLevelPackCfg(id);
         if (cfg == null) {
@@ -413,7 +413,10 @@ public class PlayerLevelPackManager implements GameEventListener, OrderGenerate,
         }
 
         result.code = Code.SUCCESS;
-        result.data = cfg.getPay();
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(cfg.getPay());
+        result.data = preGenerateOrderData;
         return result;
     }
 
