@@ -348,5 +348,10 @@ public interface ActivityConstant {
         //买一送七领取奖励
         int REQ_BUY_ONE_GET_SEVEN_CLAIM_REWARDS = BASE_MSG_PREFIX | 0x8C;
         int RES_BUY_ONE_GET_SEVEN_CLAIM_REWARDS = BASE_MSG_PREFIX | 0x8D;
+
+        //黄金宝藏
+        int RES_GOLD_TREASURE = BASE_MSG_PREFIX | 0x8E;
+        //领取黄金宝藏的奖励
+        int RES_CLAIM_GOLD_TREASURE_REWARDS = BASE_MSG_PREFIX | 0x8F;
     }
 }

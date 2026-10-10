@@ -26,6 +26,7 @@ import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.MailService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
+import com.jjg.game.sampledata.bean.ActivityConfigCfg;
 import com.jjg.game.sampledata.bean.BaseCfgBean;
 import com.jjg.game.sampledata.bean.BuyOneGetSevenCfg;
 import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
@@ -308,19 +309,18 @@ public class BuyOneGetSevenController extends BaseActivityController
         }
         ShopRechargeListCfg shopCfg = getShopCfg(activityData);
         if (shopCfg == null) {
-            log.warn("买一送七下单失败，未找到充值商品配置 playerId={},productId={},activityId={},channelCommodity={}",
-                    player.getId(), req.productId, activityData.getId(), activityData.getChannelCommodity());
+            log.warn("买一送七下单失败，未找到充值商品配置 playerId={},productId={},activityId={}",
+                    player.getId(), req.productId, activityData.getId());
             return result;
         }
         if (shopCfg.getPrice() == null) {
-            log.warn("买一送七下单失败，充值商品价格为空 playerId={},productId={},activityId={},channelCommodity={}",
-                    player.getId(), req.productId, activityData.getId(), activityData.getChannelCommodity());
+            log.warn("买一送七下单失败，充值商品价格为空 playerId={},productId={},activityId={}",
+                    player.getId(), req.productId, activityData.getId());
             return result;
         }
         if (StringUtils.isBlank(getChannelProductId(player, shopCfg))) {
-            log.warn("买一送七下单失败，渠道商品ID为空 playerId={},productId={},activityId={},channel={},channelCommodity={}",
-                    player.getId(), req.productId, activityData.getId(), player.getChannel(),
-                    activityData.getChannelCommodity());
+            log.warn("买一送七下单失败，渠道商品ID为空 playerId={},productId={},activityId={},channel={}",
+                    player.getId(), req.productId, activityData.getId(), player.getChannel());
             return result;
         }
 
@@ -546,10 +546,6 @@ public class BuyOneGetSevenController extends BaseActivityController
 
     private long getUnlockIntervalMillis(ActivityData activityData) {
         return TimeUnit.SECONDS.toMillis(activityData.getValueParam().get(UNLOCK_INTERVAL_PARAM_INDEX));
-    }
-
-    private ShopRechargeListCfg getShopCfg(ActivityData activityData) {
-        return GameDataManager.getShopRechargeListCfg(activityData.getChannelCommodity());
     }
 
     private String getChannelProductId(Player player, ShopRechargeListCfg shopCfg) {

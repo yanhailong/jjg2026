@@ -129,7 +129,7 @@ public class GrowthFundController extends BaseActivityController implements Orde
             info.rewards = ItemUtils.buildItemInfo(rewards);
         }
 
-        ShopRechargeListCfg shopRechargeListCfg = GameDataManager.getShopRechargeListCfg(activityData.getChannelCommodity());
+        ShopRechargeListCfg shopRechargeListCfg = getShopCfg(activityData);
 
         info.isBuy = true;
         activityLogger.sendGrowthFundBuyLog(player, activityData, shopRechargeListCfg == null ? null : shopRechargeListCfg.getPrice(),
@@ -352,7 +352,7 @@ public class GrowthFundController extends BaseActivityController implements Orde
             }
             ActivityData activityData = activityManager.getActivityData().get(entry.getKey());
             if (activityData != null) {
-                ShopRechargeListCfg shopRechargeListCfg = GameDataManager.getShopRechargeListCfg(activityData.getChannelCommodity());
+                ShopRechargeListCfg shopRechargeListCfg = getShopCfg(activityData);
                 if (shopRechargeListCfg != null) {
                     activityInfo.sellingPrice = shopRechargeListCfg.getPrice().toPlainString();
                     if (player.getChannel() == ChannelType.APPLE) {
@@ -449,7 +449,7 @@ public class GrowthFundController extends BaseActivityController implements Orde
         if (activityData == null || !checkPlayerCanJoinActivity(player, activityData)) {
             return result;
         }
-        ShopRechargeListCfg shopRechargeListCfg = GameDataManager.getShopRechargeListCfg(activityData.getChannelCommodity());
+        ShopRechargeListCfg shopRechargeListCfg = getShopCfg(activityData);
         if (shopRechargeListCfg == null || shopRechargeListCfg.getPrice() == null) {
             return result;
         }

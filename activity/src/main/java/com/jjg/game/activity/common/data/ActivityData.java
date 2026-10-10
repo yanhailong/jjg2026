@@ -82,10 +82,6 @@ public class ActivityData {
      */
     private List<BigDecimal> bigDecimalParam;
     /**
-     * 渠道和商品ID
-     */
-    private int channelCommodity;
-    /**
      * 道具掉落包ID
      */
     private Integer dropId;
@@ -130,14 +126,6 @@ public class ActivityData {
 
     public void setId(long id) {
         this.id = id;
-    }
-
-    public int getChannelCommodity() {
-        return channelCommodity;
-    }
-
-    public void setChannelCommodity(int channelCommodity) {
-        this.channelCommodity = channelCommodity;
     }
 
     public void setRound(long round) {
@@ -278,7 +266,6 @@ public class ActivityData {
         data.setValueParam(cfg.getValueParam());
         data.setDropId(cfg.getDropConfigId());
         data.setBigDecimalParam(cfg.getBigDecimalParam());
-        data.setChannelCommodity(cfg.getChannelCommodity());
         long currentTimeMillis = System.currentTimeMillis();
         switch (data.getOpenType()) {
             case ActivityConstant.Common.CYCLE_SERVER_TYPE -> {

@@ -99,17 +99,34 @@ public class PlayerActivityDao {
     public <T extends PlayerActivityData> Map<Integer, T> getPlayerActivityData(
             long playerId, ActivityType activityType, long activityId) {
         try {
+            return getPlayerActivityDataOrThrow(playerId, activityType, activityId);
+        } catch (Exception e) {
+            log.error("获取活动数据异常 playerId:{} activityType:{} activityId:{}",
+                    playerId, activityType, activityId, e);
+            return new HashMap<>();
+        }
+    }
+
+    /**
+     * 严格读取玩家单个活动的数据，读取或解析失败时抛出异常。
+     */
+    public <T extends PlayerActivityData> Map<Integer, T> getPlayerActivityDataOrThrow(
+            long playerId, ActivityType activityType, long activityId) {
+        try {
             HashOperations<String, String, String> hash = redisTemplate.opsForHash();
             String jsonData = hash.get(getKey(playerId, activityType.getType()), String.valueOf(activityId));
             if (jsonData == null) {
                 return new HashMap<>();
             }
-            return mapper.readValue(jsonData, new TypeReference<>() {
+            Map<Integer, T> data = mapper.readValue(jsonData, new TypeReference<>() {
             });
+            if (data == null) {
+                throw new IllegalStateException("活动数据为空");
+            }
+            return data;
         } catch (Exception e) {
-            log.error("获取活动数据异常 playerId:{} activityType:{} activityId:{}",
-                    playerId, activityType, activityId, e);
-            return new HashMap<>();
+            throw new IllegalStateException("读取活动数据失败 playerId:" + playerId
+                    + " activityType:" + activityType + " activityId:" + activityId, e);
         }
     }
 
@@ -154,7 +171,7 @@ public class PlayerActivityDao {
      * @param activityId   活动 ID
      * @param data         活动数据 Map
      */
-    public <T extends PlayerActivityData> void savePlayerActivityData(
+    public <T extends PlayerActivityData> boolean savePlayerActivityData(
             long playerId, ActivityType activityType, long activityId, Map<Integer, T> data) {
         try {
             String json = mapper.writeValueAsString(data);
@@ -169,9 +186,11 @@ public class PlayerActivityDao {
                         json
                 );
             }
+            return true;
         } catch (Exception e) {
             log.error("保存单条活动数据异常 playerId:{} activityType:{} activityId:{}",
                     playerId, activityType, activityId, e);
+            return false;
         }
     }
 

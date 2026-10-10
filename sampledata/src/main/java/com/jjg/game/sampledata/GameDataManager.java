@@ -176,6 +176,7 @@ public class GameDataManager {
     containerMap.put(GiftListCfg.class, new GiftListCfgContainer());
     containerMap.put(GiftPackCfg.class, new GiftPackCfgContainer());
     containerMap.put(GlobalConfigCfg.class, new GlobalConfigCfgContainer());
+    containerMap.put(GoldTreasureCfg.class, new GoldTreasureCfgContainer());
     containerMap.put(GrowthFundCfg.class, new GrowthFundCfgContainer());
     containerMap.put(GuideCfg.class, new GuideCfgContainer());
     containerMap.put(GuideDetailsCfg.class, new GuideDetailsCfgContainer());
@@ -1361,6 +1362,18 @@ public class GameDataManager {
 
   public static List<GlobalConfigCfg> getGlobalConfigCfgList() {
     return getInstance().getCfgContainer(GlobalConfigCfg.class).getCfgBeanList();
+  }
+
+  public static GoldTreasureCfg getGoldTreasureCfg(int key) {
+    return getInstance().getCfgContainer(GoldTreasureCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, GoldTreasureCfg> getGoldTreasureCfgMap() {
+    return getInstance().getCfgContainer(GoldTreasureCfg.class).getCfgBeanMap();
+  }
+
+  public static List<GoldTreasureCfg> getGoldTreasureCfgList() {
+    return getInstance().getCfgContainer(GoldTreasureCfg.class).getCfgBeanList();
   }
 
   public static GrowthFundCfg getGrowthFundCfg(int key) {

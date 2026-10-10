@@ -24,7 +24,7 @@ public class ActivityConfigCfg extends BaseCfgBean {
   /** 值3 */
   protected List<BigDecimal> bigDecimalParam;
   /** 渠道和商品ID */
-  protected int channelCommodity;
+  protected List<Integer> channelCommodity;
   /** 解锁条件 */
   protected String condition;
   /** 掉落id */
@@ -56,7 +56,7 @@ public class ActivityConfigCfg extends BaseCfgBean {
   }
 
   /** 返回渠道和商品ID */
-  public int getChannelCommodity() {
+  public List<Integer> getChannelCommodity() {
     return channelCommodity;
   }
 

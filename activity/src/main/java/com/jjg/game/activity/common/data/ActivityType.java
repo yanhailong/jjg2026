@@ -9,6 +9,7 @@ import com.jjg.game.activity.continuousRecharge.ContinuousRechargeController;
 import com.jjg.game.activity.dailylogin.controller.DailyLoginController;
 import com.jjg.game.activity.dailyrecharge.controller.DailyRechargeController;
 import com.jjg.game.activity.firstpayment.controller.FirstPaymentController;
+import com.jjg.game.activity.goldTreasure.GoldTreasureController;
 import com.jjg.game.activity.grandroulette.controller.GrandRouletteController;
 import com.jjg.game.activity.growthfund.controller.GrowthFundController;
 import com.jjg.game.activity.officialawards.controller.OfficialAwardsController;
@@ -56,6 +57,9 @@ public enum ActivityType {
     //成长基金
     GROWTH_FUND(15, GrowthFundController.class, true, false,
             ActivityTargetType.SIM_ALL_LEVEL.getTargetKey(), false, false, false),
+    //黄金宝藏
+    GOLD_TREASURE(17, GoldTreasureController.class, false, false,
+            ActivityTargetType.NONE.getTargetKey(), false, false, true),
     //买一送七
     BUY_ONE_GET_SEVEN(19, BuyOneGetSevenController.class, false, false,
             ActivityTargetType.NONE.getTargetKey(), false, false, true),

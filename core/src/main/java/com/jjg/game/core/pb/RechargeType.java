@@ -76,6 +76,9 @@ public enum RechargeType {
 
     /**迷你商店*/
     SHOP_MINI(17),
+
+    /**黄金宝藏*/
+    GOLD_TREASURE(18),
     ;
     private final int type;
 
