@@ -150,6 +150,8 @@ public enum AddType {
     ACTIVITY_BUY_ONE_GET_SEVEN_CLAIM_REWARD(633),
     //黄金宝藏领取奖励
     ACTIVITY_GOLD_TREASURE_REWARDS(634),
+    //连续礼包购买和终极奖励
+    ACTIVITY_CONTINUOUS_GIFT_REWARDS(635),
 
 
     //好友房申请庄家扣除准备金

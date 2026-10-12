@@ -353,5 +353,8 @@ public interface ActivityConstant {
         int RES_GOLD_TREASURE = BASE_MSG_PREFIX | 0x8E;
         //领取黄金宝藏的奖励
         int RES_CLAIM_GOLD_TREASURE_REWARDS = BASE_MSG_PREFIX | 0x8F;
+        //连续礼包
+        int RES_CONTINUOUS_GIFT = BASE_MSG_PREFIX | 0x90;
+        int RES_CLAIM_CONTINUOUS_GIFT_REWARDS = BASE_MSG_PREFIX | 0x91;
     }
 }

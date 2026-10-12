@@ -139,7 +139,7 @@ public class RedDotDetails {
         ALLIANCE(14, RedDotType.COMMON, false),
         @ProtoDesc("建筑；子模块1=可升级数量，子模块2=数据看板入口感叹号")
         BUILDING(15, RedDotType.COUNT, false),
-        @ProtoDesc("赛季；子模块1=黄金宝藏可领取奖励")
+        @ProtoDesc("赛季；子模块1=黄金宝藏可领取奖励，2=连续礼包终极奖励")
         SEASON(16, RedDotType.COMMON, false),
         ;
 

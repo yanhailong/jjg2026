@@ -1063,7 +1063,7 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
         List<RedDotDetails> result = new ArrayList<>();
         for (ActivityType type : ActivityType.values()) {
             if (submodule != 0 && submodule != type.getType()) continue;
-            if (type == ActivityType.GOLD_TREASURE) continue;
+            if (type == ActivityType.GOLD_TREASURE || type == ActivityType.CONTINUOUS_GIFT) continue;
             BaseActivityController controller = type.getController();
             if (controller == null) continue;
             long count = 0;
@@ -1110,7 +1110,7 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
         List<Integer> result = new ArrayList<>();
         result.add(0);
         for (ActivityType type : ActivityType.values()) {
-            if (type != ActivityType.GOLD_TREASURE) result.add(type.getType());
+            if (type != ActivityType.GOLD_TREASURE && type != ActivityType.CONTINUOUS_GIFT) result.add(type.getType());
         }
         return result;
     }

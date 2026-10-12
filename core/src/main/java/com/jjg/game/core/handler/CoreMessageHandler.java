@@ -612,7 +612,7 @@ public class CoreMessageHandler {
 
             //真实下单
             if (preOrderResult.data.getType() == RechargeCfgType.MONEY) {
-                Order order = orderService.generateOrder(playerController.getPlayer(), payType, req.productId, preOrderResult.data.getPrice(), rechargeType, req.desc);
+                Order order = orderService.generateOrder(playerController.getPlayer(), payType, StringUtils.isNotEmpty(preOrderResult.data.getOrderProductId()) ? preOrderResult.data.getOrderProductId() : req.productId, preOrderResult.data.getPrice(), rechargeType, req.desc);
                 if (order == null) {
                     notifyOrderCreationFailed(matchedGenerate, playerController, req);
                     log.debug("预下单失败11 playerId = {},req = {}", playerController.playerId(), JSON.toJSONString(req));

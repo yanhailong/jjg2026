@@ -5,6 +5,7 @@ import com.jjg.game.activity.bundleGiftPack.BundleGiftPackController;
 import com.jjg.game.activity.buyOneGetSeven.BuyOneGetSevenController;
 import com.jjg.game.activity.cashcow.controller.CashCowController;
 import com.jjg.game.activity.common.controller.BaseActivityController;
+import com.jjg.game.activity.continousGift.ContinuousGiftController;
 import com.jjg.game.activity.continuousRecharge.ContinuousRechargeController;
 import com.jjg.game.activity.dailylogin.controller.DailyLoginController;
 import com.jjg.game.activity.dailyrecharge.controller.DailyRechargeController;
@@ -72,6 +73,9 @@ public enum ActivityType {
     //广告福利
     ADS_REWARD(25, AdsRewardController.class, false, false,
             ActivityTargetType.NONE.getTargetKey(), true, false, true),
+    //连续礼包
+    CONTINUOUS_GIFT(27, ContinuousGiftController.class, false, false,
+            ActivityTargetType.NONE.getTargetKey(), false, false, true),
     ;
     //活动类型
     private final int type;

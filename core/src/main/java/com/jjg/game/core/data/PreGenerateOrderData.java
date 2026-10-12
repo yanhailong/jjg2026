@@ -18,6 +18,8 @@ public class PreGenerateOrderData {
     private String productId;
     //ReqGenerateOrder.desc  json格式备注
     private String desc;
+    //其他
+    private String orderProductId;
 
     public RechargeCfgType getType() {
         return type;
@@ -57,5 +59,13 @@ public class PreGenerateOrderData {
 
     public void setDesc(String desc) {
         this.desc = desc;
+    }
+
+    public String getOrderProductId() {
+        return orderProductId;
+    }
+
+    public void setOrderProductId(String orderProductId) {
+        this.orderProductId = orderProductId;
     }
 }

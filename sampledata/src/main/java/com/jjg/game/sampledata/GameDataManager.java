@@ -153,6 +153,7 @@ public class GameDataManager {
     containerMap.put(ChessRobotCfg.class, new ChessRobotCfgContainer());
     containerMap.put(ChessTexasStrategyCfg.class, new ChessTexasStrategyCfgContainer());
     containerMap.put(ConditionCfg.class, new ConditionCfgContainer());
+    containerMap.put(ConsecutivePackCfg.class, new ConsecutivePackCfgContainer());
     containerMap.put(ContinuouschargingCfg.class, new ContinuouschargingCfgContainer());
     containerMap.put(CumulativebenefitsCfg.class, new CumulativebenefitsCfgContainer());
     containerMap.put(DailyRechargeCfg.class, new DailyRechargeCfgContainer());
@@ -242,6 +243,10 @@ public class GameDataManager {
     containerMap.put(SharePromoteCfg.class, new SharePromoteCfgContainer());
     containerMap.put(ShopMiniCfg.class, new ShopMiniCfgContainer());
     containerMap.put(ShopRechargeListCfg.class, new ShopRechargeListCfgContainer());
+    containerMap.put(SmallDrawCfg.class, new SmallDrawCfgContainer());
+    containerMap.put(SmallDrawDailyGiftCfg.class, new SmallDrawDailyGiftCfgContainer());
+    containerMap.put(SmallDrawGrandPrizeCfg.class, new SmallDrawGrandPrizeCfgContainer());
+    containerMap.put(SmallDrawRewardCfg.class, new SmallDrawRewardCfgContainer());
     containerMap.put(SouthernMoneyCfg.class, new SouthernMoneyCfgContainer());
     containerMap.put(SpecialAuxiliaryCfg.class, new SpecialAuxiliaryCfgContainer());
     containerMap.put(SpecialGirdCfg.class, new SpecialGirdCfgContainer());
@@ -1087,6 +1092,18 @@ public class GameDataManager {
 
   public static List<ConditionCfg> getConditionCfgList() {
     return getInstance().getCfgContainer(ConditionCfg.class).getCfgBeanList();
+  }
+
+  public static ConsecutivePackCfg getConsecutivePackCfg(int key) {
+    return getInstance().getCfgContainer(ConsecutivePackCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, ConsecutivePackCfg> getConsecutivePackCfgMap() {
+    return getInstance().getCfgContainer(ConsecutivePackCfg.class).getCfgBeanMap();
+  }
+
+  public static List<ConsecutivePackCfg> getConsecutivePackCfgList() {
+    return getInstance().getCfgContainer(ConsecutivePackCfg.class).getCfgBeanList();
   }
 
   public static ContinuouschargingCfg getContinuouschargingCfg(int key) {
@@ -2155,6 +2172,54 @@ public class GameDataManager {
 
   public static List<ShopRechargeListCfg> getShopRechargeListCfgList() {
     return getInstance().getCfgContainer(ShopRechargeListCfg.class).getCfgBeanList();
+  }
+
+  public static SmallDrawCfg getSmallDrawCfg(int key) {
+    return getInstance().getCfgContainer(SmallDrawCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, SmallDrawCfg> getSmallDrawCfgMap() {
+    return getInstance().getCfgContainer(SmallDrawCfg.class).getCfgBeanMap();
+  }
+
+  public static List<SmallDrawCfg> getSmallDrawCfgList() {
+    return getInstance().getCfgContainer(SmallDrawCfg.class).getCfgBeanList();
+  }
+
+  public static SmallDrawDailyGiftCfg getSmallDrawDailyGiftCfg(int key) {
+    return getInstance().getCfgContainer(SmallDrawDailyGiftCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, SmallDrawDailyGiftCfg> getSmallDrawDailyGiftCfgMap() {
+    return getInstance().getCfgContainer(SmallDrawDailyGiftCfg.class).getCfgBeanMap();
+  }
+
+  public static List<SmallDrawDailyGiftCfg> getSmallDrawDailyGiftCfgList() {
+    return getInstance().getCfgContainer(SmallDrawDailyGiftCfg.class).getCfgBeanList();
+  }
+
+  public static SmallDrawGrandPrizeCfg getSmallDrawGrandPrizeCfg(int key) {
+    return getInstance().getCfgContainer(SmallDrawGrandPrizeCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, SmallDrawGrandPrizeCfg> getSmallDrawGrandPrizeCfgMap() {
+    return getInstance().getCfgContainer(SmallDrawGrandPrizeCfg.class).getCfgBeanMap();
+  }
+
+  public static List<SmallDrawGrandPrizeCfg> getSmallDrawGrandPrizeCfgList() {
+    return getInstance().getCfgContainer(SmallDrawGrandPrizeCfg.class).getCfgBeanList();
+  }
+
+  public static SmallDrawRewardCfg getSmallDrawRewardCfg(int key) {
+    return getInstance().getCfgContainer(SmallDrawRewardCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, SmallDrawRewardCfg> getSmallDrawRewardCfgMap() {
+    return getInstance().getCfgContainer(SmallDrawRewardCfg.class).getCfgBeanMap();
+  }
+
+  public static List<SmallDrawRewardCfg> getSmallDrawRewardCfgList() {
+    return getInstance().getCfgContainer(SmallDrawRewardCfg.class).getCfgBeanList();
   }
 
   public static SouthernMoneyCfg getSouthernMoneyCfg(int key) {
