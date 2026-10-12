@@ -341,6 +341,8 @@ public enum AddType {
     SIM_ACTIVE_PASS(1828),
     //赛季通行证
     SIM_SEASON_PASS(1829),
+    //赛季小额抽奖
+    SIM_SEASON_SMALL_DRAW(1830),
 
     //创建联盟
     ALLIANCE_CREATE(2001),

@@ -27,6 +27,7 @@ import com.jjg.game.season.service.SeasonEconomyService;
 import com.jjg.game.season.service.SeasonFreeGameService;
 import com.jjg.game.season.service.SeasonLifecycleService;
 import com.jjg.game.season.service.SeasonService;
+import com.jjg.game.season.service.SeasonSmallDrawService;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.dao.*;
 import com.jjg.game.sim.data.*;
@@ -153,6 +154,8 @@ public class SimManager {
     private SeasonLifecycleService seasonLifecycleService;
     @Autowired
     private SeasonService seasonService;
+    @Autowired
+    private SeasonSmallDrawService smallDrawService;
     @Autowired
     private SeasonFreeGameService seasonFreeGameService;
     @Autowired
@@ -515,6 +518,7 @@ public class SimManager {
         SimPlayerContext ctx = createContextByPlayerId(playerController.playerId(), playerController);
         if (ctx != null) {
             ctx.setPlayerController(playerController);
+            smallDrawService.onLogin(ctx);
         }
         return ctx;
     }

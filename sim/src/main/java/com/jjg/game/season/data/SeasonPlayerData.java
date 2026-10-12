@@ -54,6 +54,7 @@ public class SeasonPlayerData extends AbstractData {
     private Map<String, Long> passProgress = new HashMap<>();
     private Map<Integer, Integer> passPurchasedTracks = new HashMap<>();
     private Map<Integer, Integer> passClaimedTracks = new HashMap<>();
+    private SeasonSmallDrawData smallDraw;
     private SeasonTrialSession activeTrial;
     private List<Long> representativeSpinWins = new ArrayList<>();
     private long representativeStake;
@@ -105,6 +106,7 @@ public class SeasonPlayerData extends AbstractData {
         getPassProgress().clear();
         getPassPurchasedTracks().clear();
         getPassClaimedTracks().clear();
+        smallDraw = null;
         activeTrial = null;
         getRepresentativeSpinWins().clear();
         representativeStake = 0;
@@ -263,6 +265,8 @@ public class SeasonPlayerData extends AbstractData {
         return passClaimedTracks;
     }
     public void setPassClaimedTracks(Map<Integer, Integer> passClaimedTracks) { this.passClaimedTracks = passClaimedTracks == null ? new HashMap<>() : passClaimedTracks; }
+    public SeasonSmallDrawData getSmallDraw() { return smallDraw; }
+    public void setSmallDraw(SeasonSmallDrawData smallDraw) { this.smallDraw = smallDraw; }
     public SeasonTrialSession getActiveTrial() { return activeTrial; }
     public void setActiveTrial(SeasonTrialSession activeTrial) { this.activeTrial = activeTrial; }
     public List<Long> getRepresentativeSpinWins() {

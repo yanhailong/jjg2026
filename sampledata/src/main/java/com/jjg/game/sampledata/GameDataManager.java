@@ -244,8 +244,6 @@ public class GameDataManager {
     containerMap.put(ShopMiniCfg.class, new ShopMiniCfgContainer());
     containerMap.put(ShopRechargeListCfg.class, new ShopRechargeListCfgContainer());
     containerMap.put(SmallDrawCfg.class, new SmallDrawCfgContainer());
-    containerMap.put(SmallDrawDailyGiftCfg.class, new SmallDrawDailyGiftCfgContainer());
-    containerMap.put(SmallDrawGrandPrizeCfg.class, new SmallDrawGrandPrizeCfgContainer());
     containerMap.put(SmallDrawRewardCfg.class, new SmallDrawRewardCfgContainer());
     containerMap.put(SouthernMoneyCfg.class, new SouthernMoneyCfgContainer());
     containerMap.put(SpecialAuxiliaryCfg.class, new SpecialAuxiliaryCfgContainer());
@@ -2184,30 +2182,6 @@ public class GameDataManager {
 
   public static List<SmallDrawCfg> getSmallDrawCfgList() {
     return getInstance().getCfgContainer(SmallDrawCfg.class).getCfgBeanList();
-  }
-
-  public static SmallDrawDailyGiftCfg getSmallDrawDailyGiftCfg(int key) {
-    return getInstance().getCfgContainer(SmallDrawDailyGiftCfg.class).getCfgBeanMap().get(key);
-  }
-
-  public static Map<Integer, SmallDrawDailyGiftCfg> getSmallDrawDailyGiftCfgMap() {
-    return getInstance().getCfgContainer(SmallDrawDailyGiftCfg.class).getCfgBeanMap();
-  }
-
-  public static List<SmallDrawDailyGiftCfg> getSmallDrawDailyGiftCfgList() {
-    return getInstance().getCfgContainer(SmallDrawDailyGiftCfg.class).getCfgBeanList();
-  }
-
-  public static SmallDrawGrandPrizeCfg getSmallDrawGrandPrizeCfg(int key) {
-    return getInstance().getCfgContainer(SmallDrawGrandPrizeCfg.class).getCfgBeanMap().get(key);
-  }
-
-  public static Map<Integer, SmallDrawGrandPrizeCfg> getSmallDrawGrandPrizeCfgMap() {
-    return getInstance().getCfgContainer(SmallDrawGrandPrizeCfg.class).getCfgBeanMap();
-  }
-
-  public static List<SmallDrawGrandPrizeCfg> getSmallDrawGrandPrizeCfgList() {
-    return getInstance().getCfgContainer(SmallDrawGrandPrizeCfg.class).getCfgBeanList();
   }
 
   public static SmallDrawRewardCfg getSmallDrawRewardCfg(int key) {

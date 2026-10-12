@@ -71,18 +71,32 @@ public enum RechargeType {
      * 赛季通行证
      */
     SEASON_PASS(15),
-    /** 活跃通行证 */
+    /**
+     * 活跃通行证
+     */
     ACTIVE_PASS(16),
 
-    /**迷你商店*/
+    /**
+     * 迷你商店
+     */
     SHOP_MINI(17),
 
-    /**黄金宝藏*/
+    /**
+     * 黄金宝藏
+     */
     GOLD_TREASURE(18),
-    /** 连续礼包 */
-    CONTINUOUS_GIFT(20),
-    /** 小额抽奖礼包 */
-    LUCKY_DRAW(19),
+    /**
+     * 连续礼包
+     */
+    CONTINUOUS_GIFT(19),
+    /**
+     * 小额抽奖礼包
+     */
+    LUCKY_DRAW(20),
+    /**
+     * 新手礼包
+     */
+    NEW_PLAYER_GIFT(21),
     ;
     private final int type;
 

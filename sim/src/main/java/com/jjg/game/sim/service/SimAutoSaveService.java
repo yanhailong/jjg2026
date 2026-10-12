@@ -153,6 +153,29 @@ public class SimAutoSaveService implements SimPlayerTickListener {
         return enqueueIfChanged(data);
     }
 
+    /** 付费交付等待本次快照确实落库；沿用同一IO队列，失败向调用方传播。 */
+    public void saveAndWait(AbstractData data) {
+        data.buildKey();
+        Document snapshot = new Document();
+        mongoTemplate.getConverter().write(data, snapshot);
+        long hash = snapshotHash(snapshot);
+        String collection = mongoTemplate.getCollectionName(data.getClass());
+        Object id = snapshot.get("_id");
+        ExecutorService ex = this.ioExecutor;
+        if (ex == null || ex.isShutdown()) {
+            persistSnapshot(collection, id, snapshot, data, hash);
+            return;
+        }
+        try {
+            ex.submit(() -> persistSnapshot(collection, id, snapshot, data, hash)).get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("等待关键业务落库被中断", e);
+        } catch (java.util.concurrent.ExecutionException e) {
+            throw new IllegalStateException("关键业务落库失败", e.getCause());
+        }
+    }
+
     /**
      * 在落库 IO 线程上执行任务, 与之前提交的落库写严格 FIFO;
      * 用于"数据落库完成后再删除源记录"这类顺序依赖 (如赛季待结算队列的消费删除)。
@@ -201,13 +224,17 @@ public class SimAutoSaveService implements SimPlayerTickListener {
 
     private void writeSnapshot(String collection, Object id, Document snapshot, AbstractData data, long hash) {
         try {
-            mongoTemplate.getCollection(collection)
-                    .replaceOne(new Document("_id", id), snapshot, new ReplaceOptions().upsert(true));
-            //写库成功后再记录哈希 (volatile 跨线程可见); 失败则保持脏, 下个周期重试
-            data.markSaved(hash);
+            persistSnapshot(collection, id, snapshot, data, hash);
         } catch (Exception e) {
             log.error("异步落库失败 collection={},id={}", collection, id, e);
         }
+    }
+
+    private void persistSnapshot(String collection, Object id, Document snapshot, AbstractData data, long hash) {
+        mongoTemplate.getCollection(collection)
+                .replaceOne(new Document("_id", id), snapshot, new ReplaceOptions().upsert(true));
+        //写库成功后再记录哈希 (volatile 跨线程可见); 失败则保持脏, 下个周期重试
+        data.markSaved(hash);
     }
 
     /**

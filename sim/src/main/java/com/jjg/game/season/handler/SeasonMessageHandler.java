@@ -17,6 +17,7 @@ import com.jjg.game.season.pb.req.*;
 import com.jjg.game.season.pb.res.ResSeasonMatch;
 import com.jjg.game.season.pb.res.ResSeasonTrialProgress;
 import com.jjg.game.season.service.SeasonService;
+import com.jjg.game.season.service.SeasonSmallDrawService;
 import com.jjg.game.sim.bridge.ToSimBridge;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
@@ -39,6 +40,8 @@ public class SeasonMessageHandler implements GmListener {
 
     @Autowired
     private SeasonService seasonService;
+    @Autowired
+    private SeasonSmallDrawService smallDrawService;
     @Autowired
     private SimPlayerContextRegistry simPlayerContextRegistry;
     @Autowired
@@ -89,6 +92,21 @@ public class SeasonMessageHandler implements GmListener {
     @Command(SeasonConstant.MsgBean.REQ_SEASON_PASS_CLAIM)
     public void reqSeasonPassClaim(PlayerController playerController, ReqSeasonPassClaim req) {
         execute(playerController, ctx -> ctx.send(seasonService.claimPassRewards(ctx, req.passId)));
+    }
+
+    @Command(SeasonConstant.MsgBean.REQ_SEASON_SMALL_DRAW_INFO)
+    public void reqSeasonSmallDrawInfo(PlayerController pc, ReqSeasonSmallDrawInfo req) {
+        execute(pc, ctx -> ctx.send(smallDrawService.info(ctx)));
+    }
+
+    @Command(SeasonConstant.MsgBean.REQ_SEASON_SMALL_DRAW_SELECT)
+    public void reqSeasonSmallDrawSelect(PlayerController pc, ReqSeasonSmallDrawSelect req) {
+        execute(pc, ctx -> ctx.send(smallDrawService.select(ctx, req.drawId, req.rewardId, req.optionIndex)));
+    }
+
+    @Command(SeasonConstant.MsgBean.REQ_SEASON_SMALL_DRAW_DAILY_REWARD)
+    public void reqSeasonSmallDrawDailyReward(PlayerController pc, ReqSeasonSmallDrawDailyReward req) {
+        execute(pc, ctx -> ctx.send(smallDrawService.claimDaily(ctx, req.drawId)));
     }
 
     @Command(SeasonConstant.MsgBean.REQ_SEASON_MATCH)

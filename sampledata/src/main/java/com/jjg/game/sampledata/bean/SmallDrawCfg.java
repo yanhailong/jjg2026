@@ -19,18 +19,23 @@ public class SmallDrawCfg extends BaseCfgBean {
   /** 配置表工作薄名 */
   public static final String SHEET_NAME = "SmallDraw";
 
+  /** 每日道具奖励 */
+  protected List<Integer> DailyReward;
   /** 最大累积天数 */
   protected int MaxCumulativeDays;
   /** 单次价格 */
   protected int PricePerUse;
-  /** 格子总数 */
-  protected int RewardSlotCount;
   /** 活动名称 */
   protected int name;
   /** 活动状态 */
   protected boolean open;
   /** 赛季ID */
   protected int seasonid;
+
+  /** 返回每日道具奖励 */
+  public List<Integer> getDailyReward() {
+    return DailyReward;
+  }
 
   /** 返回最大累积天数 */
   public int getMaxCumulativeDays() {
@@ -40,11 +45,6 @@ public class SmallDrawCfg extends BaseCfgBean {
   /** 返回单次价格 */
   public int getPricePerUse() {
     return PricePerUse;
-  }
-
-  /** 返回格子总数 */
-  public int getRewardSlotCount() {
-    return RewardSlotCount;
   }
 
   /** 返回活动名称 */
