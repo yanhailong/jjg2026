@@ -240,6 +240,7 @@ public class ShopService implements OrderGenerate {
             return result;
         }
         if (shopProduct.getMoney() == null) {
+            log.warn("商城下单失败，商品价格为空 playerId={},productId={}", player.getId(), req.productId);
             return result;
         }
         result.code = Code.SUCCESS;

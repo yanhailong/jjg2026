@@ -203,6 +203,10 @@ public class BundleGiftPackController extends BaseActivityController implements 
         Map<Integer, BundleGiftPackCfg> cfgMap = getDetailCfgBean(activityData);
         ShopRechargeListCfg shopCfg = getPurchaseShopCfg(activityData, cfgMap, target);
         if (!isValidShopCfg(player, shopCfg)) {
+            log.warn("集合礼包下单失败，充值商品配置、价格或渠道商品ID无效 playerId={},productId={},activityId={},giftId={},shopCfgId={},price={},channel={}",
+                    player.getId(), req.productId, activityData.getId(), giftId,
+                    shopCfg == null ? null : shopCfg.getId(),
+                    shopCfg == null ? null : shopCfg.getPrice(), player.getChannel());
             return result;
         }
         Map<Integer, PlayerActivityData> playerData = playerActivityDao.getPlayerActivityData(
@@ -210,11 +214,16 @@ public class BundleGiftPackController extends BaseActivityController implements 
         if (target.isAllGift()) {
             if (cfgMap.size() != activityData.getValue().size()
                     || !hasConfiguredRewards(cfgMap, cfgMap.keySet()) || CollectionUtil.isNotEmpty(playerData)) {
+                log.warn("集合礼包下单失败，全礼包配置不完整、奖励配置无效或已有购买记录 playerId={},productId={},activityId={},cfgIds={},configuredGiftIds={},purchasedGiftIds={}",
+                        player.getId(), req.productId, activityData.getId(), cfgMap.keySet(),
+                        activityData.getValue(), playerData == null ? null : playerData.keySet());
                 return result;
             }
         } else {
             BundleGiftPackCfg cfg = cfgMap.get(target.giftId());
             if (cfg == null || CollectionUtil.isEmpty(cfg.getGetItem())) {
+                log.warn("集合礼包下单失败，礼包配置不存在或奖励为空 playerId={},productId={},activityId={},giftId={},cfgExists={}",
+                        player.getId(), req.productId, activityData.getId(), giftId, cfg != null);
                 return result;
             }
 
@@ -228,7 +237,8 @@ public class BundleGiftPackController extends BaseActivityController implements 
         int tmpCode = tmpOrderHandle(corePlayerService, player, 1002, AddType.ACTIVITY_BUNDLE_GIFT_PACK, target.isAllGift() ? 3 : ((giftId % 1000) - 1));
         if (tmpCode != Code.SUCCESS) {
             result.code = tmpCode;
-            log.warn("集合礼包临时钻石购买失败 playerId={},round={}", player.getId(), target.isAllGift() ? 3 : ((giftId % 1000) - 1));
+            log.warn("集合礼包临时钻石购买失败 playerId={},productId={},round={},code={}",
+                    player.getId(), req.productId, target.isAllGift() ? 3 : ((giftId % 1000) - 1), tmpCode);
             return result;
         }
 

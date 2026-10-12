@@ -448,15 +448,20 @@ public class PiggyBankController extends BaseActivityController implements Order
         if (cfgBean instanceof PiggyBankCfg cfg) {
             String channelCommodity = cfg.getChannelCommodity().get(player.getChannel().getValue());
             if (channelCommodity == null) {
+                log.warn("储钱罐下单失败，渠道商品ID为空 playerId={},productId={},cfgId={},channel={}",
+                        player.getId(), req.productId, cfg.getId(), player.getChannel());
                 return result;
             }
             if (cfg.getPay() == null) {
+                log.warn("储钱罐下单失败，商品价格为空 playerId={},productId={},cfgId={}",
+                        player.getId(), req.productId, cfg.getId());
                 return result;
             }
 
             int tmpCode = tmpOrderHandle(corePlayerService, player, 1005, AddType.ACTIVITY_PIGGY_BANK_REWARDS, cfg.getId() - 1);
             if (tmpCode != Code.SUCCESS) {
-                log.warn("储钱罐临时钻石购买失败 playerId={},round={}", player.getId(), cfg.getId() - 1);
+                log.warn("储钱罐临时钻石购买失败 playerId={},productId={},round={},code={}",
+                        player.getId(), req.productId, cfg.getId() - 1, tmpCode);
                 return new CommonResult<>(tmpCode);
             }
 
@@ -465,6 +470,9 @@ public class PiggyBankController extends BaseActivityController implements Order
             preGenerateOrderData.setType(RechargeCfgType.MONEY);
             preGenerateOrderData.setPrice(cfg.getPay());
             result.data = preGenerateOrderData;
+        } else {
+            log.warn("储钱罐下单失败，活动参与条件或礼包配置校验未通过 playerId={},productId={},cfgId={}",
+                    player.getId(), req.productId, cfgBean == null ? null : cfgBean.getId());
         }
         return result;
     }

@@ -447,16 +447,24 @@ public class GrowthFundController extends BaseActivityController implements Orde
         long activityId = Long.parseLong(req.productId);
         ActivityData activityData = activityManager.getActivityData().get(activityId);
         if (activityData == null || !checkPlayerCanJoinActivity(player, activityData)) {
+            log.warn("成长基金下单失败，活动不存在或玩家无法参与 playerId={},productId={},activityId={},activityExists={}",
+                    player.getId(), req.productId, activityId, activityData != null);
             return result;
         }
         ShopRechargeListCfg shopRechargeListCfg = getShopCfg(activityData);
         if (shopRechargeListCfg == null || shopRechargeListCfg.getPrice() == null) {
+            log.warn("成长基金下单失败，充值商品配置或价格为空 playerId={},productId={},activityId={},shopCfgId={},price={}",
+                    player.getId(), req.productId, activityId,
+                    shopRechargeListCfg == null ? null : shopRechargeListCfg.getId(),
+                    shopRechargeListCfg == null ? null : shopRechargeListCfg.getPrice());
             return result;
         }
 
         int tmpCode = tmpOrderHandle(corePlayerService, player, 1001, AddType.ACTIVITY_GROWTH_FUND_BUY, 0);
         if (tmpCode != Code.SUCCESS) {
             result.code = tmpCode;
+            log.warn("成长基金临时钻石购买失败 playerId={},productId={},activityId={},code={}",
+                    player.getId(), req.productId, activityId, tmpCode);
             return result;
         }
 

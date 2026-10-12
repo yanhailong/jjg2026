@@ -322,6 +322,8 @@ public class BuyOneGetSevenController extends BaseActivityController
         int tmpCode = tmpOrderHandle(corePlayerService, player, 1003, AddType.ACTIVITY_BUY_ONE_GET_SEVEN_BUY, 0);
         if (tmpCode != Code.SUCCESS) {
             result.code = tmpCode;
+            log.warn("买一送七临时钻石购买失败 playerId={},productId={},activityId={},code={}",
+                    player.getId(), req.productId, activityData.getId(), tmpCode);
             return result;
         }
 

@@ -396,19 +396,25 @@ public class PlayerLevelPackManager implements GameEventListener, OrderGenerate,
         int id = Integer.parseInt(req.productId);
         PlayerLevelPackCfg cfg = GameDataManager.getPlayerLevelPackCfg(id);
         if (cfg == null) {
+            log.warn("等级礼包下单失败，礼包配置不存在 playerId={},productId={}", player.getId(), req.productId);
             return result;
         }
         String channelCommodity = cfg.getChannelCommodity().get(player.getChannel().getValue());
         if (channelCommodity == null) {
+            log.warn("等级礼包下单失败，渠道商品ID为空 playerId={},productId={},cfgId={},channel={}",
+                    player.getId(), req.productId, cfg.getId(), player.getChannel());
             return result;
         }
         if (cfg.getPay() == null) {
+            log.warn("等级礼包下单失败，商品价格为空 playerId={},productId={},cfgId={}",
+                    player.getId(), req.productId, cfg.getId());
             return result;
         }
 
         int tmpCode = tmpOrderHandle(playerService, player, 1008, AddType.LEVEL_PACKAGE, cfg.getId() - 1);
         if (tmpCode != Code.SUCCESS) {
-            log.warn("等级礼包临时钻石购买失败 playerId={},round={}", player.getId(), cfg.getId() - 1);
+            log.warn("等级礼包临时钻石购买失败 playerId={},productId={},round={},code={}",
+                    player.getId(), req.productId, cfg.getId() - 1, tmpCode);
             return new CommonResult<>(tmpCode);
         }
 

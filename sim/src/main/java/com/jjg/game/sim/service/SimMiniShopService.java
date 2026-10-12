@@ -141,6 +141,9 @@ public class SimMiniShopService implements OrderGenerate {
 
         ShopRechargeListCfg recharge = GameDataManager.getShopRechargeListCfg(shopMiniCfg.getShopRechargeListId());
         if (recharge == null || recharge.getPrice() == null) {
+            log.warn("迷你商店下单失败，充值商品配置或价格为空 playerId={},productId={},shopCfgId={},price={}",
+                    player.getId(), req.productId, shopMiniCfg.getShopRechargeListId(),
+                    recharge == null ? null : recharge.getPrice());
             return new CommonResult<>(Code.SAMPLE_ERROR);
         }
         PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();

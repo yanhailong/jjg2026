@@ -344,9 +344,13 @@ public class PrivilegeCardController extends BaseActivityController implements O
         if (cfgBean instanceof PrivilegeCardCfg cfg) {
             String channelCommodity = cfg.getChannelCommodity().get(player.getChannel().getValue());
             if (channelCommodity == null) {
+                log.warn("特权卡下单失败，渠道商品ID为空 playerId={},productId={},cfgId={},channel={}",
+                        player.getId(), req.productId, cfg.getId(), player.getChannel());
                 return result;
             }
             if (cfg.getPurchasecost() == null) {
+                log.warn("特权卡下单失败，商品价格为空 playerId={},productId={},cfgId={}",
+                        player.getId(), req.productId, cfg.getId());
                 return result;
             }
             result.code = Code.SUCCESS;
@@ -354,6 +358,9 @@ public class PrivilegeCardController extends BaseActivityController implements O
             preGenerateOrderData.setType(RechargeCfgType.MONEY);
             preGenerateOrderData.setPrice(cfg.getPurchasecost());
             result.data = preGenerateOrderData;
+        } else {
+            log.warn("特权卡下单失败，活动参与条件或礼包配置校验未通过 playerId={},productId={},cfgId={}",
+                    player.getId(), req.productId, cfgBean == null ? null : cfgBean.getId());
         }
         return result;
     }

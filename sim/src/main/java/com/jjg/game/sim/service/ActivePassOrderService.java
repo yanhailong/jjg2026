@@ -53,19 +53,23 @@ public class ActivePassOrderService implements OrderGenerate {
     public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
         int[] target = parse(req.productId);
         if (target == null) {
+            log.warn("活跃通行证下单失败，商品参数无效 playerId={},productId={}", player.getId(), req.productId);
             return new CommonResult<>(Code.PARAM_ERROR);
         }
         ActivePassPurchase result = router.execute(player.getId(), null,
                 () -> prepare(contexts.getContext(player.getId()), target[0], target[1]),
                 rpc -> rpc.prepareActivePassOrder(player.getId(), target[0], target[1]));
         if (result == null || result.code != Code.SUCCESS) {
+            log.warn("活跃通行证下单失败，预购买校验失败或所属节点未返回结果 playerId={},productId={},passId={},track={},code={}",
+                    player.getId(), req.productId, target[0], target[1], result == null ? Code.EXCEPTION : result.code);
             return new CommonResult<>(result == null ? Code.EXCEPTION : result.code);
         }
         req.productId = result.productId;
 
         int tmpCode = tmpOrderHandle(playerService, player, 1004, AddType.SIM_ACTIVE_PASS, target[1] == BASIC ? 0 : 1);
         if (tmpCode != Code.SUCCESS) {
-            log.warn("活跃通行证临时钻石购买失败 playerId={},round={}", player.getId(), target[1] == BASIC ? 0 : 1);
+            log.warn("活跃通行证临时钻石购买失败 playerId={},productId={},round={},code={}",
+                    player.getId(), req.productId, target[1] == BASIC ? 0 : 1, tmpCode);
             return new CommonResult<>(tmpCode);
         }
         PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();

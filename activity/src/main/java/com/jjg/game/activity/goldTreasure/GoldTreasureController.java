@@ -97,6 +97,7 @@ public class GoldTreasureController extends BaseActivityController implements Or
             PlayerActivityData previous = playerData.get(detailId);
             if (isClaimed(previous)) {
                 res.code = Code.REPEAT_OP;
+                log.warn("该奖励已被领取 playerId={},detailId={}", playerId, detailId);
                 return res;
             }
             GoldTreasureCfg next = nextUnclaimedReward(cfgMap, playerData);
@@ -107,10 +108,8 @@ public class GoldTreasureController extends BaseActivityController implements Or
             PlayerActivityData claimed = new PlayerActivityData(activityData.getId(), activityData.getRound());
             claimed.setClaimStatus(ActivityConstant.ClaimStatus.CLAIMED);
             playerData.put(detailId, claimed);
-            if (!savePlayerData(playerId, activityData, playerData)) {
-                res.code = Code.FAIL;
-                return res;
-            }
+            savePlayerData(playerId, activityData, playerData);
+
             CommonResult<ItemOperationResult> added;
             try {
                 if (shop.getType() == 2) {
@@ -151,8 +150,9 @@ public class GoldTreasureController extends BaseActivityController implements Or
             return null;
         }
         Map<Integer, PlayerActivityData> playerData = readCurrentData(player.getId(), activityData);
+        GoldTreasureCfg next = nextUnclaimedReward(getDetailCfgBean(activityData), playerData);
         return buildDetailInfo(player, activityData, cfg, playerData,
-                claimableRewardId(player, getDetailCfgBean(activityData), playerData));
+                next == null ? 0 : next.getId());
     }
 
     @Override
@@ -168,16 +168,9 @@ public class GoldTreasureController extends BaseActivityController implements Or
     }
 
     @Override
-    public ResGoldTreasure getPlayerActivityInfoByType(Player player, ActivityType activityType) {
-        if (activityType != ActivityType.GOLD_TREASURE) {
-            return new ResGoldTreasure(Code.PARAM_ERROR);
-        }
-        return buildResponse(player, activityManager.getOpenActivityData(player, activityType));
-    }
-
-    @Override
     public ResGoldTreasure getPlayerActivityInfoByTypeRes(Player player, Map<Long, List<BaseActivityDetailInfo>> allDetailInfo) {
-        return getPlayerActivityInfoByType(player, ActivityType.GOLD_TREASURE);
+        ActivityData activityData = activityManager.getOpenActivityData(player, ActivityType.GOLD_TREASURE);
+        return buildResponse(player, activityData);
     }
 
     @Override
@@ -200,41 +193,57 @@ public class GoldTreasureController extends BaseActivityController implements Or
         CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.ERROR_REQ);
         ActivityData activityData = activityManager.getOpenActivityData(player, ActivityType.GOLD_TREASURE);
         if (!checkPlayerCanJoinActivity(player, activityData)) {
+            log.warn("黄金宝藏下单失败，活动不存在、未开放或玩家无法参与 playerId={},productId={},activityId={}",
+                    player.getId(), req.productId, activityData == null ? null : activityData.getId());
             return result;
         }
-        int detailId;
-        try {
-            detailId = Integer.parseInt(req.productId);
-        } catch (NumberFormatException e) {
-            result.code = Code.PARAM_ERROR;
-            return result;
-        }
+        int detailId = Integer.parseInt(req.productId);
         Map<Integer, GoldTreasureCfg> cfgMap = getDetailCfgBean(activityData);
         GoldTreasureCfg cfg = cfgMap.get(detailId);
         if (cfg == null) {
             result.code = Code.PARAM_ERROR;
+            log.warn("预下单失败，获取GoldTreasureCfg配置失败 playerId:{} detailId:{}", player.getId(), detailId);
             return result;
         }
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(cfg.getPayId());
-        if (shop != null && shop.getType() != 1) {
+        if (shop == null) {
             result.code = Code.PARAM_ERROR;
+            log.warn("预下单失败，获取ShopRechargeListCfg配置失败 playerId:{} detailId:{},cfgId:{}", player.getId(), detailId, cfg.getPayId());
             return result;
         }
-        if (shop == null || shop.getPrice() == null || shop.getPrice().signum() <= 0
+
+        Map<Integer, PlayerActivityData> playerData = readCurrentData(player.getId(), activityData);
+        if (playerData.containsKey(detailId)) {
+            result.code = Code.REPEAT_OP;
+            log.warn("黄金宝藏下单失败，该档位已有购买或领取记录 playerId={},productId={},activityId={},detailId={}",
+                    player.getId(), req.productId, activityData.getId(), detailId);
+            return result;
+        }
+        GoldTreasureCfg next = nextUnclaimedReward(cfgMap, playerData);
+        if (next == null || next.getId() != detailId) {
+            log.warn("黄金宝藏下单失败，未按档位顺序购买 playerId={},productId={},activityId={},detailId={},nextDetailId={}",
+                    player.getId(), req.productId, activityData.getId(), detailId, next == null ? null : next.getId());
+            return result;
+        }
+
+        RechargeCfgType rechargeCfgType = RechargeCfgType.valueOf(shop.getType());
+        if (rechargeCfgType != RechargeCfgType.MONEY) {
+            result.code = Code.SUCCESS;
+            result.data = new PreGenerateOrderData();
+            result.data.setType(rechargeCfgType);
+            return result;
+        }
+
+        if (shop.getPrice() == null || shop.getPrice().signum() <= 0
                 || StringUtils.isBlank(channelProductId(player, shop)) || CollectionUtil.isEmpty(cfg.getGetItem())) {
             result.code = Code.SAMPLE_ERROR;
+            log.warn("黄金宝藏下单失败，充值商品配置、价格、渠道商品ID或奖励无效 playerId={},productId={},detailId={},shopCfgId={},price={},channelProductId={},rewardsEmpty={}",
+                    player.getId(), req.productId, detailId, cfg.getPayId(),
+                    shop.getPrice(),
+                    channelProductId(player, shop), CollectionUtil.isEmpty(cfg.getGetItem()));
             return result;
         }
         try {
-            Map<Integer, PlayerActivityData> playerData = readCurrentData(player.getId(), activityData);
-            if (playerData.containsKey(detailId)) {
-                result.code = Code.REPEAT_OP;
-                return result;
-            }
-            GoldTreasureCfg next = nextUnclaimedReward(cfgMap, playerData);
-            if (next == null || next.getId() != detailId) {
-                return result;
-            }
             result.code = Code.SUCCESS;
             PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
             preGenerateOrderData.setType(RechargeCfgType.MONEY);
@@ -280,8 +289,13 @@ public class GoldTreasureController extends BaseActivityController implements Or
         int detailId = Integer.parseInt(preGenerateOrderData.getProductId());
         ActivityData activityData = activityManager.getOpenActivityData(player, ActivityType.GOLD_TREASURE);
         GoldTreasureCfg cfg = getDetailCfgBean(activityData).get(detailId);
-        ShopRechargeListCfg shop = cfg == null ? null : GameDataManager.getShopRechargeListCfg(cfg.getPayId());
-        if (shop == null || shop.getType() != 1) {
+        if (cfg == null) {
+            log.warn("充值后处理失败，未找到GoldTreasureCfg配置 playerId:{} detailId:{}", player.getId(), detailId);
+            return false;
+        }
+        ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(cfg.getPayId());
+        if (shop == null) {
+            log.warn("充值后处理失败，未找到ShopRechargeListCfg配置 playerId:{} detailId:{}", player.getId(), detailId);
             return false;
         }
         return receivePayment(player, activityData, cfg, null, preGenerateOrderData.getProductId());
@@ -366,10 +380,11 @@ public class GoldTreasureController extends BaseActivityController implements Or
     private List<GoldTreasureDetailInfo> buildDetails(Player player, ActivityData activityData,
                                                       Map<Integer, PlayerActivityData> playerData) {
         Map<Integer, GoldTreasureCfg> cfgMap = getDetailCfgBean(activityData);
-        int claimableId = claimableRewardId(player, cfgMap, playerData);
+        GoldTreasureCfg next = nextUnclaimedReward(cfgMap, playerData);
+        int unlockedId = next == null ? 0 : next.getId();
         List<GoldTreasureDetailInfo> result = new ArrayList<>(cfgMap.size());
         for (GoldTreasureCfg cfg : cfgMap.values()) {
-            result.add(buildDetailInfo(player, activityData, cfg, playerData, claimableId));
+            result.add(buildDetailInfo(player, activityData, cfg, playerData, unlockedId));
         }
         return result;
     }
@@ -383,7 +398,7 @@ public class GoldTreasureController extends BaseActivityController implements Or
     }
 
     private GoldTreasureDetailInfo buildDetailInfo(Player player, ActivityData activityData, GoldTreasureCfg cfg,
-                                                   Map<Integer, PlayerActivityData> playerData, int claimableId) {
+                                                   Map<Integer, PlayerActivityData> playerData, int unlockedId) {
         GoldTreasureDetailInfo info = new GoldTreasureDetailInfo();
         info.activityId = activityData.getId();
         info.detailId = cfg.getId();
@@ -393,8 +408,10 @@ public class GoldTreasureController extends BaseActivityController implements Or
         info.best = cfg.getValue();
         if (isClaimed(playerData.get(cfg.getId()))) {
             info.claimStatus = ActivityConstant.ClaimStatus.CLAIMED;
-        } else if (claimableId == cfg.getId()) {
-            info.claimStatus = ActivityConstant.ClaimStatus.CAN_CLAIM;
+        } else if (unlockedId == cfg.getId()) {
+            info.claimStatus = CollectionUtil.isNotEmpty(cfg.getGetItem())
+                    && canClaim(player, GameDataManager.getShopRechargeListCfg(cfg.getPayId()), playerData.get(cfg.getId()))
+                    ? ActivityConstant.ClaimStatus.CAN_CLAIM : ActivityConstant.ClaimStatus.NOT_CLAIM;
         }
         return info;
     }

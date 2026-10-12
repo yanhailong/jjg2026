@@ -314,16 +314,22 @@ public class ScratchCardsController extends BaseActivityController implements Or
         if (cfgBean instanceof ScratchCardsCfg cfg && cfg.getType() == ActivityConstant.ScratchCards.GIFT_TYPE
                 && cfg.getChannelCommodity() > 0 && CollectionUtil.isNotEmpty(cfg.getGetItem())) {
             if (cfg.getCount() <= 0 || countDao.getCount(getBuyCountFeature(player.getId()), String.valueOf(cfg.getId())).intValue() >= cfg.getCount()) {
+                log.warn("刮刮卡下单失败，购买次数配置无效或已达到限购次数 playerId={},productId={},cfgId={},countLimit={}",
+                        player.getId(), req.productId, cfg.getId(), cfg.getCount());
                 return result;
             }
             ShopRechargeListCfg shopRechargeListCfg = GameDataManager.getShopRechargeListCfg(cfg.getChannelCommodity());
             if (shopRechargeListCfg == null || shopRechargeListCfg.getPrice() == null) {
+                log.warn("刮刮卡下单失败，充值商品配置或价格为空 playerId={},productId={},shopCfgId={},price={}",
+                        player.getId(), req.productId, cfg.getChannelCommodity(),
+                        shopRechargeListCfg == null ? null : shopRechargeListCfg.getPrice());
                 return result;
             }
 
             int tmpCode = tmpOrderHandle(corePlayerService, player, 1006, AddType.ACTIVITY_SCRATCH_CARDS_BUY_GIFT, (cfg.getId() % 100) - 1);
             if (tmpCode != Code.SUCCESS) {
-                log.warn("刮刮卡临时钻石购买失败 playerId={},round={}", player.getId(), (cfg.getId() % 100) - 1);
+                log.warn("刮刮卡临时钻石购买失败 playerId={},productId={},round={},code={}",
+                        player.getId(), req.productId, (cfg.getId() % 100) - 1, tmpCode);
                 return new CommonResult<>(tmpCode);
             }
 
@@ -332,6 +338,9 @@ public class ScratchCardsController extends BaseActivityController implements Or
             preGenerateOrderData.setType(RechargeCfgType.MONEY);
             preGenerateOrderData.setPrice(shopRechargeListCfg.getPrice());
             result.data = preGenerateOrderData;
+        } else {
+            log.warn("刮刮卡下单失败，活动参与条件、礼包类型、充值商品ID或奖励配置校验未通过 playerId={},productId={},cfgId={}",
+                    player.getId(), req.productId, cfgBean == null ? null : cfgBean.getId());
         }
         return result;
     }
