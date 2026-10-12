@@ -45,3 +45,13 @@ AGENTS.md
 .agents
 agent-tools
 terminals
+
+# Gift feature tests and integration notes
+!sim/src/test/
+sim/src/test/**
+!sim/src/test/**/
+!sim/src/test/**/ContinuousGift*Test.java
+!sim/src/test/**/LuckyDraw*Test.java
+/.tmp/continuous-gift/
+!docs/continuous-gift.md
+!docs/lucky-draw.md

@@ -18,6 +18,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @date 2026/5/26
  */
 public class SimPlayerContext {
+    private long luckyDrawObservedDay = Long.MIN_VALUE;
+    public long getLuckyDrawObservedDay() { return luckyDrawObservedDay; }
+    public void setLuckyDrawObservedDay(long day) { luckyDrawObservedDay = day; }
+
     private long playerId;
     private PlayerController playerController;
     private SimBaseData simBaseData;

@@ -79,6 +79,10 @@ public enum RechargeType {
 
     /**黄金宝藏*/
     GOLD_TREASURE(18),
+    /** 连续礼包 */
+    CONTINUOUS_GIFT(20),
+    /** 小额抽奖礼包 */
+    SEASON_LUCKY_DRAW(19),
     ;
     private final int type;
 
