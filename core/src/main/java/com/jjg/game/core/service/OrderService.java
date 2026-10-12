@@ -51,20 +51,6 @@ public class OrderService {
         return generateOrder(player.getId(), account.getChannel(), payType, productId, price, rechargeType, desc);
     }
 
-    public Order generateOrder(Player player, PayType payType, String productId, BigDecimal price,
-                               RechargeType rechargeType, String desc, String channelProductId) {
-        Account account = accountDao.queryAccountByPlayerId(player.getId());
-        return generateOrder(player.getId(), account.getChannel(), payType, productId, price,
-                rechargeType, OrderStatus.ORDER, channelProductId, null, desc);
-    }
-
-    public static String continuousGiftOrderId(long playerId, String token) {
-        return "cg" + org.apache.commons.codec.digest.DigestUtils.sha256Hex(playerId + ":" + token);
-    }
-    public static String luckyDrawOrderId(long playerId, String token) {
-        return "ld" + org.apache.commons.codec.digest.DigestUtils.sha256Hex(playerId + ":" + token);
-    }
-
     /**
      * 生成订单
      *
@@ -101,15 +87,8 @@ public class OrderService {
      */
     private Order generateOrder(String orderIdPrefix, long playerId, ChannelType playerChannel, PayType payType, String productId, BigDecimal price,
                                 RechargeType rechargeType, OrderStatus orderStatus, String channelProductId, List<Item> items, String desc) {
-        String giftOrderId = rechargeType == RechargeType.CONTINUOUS_GIFT ? continuousGiftOrderId(playerId, productId)
-                : rechargeType == RechargeType.SEASON_LUCKY_DRAW ? luckyDrawOrderId(playerId, productId) : null;
-        if (giftOrderId != null) {
-            Order existing = orderDao.getOrderById(giftOrderId);
-            if (existing != null) return existing;
-        }
         for (int i = 0; i < CoreConst.Common.MONGO_TRY_COUNT; i++) {
             String orderId = (StringUtils.isBlank(orderIdPrefix) ? "cz" : orderIdPrefix) + DateUtil.format(DateUtil.date(), "yyMMdd") + RandomUtils.getRandomString(9);
-            if (giftOrderId != null) orderId = giftOrderId;
             String uuid = RandomUtils.getOriginalUUid();
             try {
                 Order order = new Order();
@@ -131,7 +110,6 @@ public class OrderService {
                 order.setChannelProductId(channelProductId);
                 order.setItems(items);
                 order.setDesc(desc);
-                if (giftOrderId != null) return orderDao.insertContinuousGiftOrder(order);
                 orderDao.insert(order);
                 return order;
             } catch (DuplicateKeyException e) {

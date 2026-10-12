@@ -42,9 +42,6 @@ public interface OrderGenerate extends IGameSysFuncInterface {
      */
     RechargeType getRechargeType();
 
-    /** 业务预占 token 与真实渠道 SKU 分开保存。 */
-    default String channelProductId(Player player, ReqGenerateOrder req) { return req.productId; }
-
 
     /**
      * 收到充值的处理

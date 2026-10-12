@@ -39,10 +39,6 @@ public class SeasonMessageHandler implements GmListener {
 
     @Autowired
     private SeasonService seasonService;
-    @Autowired private com.jjg.game.season.service.ContinuousGiftService continuousGifts;
-    @Autowired private com.jjg.game.season.service.SeasonLifecycleService seasonLifecycle;
-    @Autowired private com.jjg.game.season.service.LuckyDrawService luckyDraws;
-    @Autowired private com.jjg.game.season.service.LuckyDrawPresence luckyDrawPresence;
     @Autowired
     private SimPlayerContextRegistry simPlayerContextRegistry;
     @Autowired
@@ -53,55 +49,6 @@ public class SeasonMessageHandler implements GmListener {
     @Command(SeasonConstant.MsgBean.REQ_SEASON_INFO)
     public void reqSeasonInfo(PlayerController playerController, ReqSeasonInfo req) {
         execute(playerController, ctx -> ctx.send(seasonService.info(ctx, req.reqType)));
-    }
-
-    @Command(SeasonConstant.MsgBean.REQ_CONTINUOUS_GIFT_LIST)
-    public void reqContinuousGiftList(PlayerController pc, ReqContinuousGiftList req) {
-        execute(pc, ctx -> {
-            long now = System.currentTimeMillis();
-            ctx.send(continuousGifts.list(ctx, req.activityId, now));
-        });
-    }
-
-    @Command(SeasonConstant.MsgBean.REQ_CONTINUOUS_GIFT_BUY)
-    public void reqContinuousGiftBuy(PlayerController pc, ReqContinuousGiftBuy req) {
-        execute(pc, ctx -> {
-            long now = System.currentTimeMillis();
-            ctx.send(continuousGifts.buy(ctx, req.activityId, req.dayIndex, now));
-        });
-    }
-
-    @Command(SeasonConstant.MsgBean.REQ_CONTINUOUS_GIFT_CLAIM)
-    public void reqContinuousGiftClaim(PlayerController pc, ReqContinuousGiftClaim req) {
-        execute(pc, ctx -> {
-            long now = System.currentTimeMillis();
-            ctx.send(continuousGifts.claim(ctx, req.activityId, now));
-        });
-    }
-
-    @Command(SeasonConstant.MsgBean.REQ_LUCKY_DRAW_INFO)
-    public void reqLuckyDrawInfo(PlayerController pc, ReqLuckyDrawInfo req) {
-        executeLuckyDraw(pc, (ctx, now) -> ctx.send(luckyDraws.info(ctx, req.activityId, req.drawType, req.enter, now)));
-    }
-    @Command(SeasonConstant.MsgBean.REQ_LUCKY_DRAW_BUY)
-    public void reqLuckyDrawBuy(PlayerController pc, ReqLuckyDrawBuy req) {
-        executeLuckyDraw(pc, (ctx, now) -> ctx.send(luckyDraws.buy(ctx, req.activityId, req.drawType, req.requestId, now)));
-    }
-    @Command(SeasonConstant.MsgBean.REQ_LUCKY_DRAW_SELECT_GRAND)
-    public void reqLuckyDrawSelectGrand(PlayerController pc, ReqLuckyDrawSelectGrand req) {
-        executeLuckyDraw(pc, (ctx, now) -> ctx.send(luckyDraws.select(ctx, req.activityId, req.drawType, req.grandId, now)));
-    }
-    @Command(SeasonConstant.MsgBean.REQ_LUCKY_DRAW_DAILY)
-    public void reqLuckyDrawDaily(PlayerController pc, ReqLuckyDrawDaily req) {
-        executeLuckyDraw(pc, (ctx, now) -> ctx.send(luckyDraws.daily(ctx, req.activityId, req.drawType, now)));
-    }
-    private void executeLuckyDraw(PlayerController pc, java.util.function.BiConsumer<SimPlayerContext, Long> action) {
-        execute(pc, ctx -> {
-            long now = System.currentTimeMillis();
-            seasonLifecycle.ensureCurrent(ctx, now);
-            luckyDrawPresence.authenticatedRequest(ctx, now);
-            action.accept(ctx, now);
-        });
     }
 
     @Command(SeasonConstant.MsgBean.REQ_SEASON_SHOP)

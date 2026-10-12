@@ -29,12 +29,6 @@ public class OrderDao extends MongoBaseDao<Order, Long> {
         return mongoTemplate.findOne(Query.query(Criteria.where("id").is(id)), Order.class);
     }
 
-    /** Insert-only: 同一业务 token 的订单重试不能覆盖已支付状态。 */
-    public Order insertContinuousGiftOrder(Order order) {
-        try { return mongoTemplate.insert(order); }
-        catch (org.springframework.dao.DuplicateKeyException duplicate) { return getOrderById(order.getId()); }
-    }
-
     public Order getOrderByUUid(String uuid) {
         return mongoTemplate.findOne(Query.query(Criteria.where("uuid").is(uuid)), Order.class);
     }
