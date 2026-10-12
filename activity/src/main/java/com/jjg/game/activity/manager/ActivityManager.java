@@ -479,7 +479,7 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
                         public void action() {
                             try {
                                 List<RedDotDetails> dots = new ArrayList<>();
-                                for (int submodule : submodules) dots.addAll(initialize(playerId, submodule));
+                                for (int submodule : submodules) dots.addAll(initializeActivityRedDots(playerId, submodule));
                                 redDotManager.updateRedDot(dots, playerId);
                             } catch (Exception e) {
                                 log.error("活动变化刷新红点失败 playerId={}", playerId, e);
@@ -1063,6 +1063,7 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
         List<RedDotDetails> result = new ArrayList<>();
         for (ActivityType type : ActivityType.values()) {
             if (submodule != 0 && submodule != type.getType()) continue;
+            if (type == ActivityType.GOLD_TREASURE) continue;
             BaseActivityController controller = type.getController();
             if (controller == null) continue;
             long count = 0;
@@ -1082,17 +1083,35 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
      */
     public void refreshRedDots(long playerId, int submodule) {
         try {
-            redDotManager.updateRedDot(initialize(playerId, submodule), playerId);
+            redDotManager.updateRedDot(initializeActivityRedDots(playerId, submodule), playerId);
         } catch (Exception e) {
             log.error("刷新活动红点失败 playerId={},submodule={}", playerId, submodule, e);
         }
+    }
+
+    private List<RedDotDetails> initializeActivityRedDots(long playerId, int activityType) {
+        ActivityType type = ActivityType.fromType(activityType);
+        if (type != null && type.getController() instanceof IRedDotService service) {
+            return service.initialize(playerId, service.getSubmodule());
+        }
+        List<RedDotDetails> result = initialize(playerId, activityType);
+        if (activityType == 0) {
+            for (ActivityType activity : ActivityType.values()) {
+                if (activity.getController() instanceof IRedDotService service) {
+                    result.addAll(service.initialize(playerId, service.getSubmodule()));
+                }
+            }
+        }
+        return result;
     }
 
     @Override
     public List<Integer> getSubmodules() {
         List<Integer> result = new ArrayList<>();
         result.add(0);
-        for (ActivityType type : ActivityType.values()) result.add(type.getType());
+        for (ActivityType type : ActivityType.values()) {
+            if (type != ActivityType.GOLD_TREASURE) result.add(type.getType());
+        }
         return result;
     }
 

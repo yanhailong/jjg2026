@@ -650,7 +650,6 @@ public class CoreMessageHandler {
                     return;
                 }
                 res.code = Code.SUCCESS;
-                playerController.send(res);
                 log.debug("玩家下单成功 req = {},resp = {}", JSON.toJSONString(req), JSON.toJSONString(res));
             }
         } catch (Exception e) {

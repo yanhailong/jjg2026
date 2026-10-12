@@ -12,6 +12,7 @@ import com.jjg.game.activity.goldTreasure.message.ResClaimGoldTreasureRewards;
 import com.jjg.game.activity.goldTreasure.message.ResGoldTreasure;
 import com.jjg.game.common.pb.AbstractResponse;
 import com.jjg.game.core.base.player.IPlayerLoginSuccess;
+import com.jjg.game.core.base.reddot.IRedDotService;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.Account;
@@ -27,6 +28,7 @@ import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
+import com.jjg.game.core.pb.reddot.RedDotDetails;
 import com.jjg.game.core.service.MailService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.core.utils.SampleDataUtils;
@@ -47,9 +49,12 @@ import java.util.Map;
 import java.util.Set;
 
 @Component
-public class GoldTreasureController extends BaseActivityController implements OrderGenerate, IPlayerLoginSuccess {
+public class GoldTreasureController extends BaseActivityController implements OrderGenerate, IPlayerLoginSuccess, IRedDotService {
     private static final int FUNCTION_ID = 5018;
+    private static final int SEASON_FUNCTION_ID = 5004;
+    private static final int RED_DOT_SUBMODULE = 1;
     private static final int UNCLAIMED_REWARD_MAIL_ID = 50;
+    private static final int ORDINARY_DISPLAY_COUNT = 4;
     private final MailService mailService;
 
     public GoldTreasureController(MailService mailService) {
@@ -100,8 +105,8 @@ public class GoldTreasureController extends BaseActivityController implements Or
                 log.warn("该奖励已被领取 playerId={},detailId={}", playerId, detailId);
                 return res;
             }
-            GoldTreasureCfg next = nextUnclaimedReward(cfgMap, playerData);
-            if (next == null || next.getId() != detailId || !canClaim(player, shop, previous)) {
+            GoldTreasureCfg next = nextUnclaimedOrdinaryReward(cfgMap, playerData);
+            if (!isUnlocked(cfg, next == null ? 0 : next.getId()) || !canClaim(player, shop, previous)) {
                 return res;
             }
 
@@ -150,9 +155,16 @@ public class GoldTreasureController extends BaseActivityController implements Or
             return null;
         }
         Map<Integer, PlayerActivityData> playerData = readCurrentData(player.getId(), activityData);
-        GoldTreasureCfg next = nextUnclaimedReward(getDetailCfgBean(activityData), playerData);
+        Map<Integer, GoldTreasureCfg> cfgMap = getDetailCfgBean(activityData);
+        GoldTreasureCfg next = nextUnclaimedOrdinaryReward(cfgMap, playerData);
+        int lastOrdinaryId = 0;
+        for (GoldTreasureCfg detailCfg : cfgMap.values()) {
+            if (detailCfg.getRewardType() == 1) {
+                lastOrdinaryId = detailCfg.getId();
+            }
+        }
         return buildDetailInfo(player, activityData, cfg, playerData,
-                next == null ? 0 : next.getId());
+                next == null ? 0 : next.getId(), lastOrdinaryId);
     }
 
     @Override
@@ -168,9 +180,16 @@ public class GoldTreasureController extends BaseActivityController implements Or
     }
 
     @Override
+    public ResGoldTreasure getPlayerActivityInfoByType(Player player, ActivityType activityType) {
+        if (activityType != ActivityType.GOLD_TREASURE) {
+            return new ResGoldTreasure(Code.PARAM_ERROR);
+        }
+        return buildResponse(player, activityManager.getOpenActivityData(player, activityType));
+    }
+
+    @Override
     public ResGoldTreasure getPlayerActivityInfoByTypeRes(Player player, Map<Long, List<BaseActivityDetailInfo>> allDetailInfo) {
-        ActivityData activityData = activityManager.getOpenActivityData(player, ActivityType.GOLD_TREASURE);
-        return buildResponse(player, activityData);
+        return getPlayerActivityInfoByType(player, ActivityType.GOLD_TREASURE);
     }
 
     @Override
@@ -219,8 +238,8 @@ public class GoldTreasureController extends BaseActivityController implements Or
                     player.getId(), req.productId, activityData.getId(), detailId);
             return result;
         }
-        GoldTreasureCfg next = nextUnclaimedReward(cfgMap, playerData);
-        if (next == null || next.getId() != detailId) {
+        GoldTreasureCfg next = nextUnclaimedOrdinaryReward(cfgMap, playerData);
+        if (!isUnlocked(cfg, next == null ? 0 : next.getId())) {
             log.warn("黄金宝藏下单失败，未按档位顺序购买 playerId={},productId={},activityId={},detailId={},nextDetailId={}",
                     player.getId(), req.productId, activityData.getId(), detailId, next == null ? null : next.getId());
             return result;
@@ -326,6 +345,29 @@ public class GoldTreasureController extends BaseActivityController implements Or
     }
 
     @Override
+    public RedDotDetails.RedDotModule getModule() {
+        return RedDotDetails.RedDotModule.SEASON;
+    }
+
+    @Override
+    public int getSubmodule() {
+        return RED_DOT_SUBMODULE;
+    }
+
+    @Override
+    public List<RedDotDetails> initialize(long playerId, int submodule) {
+        if (submodule != 0 && submodule != RED_DOT_SUBMODULE) {
+            return List.of();
+        }
+        Player player = corePlayerService.get(playerId);
+        ActivityData activityData = player == null ? null
+                : activityManager.getOpenActivityData(player, ActivityType.GOLD_TREASURE);
+        boolean available = activityData != null && hasRedDot(playerId, activityData)
+                && gameFunctionService.getOpenedFuncIdList(player).contains(SEASON_FUNCTION_ID);
+        return List.of(redDotManager.buildRedDotDetails(getModule(), RED_DOT_SUBMODULE, available ? 1 : 0));
+    }
+
+    @Override
     public boolean hasRedDot(long playerId, ActivityData activityData) {
         Player player = corePlayerService.get(playerId);
         if (!checkPlayerCanJoinActivity(player, activityData)) {
@@ -380,25 +422,48 @@ public class GoldTreasureController extends BaseActivityController implements Or
     private List<GoldTreasureDetailInfo> buildDetails(Player player, ActivityData activityData,
                                                       Map<Integer, PlayerActivityData> playerData) {
         Map<Integer, GoldTreasureCfg> cfgMap = getDetailCfgBean(activityData);
-        GoldTreasureCfg next = nextUnclaimedReward(cfgMap, playerData);
+        GoldTreasureCfg next = nextUnclaimedOrdinaryReward(cfgMap, playerData);
         int unlockedId = next == null ? 0 : next.getId();
-        List<GoldTreasureDetailInfo> result = new ArrayList<>(cfgMap.size());
+        int ordinaryRemaining = 0;
+        int lastOrdinaryId = 0;
         for (GoldTreasureCfg cfg : cfgMap.values()) {
-            result.add(buildDetailInfo(player, activityData, cfg, playerData, unlockedId));
+            if (cfg.getRewardType() == 1) {
+                ordinaryRemaining++;
+                lastOrdinaryId = cfg.getId();
+            }
+        }
+        List<GoldTreasureDetailInfo> result = new ArrayList<>(
+                cfgMap.size() - ordinaryRemaining + Math.min(ORDINARY_DISPLAY_COUNT, ordinaryRemaining));
+        int ordinaryDisplayed = 0;
+        for (GoldTreasureCfg cfg : cfgMap.values()) {
+            if (cfg.getRewardType() == 1) {
+                if (ordinaryDisplayed == ORDINARY_DISPLAY_COUNT
+                        || ordinaryRemaining-- > ORDINARY_DISPLAY_COUNT && isClaimed(playerData.get(cfg.getId()))) {
+                    continue;
+                }
+                ordinaryDisplayed++;
+            }
+            result.add(buildDetailInfo(player, activityData, cfg, playerData, unlockedId, lastOrdinaryId));
         }
         return result;
     }
 
     private int claimableRewardId(Player player, Map<Integer, GoldTreasureCfg> cfgMap,
                                   Map<Integer, PlayerActivityData> playerData) {
-        GoldTreasureCfg next = nextUnclaimedReward(cfgMap, playerData);
-        return next != null && CollectionUtil.isNotEmpty(next.getGetItem())
-                && canClaim(player, GameDataManager.getShopRechargeListCfg(next.getPayId()), playerData.get(next.getId()))
-                ? next.getId() : 0;
+        GoldTreasureCfg next = nextUnclaimedOrdinaryReward(cfgMap, playerData);
+        int unlockedId = next == null ? 0 : next.getId();
+        for (GoldTreasureCfg cfg : cfgMap.values()) {
+            PlayerActivityData data = playerData.get(cfg.getId());
+            if (!isClaimed(data) && isUnlocked(cfg, unlockedId) && CollectionUtil.isNotEmpty(cfg.getGetItem())
+                    && canClaim(player, GameDataManager.getShopRechargeListCfg(cfg.getPayId()), data)) {
+                return cfg.getId();
+            }
+        }
+        return 0;
     }
 
     private GoldTreasureDetailInfo buildDetailInfo(Player player, ActivityData activityData, GoldTreasureCfg cfg,
-                                                   Map<Integer, PlayerActivityData> playerData, int unlockedId) {
+                                                   Map<Integer, PlayerActivityData> playerData, int unlockedId, int lastOrdinaryId) {
         GoldTreasureDetailInfo info = new GoldTreasureDetailInfo();
         info.activityId = activityData.getId();
         info.detailId = cfg.getId();
@@ -406,9 +471,10 @@ public class GoldTreasureController extends BaseActivityController implements Or
         info.rewardItems = ItemUtils.buildItemInfo(cfg.getGetItem());
         info.rechargeInfo = SampleDataUtils.transRechargeCfgToRechargeInfo(cfg.getPayId(), player.getChannel());
         info.best = cfg.getValue();
+        info.last = cfg.getRewardType() == 1 && cfg.getId() == lastOrdinaryId;
         if (isClaimed(playerData.get(cfg.getId()))) {
             info.claimStatus = ActivityConstant.ClaimStatus.CLAIMED;
-        } else if (unlockedId == cfg.getId()) {
+        } else if (isUnlocked(cfg, unlockedId)) {
             info.claimStatus = CollectionUtil.isNotEmpty(cfg.getGetItem())
                     && canClaim(player, GameDataManager.getShopRechargeListCfg(cfg.getPayId()), playerData.get(cfg.getId()))
                     ? ActivityConstant.ClaimStatus.CAN_CLAIM : ActivityConstant.ClaimStatus.NOT_CLAIM;
@@ -416,10 +482,14 @@ public class GoldTreasureController extends BaseActivityController implements Or
         return info;
     }
 
-    private GoldTreasureCfg nextUnclaimedReward(Map<Integer, GoldTreasureCfg> cfgMap,
-                                                Map<Integer, PlayerActivityData> playerData) {
+    private boolean isUnlocked(GoldTreasureCfg cfg, int ordinaryUnlockedId) {
+        return cfg.getRewardType() == 2 || cfg.getId() == ordinaryUnlockedId;
+    }
+
+    private GoldTreasureCfg nextUnclaimedOrdinaryReward(Map<Integer, GoldTreasureCfg> cfgMap,
+                                                        Map<Integer, PlayerActivityData> playerData) {
         for (GoldTreasureCfg cfg : cfgMap.values()) {
-            if (!isClaimed(playerData.get(cfg.getId()))) {
+            if (cfg.getRewardType() == 1 && !isClaimed(playerData.get(cfg.getId()))) {
                 return cfg;
             }
         }
@@ -431,7 +501,7 @@ public class GoldTreasureController extends BaseActivityController implements Or
             return false;
         }
         return switch (shop.getType()) {
-            case 1 -> data != null && data.getClaimStatus() == ActivityConstant.ClaimStatus.CAN_CLAIM;
+            case 1, 3 -> data != null && data.getClaimStatus() == ActivityConstant.ClaimStatus.CAN_CLAIM;
             case 2 -> shop.getRedeem() != null && shop.getRedeem().size() == 1
                     && playerPackService.checkHasItems(player, shop.getRedeem());
             case 4 -> true;
@@ -500,12 +570,30 @@ public class GoldTreasureController extends BaseActivityController implements Or
         Map<Integer, GoldTreasureCfg> cfgMap = getDetailCfgBean(activityData);
         Set<Integer> starItems = starItemIds(cfgMap);
         PlayerPack pack = playerPackService.getFromAllDB(player.getId());
-        GoldTreasureCfg cfg = nextUnclaimedReward(cfgMap, playerData);
-        ShopRechargeListCfg shop = cfg == null ? null : GameDataManager.getShopRechargeListCfg(cfg.getPayId());
-        boolean claimable = shop != null && CollectionUtil.isNotEmpty(cfg.getGetItem())
-                && (shop.getType() == 2 ? shop.getRedeem() != null && shop.getRedeem().size() == 1 && pack != null
-                && pack.checkHasItems(ItemUtils.buildItems(shop.getRedeem())) : canClaim(player, shop, playerData.get(cfg.getId())));
-        if (claimable) {
+        GoldTreasureCfg next = nextUnclaimedOrdinaryReward(cfgMap, playerData);
+        int unlockedId = next == null ? 0 : next.getId();
+        Map<Integer, Long> exchanged = new HashMap<>();
+        for (GoldTreasureCfg cfg : cfgMap.values()) {
+            PlayerActivityData data = playerData.get(cfg.getId());
+            if (isClaimed(data) || !isUnlocked(cfg, unlockedId) || CollectionUtil.isEmpty(cfg.getGetItem())) {
+                continue;
+            }
+            ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(cfg.getPayId());
+            if (shop == null) {
+                continue;
+            }
+            Map.Entry<Integer, Long> cost = null;
+            if (shop.getType() == 2) {
+                if (shop.getRedeem() == null || shop.getRedeem().size() != 1 || pack == null) {
+                    continue;
+                }
+                cost = shop.getRedeem().entrySet().iterator().next();
+                if (pack.getItemCount(cost.getKey()) - exchanged.getOrDefault(cost.getKey(), 0L) < cost.getValue()) {
+                    continue;
+                }
+            } else if (!canClaim(player, shop, data)) {
+                continue;
+            }
             if (!sendRewardMail(player.getId(), cfg, starItems)) {
                 return false;
             }
@@ -514,6 +602,9 @@ public class GoldTreasureController extends BaseActivityController implements Or
             playerData.put(cfg.getId(), claimed);
             if (!savePlayerData(player.getId(), activityData, playerData)) {
                 return false;
+            }
+            if (cost != null) {
+                exchanged.merge(cost.getKey(), cost.getValue(), Math::addExact);
             }
         }
         Map<Integer, Long> removes = new HashMap<>();
