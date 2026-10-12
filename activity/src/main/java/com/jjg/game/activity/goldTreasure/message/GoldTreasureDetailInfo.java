@@ -16,6 +16,8 @@ public class GoldTreasureDetailInfo extends BaseActivityDetailInfo {
     @ProtoDesc("充值信息")
     public RechargeInfo rechargeInfo;
     public int best;
+    @ProtoDesc("是否为最后一条普通奖励")
+    public boolean last;
 
     public GoldTreasureDetailInfo() {
         claimStatus = 0;
