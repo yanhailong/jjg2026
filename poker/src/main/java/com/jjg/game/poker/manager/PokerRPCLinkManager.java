@@ -5,6 +5,7 @@ import com.jjg.game.common.cluster.ClusterSystem;
 import com.jjg.game.common.rpc.ClusterRpcReference;
 import com.jjg.game.common.rpc.GameRpcContext;
 import com.jjg.game.common.rpc.RpcReqParameterBuilder;
+import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.service.PlayerStatService;
@@ -22,7 +23,9 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.LongFunction;
 
-/** Poker节点到SIM节点的RPC链路，目前用于赛季币查询与结算。 */
+/**
+ * Poker节点到SIM节点的RPC链路，目前用于赛季币查询与结算。
+ */
 @Component
 public class PokerRPCLinkManager {
 
@@ -61,31 +64,25 @@ public class PokerRPCLinkManager {
         return result;
     }
 
-    public CommonResult<Long> deductSeasonCoin(PokerSeasonAccount account, long amount) {
+    public CommonResult<Long> deductSeasonCoin(PokerSeasonAccount account, long amount, AddType addType, String desc) {
         long txnId = nextTxnId();
         CommonResult<Long> result = seasonCoinCall(account,
-                id -> toSimBridge.deductSeasonCoin(account.getPlayerId(), amount, id), txnId, "扣除");
-        if (result.code == Code.EXCEPTION) {
-            result = seasonCoinCall(account,
-                    id -> toSimBridge.deductSeasonCoin(account.getPlayerId(), amount, id), txnId, "扣除重试");
-        }
+                id -> toSimBridge.deductSeasonCoin(account.getPlayerId(), amount, id, addType, desc), txnId, "扣除");
         updateBalance(account, result);
         return result;
     }
 
-    public CommonResult<Long> addSeasonCoin(PokerSeasonAccount account, long amount) {
+    public CommonResult<Long> addSeasonCoin(PokerSeasonAccount account, long amount, AddType addType, String desc) {
         long txnId = nextTxnId();
         CommonResult<Long> result = seasonCoinCall(account,
-                id -> toSimBridge.addSeasonCoin(account.getPlayerId(), amount, id), txnId, "增加");
-        if (result.code == Code.EXCEPTION) {
-            result = seasonCoinCall(account,
-                    id -> toSimBridge.addSeasonCoin(account.getPlayerId(), amount, id), txnId, "增加重试");
-        }
+                id -> toSimBridge.addSeasonCoin(account.getPlayerId(), amount, id, addType, desc), txnId, "增加");
         updateBalance(account, result);
         return result;
     }
 
-    /** 斗仙牌大结算完成后按所属 SIM 节点批量通知，不阻塞牌桌收尾。 */
+    /**
+     * 斗仙牌大结算完成后按所属 SIM 节点批量通知，不阻塞牌桌收尾。
+     */
     public void notifyDouXianSettled(Map<Long, String> players) {
         if (players == null || players.isEmpty()) {
             return;
@@ -96,7 +93,9 @@ public class PokerRPCLinkManager {
         }
     }
 
-    /** 斗仙牌每回合结算后，按所属 SIM 节点批量上报真人玩家的正向净赢。 */
+    /**
+     * 斗仙牌每回合结算后，按所属 SIM 节点批量上报真人玩家的正向净赢。
+     */
     public void notifyDouXianWins(Map<Long, String> players, int transactionItemId,
                                   Map<Long, Long> playerWins) {
         if (playerWins == null || playerWins.isEmpty()) {
@@ -200,8 +199,8 @@ public class PokerRPCLinkManager {
     }
 
     private CommonResult<Long> seasonCoinCall(PokerSeasonAccount account,
-                                               LongFunction<CommonResult<Long>> rpc,
-                                               long txnId, String action) {
+                                              LongFunction<CommonResult<Long>> rpc,
+                                              long txnId, String action) {
         ClusterClient client = resolveSimClient(account);
         if (client == null) {
             return new CommonResult<>(Code.EXCEPTION);
@@ -263,6 +262,7 @@ public class PokerRPCLinkManager {
             return null;
         }
     }
+
     private void updateBalance(PokerSeasonAccount account, CommonResult<Long> result) {
         if (result.success() && result.data != null) {
             account.setBalance(result.data);

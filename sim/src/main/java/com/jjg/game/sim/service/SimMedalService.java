@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 成就徽章服务：按 BadgeID 汇总完成任务数，解析 MedalBuff 档位，维护排行及固定值加成缓存。
+ * 成就徽章服务：按 BadgeID 汇总已领取奖励的任务数，解析 MedalBuff 档位，维护排行及固定值加成缓存。
  */
 @Service
 public class SimMedalService {
@@ -59,7 +59,7 @@ public class SimMedalService {
             if (badge == null) {
                 continue;
             }
-            SimTaskConfigService.BadgeBuffTier active = badge.activeTier(completedCount(data, badge));
+            SimTaskConfigService.BadgeBuffTier active = badge.activeTier(claimedCount(data, badge));
             if (active != null) {
                 result.add(active.cfgId());
             }
@@ -67,7 +67,7 @@ public class SimMedalService {
         return result;
     }
 
-    /** 玩家至少完成一个对应成就后即获得徽章，是否激活 Buff 档位由 CollectNum 独立决定。 */
+    /** 玩家至少领取一个对应成就奖励后即获得徽章，是否激活 Buff 档位由 CollectNum 独立决定。 */
     public List<Integer> getActivatedMedalIds(SimPlayerContext ctx) {
         SimTaskData data = ctx == null ? null : ctx.getSimTaskData();
         if (data == null) {
@@ -75,8 +75,8 @@ public class SimMedalService {
         }
         List<Integer> result = new ArrayList<>();
         for (SimTaskConfigService.AchievementBadgeDef badge : taskConfig.badges()) {
-            int completed = completedCount(data, badge);
-            if (completed > 0) {
+            int claimed = claimedCount(data, badge);
+            if (claimed > 0) {
                 result.add(badge.badgeId());
             }
         }
@@ -92,14 +92,14 @@ public class SimMedalService {
         }
 
         List<BadgeSnapshot> snapshots = new ArrayList<>();
-        int completedTotal = 0;
+        int claimedTotal = 0;
         int taskTotal = 0;
         for (SimTaskConfigService.AchievementBadgeDef badge : taskConfig.badges()) {
-            int completed = completedCount(data, badge);
-            completedTotal += completed;
+            int claimed = claimedCount(data, badge);
+            claimedTotal += claimed;
             taskTotal += badge.taskIds().size();
             snapshots.add(new BadgeSnapshot(
-                    badge, completed, badge.activeTier(completed), badge.nextTier(completed)));
+                    badge, claimed, badge.activeTier(claimed), badge.nextTier(claimed)));
         }
         snapshots.sort(Comparator
                 .comparing((BadgeSnapshot snapshot) -> !snapshot.unlocked())
@@ -108,9 +108,9 @@ public class SimMedalService {
 
         EnumMap<BuildingOutputType, Integer> activeBuffs = calcActiveMedalBuffs(data);
         ctx.setMedalBuffMap(activeBuffs);
-        res.completedAchievementCount = completedTotal;
+        res.completedAchievementCount = claimedTotal;
         res.totalAchievementCount = taskTotal;
-        res.rankBasisPoints = syncAndGetRankBasisPoints(ctx.playerId(), completedTotal);
+        res.rankBasisPoints = syncAndGetRankBasisPoints(ctx.playerId(), claimedTotal);
         res.activeBuffs = toKvList(activeBuffs);
         res.badgeInfos = snapshots.stream().map(this::toInfo).toList();
         res.medalShowMax = medalShowMax();
@@ -146,7 +146,7 @@ public class SimMedalService {
         return res;
     }
 
-    /** 成就完成后一次刷新排行分值与固定值加成缓存。 */
+    /** 成就奖励领取后刷新排行分值与固定值加成缓存。 */
     public void refreshAchievementState(SimPlayerContext ctx) {
         if (ctx == null || ctx.getSimTaskData() == null) {
             return;
@@ -154,7 +154,7 @@ public class SimMedalService {
         try {
             SimTaskData data = ctx.getSimTaskData();
             ctx.setMedalBuffMap(calcActiveMedalBuffs(data));
-            syncRankScore(ctx.playerId(), completedAchievementCount(data));
+            syncRankScore(ctx.playerId(), claimedAchievementCount(data));
         } catch (Exception e) {
             log.warn("刷新成就徽章状态失败 playerId={}", ctx.playerId(), e);
         }
@@ -172,14 +172,14 @@ public class SimMedalService {
         }
     }
 
-    /** 每个徽章只取完成数达到的最高档，再合并其 BuffId 固定值。 */
+    /** 每个徽章只取领奖数达到的最高档，再合并其 BuffId 固定值。 */
     EnumMap<BuildingOutputType, Integer> calcActiveMedalBuffs(SimTaskData data) {
         EnumMap<BuildingOutputType, Integer> merged = new EnumMap<>(BuildingOutputType.class);
         if (data == null) {
             return merged;
         }
         for (SimTaskConfigService.AchievementBadgeDef badge : taskConfig.badges()) {
-            SimTaskConfigService.BadgeBuffTier active = badge.activeTier(completedCount(data, badge));
+            SimTaskConfigService.BadgeBuffTier active = badge.activeTier(claimedCount(data, badge));
             if (active == null || active.buffs().isEmpty()) {
                 continue;
             }
@@ -204,15 +204,15 @@ public class SimMedalService {
         return getFixedBonus(ctx, BuildingOutputType.WATCH_ADS_ADD_GOLD);
     }
 
-    private int completedAchievementCount(SimTaskData data) {
+    private int claimedAchievementCount(SimTaskData data) {
         int count = 0;
         for (SimTaskConfigService.AchievementBadgeDef badge : taskConfig.badges()) {
-            count += completedCount(data, badge);
+            count += claimedCount(data, badge);
         }
         return count;
     }
 
-    private int completedCount(SimTaskData data, SimTaskConfigService.AchievementBadgeDef badge) {
+    private int claimedCount(SimTaskData data, SimTaskConfigService.AchievementBadgeDef badge) {
         int count = 0;
         for (int groupId : taskConfig.achievementGroups(badge.badgeId())) {
             TaskDetail task = data.getAchievementTasks().get(groupId);
@@ -224,7 +224,7 @@ public class SimMedalService {
                 continue;
             }
             count += preceding;
-            if (task.getStatus() != TaskConstant.TaskStatus.STATUS_IN_PROGRESS) {
+            if (task.getStatus() == TaskConstant.TaskStatus.STATUS_REWARDED) {
                 count++;
             }
         }
@@ -236,7 +236,7 @@ public class SimMedalService {
         info.badgeId = snapshot.badge().badgeId();
         info.buildingId = snapshot.badge().buildingId();
         info.gameId = snapshot.badge().gameId();
-        info.completedTaskCount = snapshot.completedCount();
+        info.completedTaskCount = snapshot.claimedCount();
         info.totalTaskCount = snapshot.badge().taskIds().size();
         info.currentBuffCfgId = snapshot.active() == null ? 0 : snapshot.active().cfgId();
         info.nextBuffCfgId = snapshot.next() == null ? 0 : snapshot.next().cfgId();
@@ -276,9 +276,9 @@ public class SimMedalService {
         return cfg == null ? 0 : Math.max(0, cfg.getIntValue());
     }
 
-    private int syncAndGetRankBasisPoints(long playerId, int completedCount) {
-        syncRankScore(playerId, completedCount);
-        if (completedCount <= 0) {
+    private int syncAndGetRankBasisPoints(long playerId, int claimedCount) {
+        syncRankScore(playerId, claimedCount);
+        if (claimedCount <= 0) {
             return 0;
         }
         RankEntry my = rankService.getRank(MEDAL_RANK_KEY, playerId);
@@ -291,21 +291,21 @@ public class SimMedalService {
         return Math.max(0, Math.min(BASIS_POINTS, basisPoints));
     }
 
-    private void syncRankScore(long playerId, int completedCount) {
-        if (completedCount <= 0) {
+    private void syncRankScore(long playerId, int claimedCount) {
+        if (claimedCount <= 0) {
             return;
         }
         long current = rankService.getPoints(MEDAL_RANK_KEY, playerId);
-        if (current != completedCount) {
-            rankService.batchSetPoints(MEDAL_RANK_KEY, List.of(new RankChange(playerId, completedCount)));
+        if (current != claimedCount) {
+            rankService.batchSetPoints(MEDAL_RANK_KEY, List.of(new RankChange(playerId, claimedCount)));
         }
     }
 
-    private record BadgeSnapshot(SimTaskConfigService.AchievementBadgeDef badge, int completedCount,
+    private record BadgeSnapshot(SimTaskConfigService.AchievementBadgeDef badge, int claimedCount,
                                  SimTaskConfigService.BadgeBuffTier active,
                                  SimTaskConfigService.BadgeBuffTier next) {
         boolean unlocked() {
-            return completedCount > 0;
+            return claimedCount > 0;
         }
 
         int activeCollectNum() {

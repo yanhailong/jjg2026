@@ -5,6 +5,7 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.PlayerPackService;
@@ -20,8 +21,6 @@ import com.jjg.game.sim.pb.res.ResMiniShop;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
 
 @Service
 public class SimMiniShopService implements OrderGenerate {
@@ -118,8 +117,8 @@ public class SimMiniShopService implements OrderGenerate {
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.SUCCESS);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.SUCCESS);
         ShopMiniCfg shopMiniCfg = GameDataManager.getShopMiniCfg(Integer.parseInt(req.productId));
         if (shopMiniCfg == null) {
             result.code = Code.SAMPLE_ERROR;
@@ -142,9 +141,15 @@ public class SimMiniShopService implements OrderGenerate {
 
         ShopRechargeListCfg recharge = GameDataManager.getShopRechargeListCfg(shopMiniCfg.getShopRechargeListId());
         if (recharge == null || recharge.getPrice() == null) {
+            log.warn("迷你商店下单失败，充值商品配置或价格为空 playerId={},productId={},shopCfgId={},price={}",
+                    player.getId(), req.productId, shopMiniCfg.getShopRechargeListId(),
+                    recharge == null ? null : recharge.getPrice());
             return new CommonResult<>(Code.SAMPLE_ERROR);
         }
-        return new CommonResult<>(Code.SUCCESS, recharge.getPrice());
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(recharge.getPrice());
+        return new CommonResult<>(Code.SUCCESS, preGenerateOrderData);
     }
 
     @Override

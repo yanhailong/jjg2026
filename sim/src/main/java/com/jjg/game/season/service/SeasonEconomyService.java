@@ -53,20 +53,6 @@ public class SeasonEconomyService {
         return true;
     }
 
-    /**
-     * 从赛季进入的 slots 下注扣币: amount<=0 只读当前余额; 余额不足返回 -1; 成功返回扣后余额。
-     */
-    public long spendForSlots(SeasonPlayerData data, long amount) {
-        if (amount <= 0) {
-            return data.getSeasonCoin();
-        }
-        if (data.getSeasonCoin() < amount) {
-            return -1;
-        }
-        data.setSeasonCoin(data.getSeasonCoin() - amount);
-        return data.getSeasonCoin();
-    }
-
     /** 仅增加可用余额，不计入 totalEarnedCoin/段位；amount<=0 时只读当前余额。 */
     public long addBalance(SeasonPlayerData data, long amount) {
         if (amount > 0) {

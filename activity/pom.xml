@@ -37,6 +37,11 @@
             <artifactId>sampledata</artifactId>
             <version>1.0-VERT-JJG-RELEASES</version>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>

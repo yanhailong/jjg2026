@@ -369,6 +369,7 @@ public class HallPlayerEventListener implements SessionCloseListener, SessionEnt
         //向在线好友广播本人下线状态, 并清理聊天频率限制缓存
         socialStatusService.broadcastStatus(playerId, SocialConst.FriendOnlineStatus.OFFLINE);
         socialRateLimiter.remove(playerId);
+        taskManager.onExit(playerId);
         log.info("玩家登出 playerId={}", playerId);
     }
 

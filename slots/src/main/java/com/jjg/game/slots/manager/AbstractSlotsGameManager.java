@@ -539,9 +539,9 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
             }
         }
 
-        if(statInfo.getSpecialModes() != null && !statInfo.getSpecialModes().isEmpty()) {
+        if (statInfo.getSpecialModes() != null && !statInfo.getSpecialModes().isEmpty()) {
             SpecialModeCfg specialModeCfg = getSpecialModeByType(statInfo.getSpecialModes().getFirst());
-            if(specialModeCfg != null) {
+            if (specialModeCfg != null) {
                 statInfo.setTypeNameId(specialModeCfg.getTypeNameId());
             }
         }
@@ -812,7 +812,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
      */
     protected CommonResult<Long> seasonDeduct(T gameData, long amount) {
         long before = gameData.getSeasonCoinBalance();
-        CommonResult<Long> result = slotsRPCLinkManager.deductSeasonCoin(gameData, amount);
+        CommonResult<Long> result = slotsRPCLinkManager.deductSeasonCoin(gameData, amount, AddType.SLOTS_BET, null);
         if (result.success() && result.data != null) {
             gameData.setSeasonCoinBalance(result.data);
             log.info("赛季币结算 type=bet,playerId={},gameType={},roomCfgId={},currency=season,amount={},before={},after={}", gameData.getPlayerId(), this.gameType, gameData.getRoomCfgId(), amount, before, result.data);
@@ -827,7 +827,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
      */
     protected boolean seasonReward(T gameData, long amount) {
         long before = gameData.getSeasonCoinBalance();
-        CommonResult<Long> result = slotsRPCLinkManager.addSeasonCoin(gameData, amount);
+        CommonResult<Long> result = slotsRPCLinkManager.addSeasonCoin(gameData, amount, AddType.SLOTS_BET_REWARD, null);
         if (!result.success() || result.data == null) {
             log.warn("赛季币发放失败 playerId={},gameType={},roomCfgId={},amount={},code={}", gameData.getPlayerId(), this.gameType, gameData.getRoomCfgId(), amount, result.code);
             return false;
@@ -3025,8 +3025,8 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
         return playerGameData.getSkillsMap();
     }
 
-    public SpecialModeCfg getSpecialModeByType(int libtype){
-        if(this.specialModeCfgMap == null || this.specialModeCfgMap.isEmpty()){
+    public SpecialModeCfg getSpecialModeByType(int libtype) {
+        if (this.specialModeCfgMap == null || this.specialModeCfgMap.isEmpty()) {
             return null;
         }
         return this.specialModeCfgMap.get(libtype);

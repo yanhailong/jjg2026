@@ -2,11 +2,12 @@ package com.jjg.game.recharge.controller;
 
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.Order;
+import com.jjg.game.core.rpc.GmToAllBridge;
 import com.jjg.game.core.rpc.GmToRechargeBridge;
 import org.springframework.stereotype.Component;
 
 @Component
-public class RPCController extends AbstractCallbackController implements GmToRechargeBridge {
+public class RPCController extends AbstractCallbackController implements GmToRechargeBridge, GmToAllBridge {
 
     @Override
     public int recharge(String selfOrderId, String channelOrderId) {
@@ -33,5 +34,15 @@ public class RPCController extends AbstractCallbackController implements GmToRec
             log.error("", e);
             return Code.EXCEPTION;
         }
+    }
+
+    @Override
+    public int reload(int reloadType) {
+        return Code.SUCCESS;
+    }
+
+    @Override
+    public int sessionNum() {
+        return 0;
     }
 }

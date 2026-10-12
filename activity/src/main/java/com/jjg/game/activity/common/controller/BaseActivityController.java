@@ -31,8 +31,11 @@ import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.GameFunctionService;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.utils.TipUtils;
+import com.jjg.game.sampledata.GameDataManager;
+import com.jjg.game.sampledata.bean.ActivityConfigCfg;
 import com.jjg.game.sampledata.bean.BaseCfgBean;
 import com.jjg.game.sampledata.bean.GameFunctionCfg;
+import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -582,5 +585,13 @@ public abstract class BaseActivityController {
         }
         Map<Integer, ? extends BaseCfgBean> bean = getDetailCfgBean(data);
         return bean.get(detailId);
+    }
+
+    protected ShopRechargeListCfg getShopCfg(ActivityData activityData) {
+        ActivityConfigCfg activityConfigCfg = GameDataManager.getActivityConfigCfg((int)activityData.getId());
+        if(activityConfigCfg == null || activityConfigCfg.getChannelCommodity() == null || activityConfigCfg.getChannelCommodity().isEmpty()) {
+            return null;
+        }
+        return GameDataManager.getShopRechargeListCfg(activityConfigCfg.getChannelCommodity().getFirst());
     }
 }

@@ -11,4 +11,5 @@ import com.jjg.game.common.proto.ProtobufMessage;
 public class SessionKickout extends AbstractMessage {
     public long playerId;
     public String sessionId;
+    public boolean removeSession;
 }

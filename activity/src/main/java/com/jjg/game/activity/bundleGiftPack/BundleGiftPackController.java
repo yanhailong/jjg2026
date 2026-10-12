@@ -13,12 +13,9 @@ import com.jjg.game.activity.constant.ActivityConstant;
 import com.jjg.game.common.pb.AbstractResponse;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
-import com.jjg.game.core.data.ChannelType;
-import com.jjg.game.core.data.CommonResult;
-import com.jjg.game.core.data.ItemOperationResult;
-import com.jjg.game.core.data.Order;
-import com.jjg.game.core.data.Player;
+import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.utils.ItemUtils;
@@ -29,12 +26,7 @@ import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 集合礼包
@@ -190,8 +182,8 @@ public class BundleGiftPackController extends BaseActivityController implements 
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         Integer giftId = parseRequestedGiftId(req.productId);
         if (giftId == null) {
             log.warn("集合礼包下单时获取数据失败 playerId={},productId={}", player.getId(), req.productId);
@@ -211,6 +203,10 @@ public class BundleGiftPackController extends BaseActivityController implements 
         Map<Integer, BundleGiftPackCfg> cfgMap = getDetailCfgBean(activityData);
         ShopRechargeListCfg shopCfg = getPurchaseShopCfg(activityData, cfgMap, target);
         if (!isValidShopCfg(player, shopCfg)) {
+            log.warn("集合礼包下单失败，充值商品配置、价格或渠道商品ID无效 playerId={},productId={},activityId={},giftId={},shopCfgId={},price={},channel={}",
+                    player.getId(), req.productId, activityData.getId(), giftId,
+                    shopCfg == null ? null : shopCfg.getId(),
+                    shopCfg == null ? null : shopCfg.getPrice(), player.getChannel());
             return result;
         }
         Map<Integer, PlayerActivityData> playerData = playerActivityDao.getPlayerActivityData(
@@ -218,11 +214,16 @@ public class BundleGiftPackController extends BaseActivityController implements 
         if (target.isAllGift()) {
             if (cfgMap.size() != activityData.getValue().size()
                     || !hasConfiguredRewards(cfgMap, cfgMap.keySet()) || CollectionUtil.isNotEmpty(playerData)) {
+                log.warn("集合礼包下单失败，全礼包配置不完整、奖励配置无效或已有购买记录 playerId={},productId={},activityId={},cfgIds={},configuredGiftIds={},purchasedGiftIds={}",
+                        player.getId(), req.productId, activityData.getId(), cfgMap.keySet(),
+                        activityData.getValue(), playerData == null ? null : playerData.keySet());
                 return result;
             }
         } else {
             BundleGiftPackCfg cfg = cfgMap.get(target.giftId());
             if (cfg == null || CollectionUtil.isEmpty(cfg.getGetItem())) {
+                log.warn("集合礼包下单失败，礼包配置不存在或奖励为空 playerId={},productId={},activityId={},giftId={},cfgExists={}",
+                        player.getId(), req.productId, activityData.getId(), giftId, cfg != null);
                 return result;
             }
 
@@ -236,14 +237,19 @@ public class BundleGiftPackController extends BaseActivityController implements 
         int tmpCode = tmpOrderHandle(corePlayerService, player, 1002, AddType.ACTIVITY_BUNDLE_GIFT_PACK, target.isAllGift() ? 3 : ((giftId % 1000) - 1));
         if (tmpCode != Code.SUCCESS) {
             result.code = tmpCode;
-            log.warn("集合礼包临时钻石购买失败 playerId={},round={}", player.getId(), target.isAllGift() ? 3 : ((giftId % 1000) - 1));
+            log.warn("集合礼包临时钻石购买失败 playerId={},productId={},round={},code={}",
+                    player.getId(), req.productId, target.isAllGift() ? 3 : ((giftId % 1000) - 1), tmpCode);
             return result;
         }
 
         req.productId = target.isAllGift()
                 ? String.valueOf(target.activityId()) : target.activityId() + "_" + target.giftId();
         result.code = Code.SUCCESS;
-        result.data = shopCfg.getPrice();
+
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(shopCfg.getPrice());
+        result.data = preGenerateOrderData;
         return result;
     }
 

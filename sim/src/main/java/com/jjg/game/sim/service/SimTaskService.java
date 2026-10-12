@@ -181,7 +181,7 @@ public class SimTaskService implements IRedDotService {
             pollStates(ctx, player, data, ctx.getSimBaseData(), changed, true);
             activeNodesChanged = activeNodesChanged(data, mainBefore, achievementsBefore);
         } while (activeNodesChanged);
-        if (containsAchievementCompletion(changed, 0)) {
+        if (containsAchievementReward(changed, 0)) {
             simMedalService.refreshAchievementState(ctx);
         }
         if (notify) {
@@ -269,7 +269,7 @@ public class SimTaskService implements IRedDotService {
                 SimTaskConfigService.AchievementGroupDef group = taskConfig.achievementGroup(groupId);
                 if (group.quality() == 1 && acceptAchievementGroup(ctx, groupId)) {
                     TaskCfg first = GameDataManager.getTaskCfg(group.taskIds().getFirst());
-                    changed.add(settleAdvancedChain(ctx, player, ctx.getSimTaskData(), first));
+                    changed.add(settleAdvancedChain(ctx, player, ctx.getSimTaskData(), first, true));
                 }
             }
         }
@@ -554,15 +554,15 @@ public class SimTaskService implements IRedDotService {
         if (pollState) {
             pollStates(ctx, player, data, ctx.getSimBaseData(), changed, false);
         }
-        if (containsAchievementCompletion(changed, changedFrom)) {
+        if (containsAchievementReward(changed, changedFrom)) {
             simMedalService.refreshAchievementState(ctx);
         }
     }
 
-    private boolean containsAchievementCompletion(List<Task> changed, int fromIndex) {
+    private boolean containsAchievementReward(List<Task> changed, int fromIndex) {
         for (int i = fromIndex; i < changed.size(); i++) {
             Task task = changed.get(i);
-            if (task.getStatus() == TaskConstant.TaskStatus.STATUS_IN_PROGRESS) {
+            if (task.getStatus() != TaskConstant.TaskStatus.STATUS_REWARDED) {
                 continue;
             }
             TaskCfg cfg = GameDataManager.getTaskCfg(task.getConfigId());
@@ -888,7 +888,10 @@ public class SimTaskService implements IRedDotService {
         }
         res.nextTask = advance(ctx, player, data, node, cfg);
         if (res.nextTask != null) {
-            res.nextTask = settleAdvancedChain(ctx, player, data, cfg);
+            res.nextTask = settleAdvancedChain(ctx, player, data, cfg, false);
+        }
+        if (cfg.getTaskType() == TaskConstant.TaskType.ACHIEVEMENT) {
+            simMedalService.refreshAchievementState(ctx);
         }
         res.rewards = ItemUtils.buildItemInfosByItem(rewardItems);
         //领奖后强制下个 tick 尽快落库(走 autosave 规范路径), 收窄崩溃重复领取窗口
@@ -922,7 +925,8 @@ public class SimTaskService implements IRedDotService {
      * 领奖续接后立即结算同一条任务链，避免下一节点的历史/状态进度已达标但仍返回进行中。
      * 无奖励节点完成时会在 {@link #onComplete} 中继续续接，因此循环到当前节点稳定为止。
      */
-    private Task settleAdvancedChain(SimPlayerContext ctx, Player player, SimTaskData data, TaskCfg chainCfg) {
+    private Task settleAdvancedChain(SimPlayerContext ctx, Player player, SimTaskData data,
+                                     TaskCfg chainCfg, boolean refreshAutoReward) {
         List<Task> changed = new ArrayList<>();
         SimBaseData baseData = ctx.getSimBaseData();
         TaskDetail node;
@@ -958,7 +962,7 @@ public class SimTaskService implements IRedDotService {
             }
         } while (node != findActiveNode(data, chainCfg));
 
-        if (containsAchievementCompletion(changed, 0)) {
+        if (refreshAutoReward && containsAchievementReward(changed, 0)) {
             simMedalService.refreshAchievementState(ctx);
         }
         TaskDetail active = findActiveNode(data, chainCfg);

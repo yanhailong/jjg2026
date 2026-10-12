@@ -23,6 +23,7 @@ import com.jjg.game.core.dao.CountDao;
 import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.listener.SimPlayerContextListener;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.utils.ItemUtils;
@@ -36,7 +37,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -129,7 +129,7 @@ public class GrowthFundController extends BaseActivityController implements Orde
             info.rewards = ItemUtils.buildItemInfo(rewards);
         }
 
-        ShopRechargeListCfg shopRechargeListCfg = GameDataManager.getShopRechargeListCfg(activityData.getChannelCommodity());
+        ShopRechargeListCfg shopRechargeListCfg = getShopCfg(activityData);
 
         info.isBuy = true;
         activityLogger.sendGrowthFundBuyLog(player, activityData, shopRechargeListCfg == null ? null : shopRechargeListCfg.getPrice(),
@@ -352,7 +352,7 @@ public class GrowthFundController extends BaseActivityController implements Orde
             }
             ActivityData activityData = activityManager.getActivityData().get(entry.getKey());
             if (activityData != null) {
-                ShopRechargeListCfg shopRechargeListCfg = GameDataManager.getShopRechargeListCfg(activityData.getChannelCommodity());
+                ShopRechargeListCfg shopRechargeListCfg = getShopCfg(activityData);
                 if (shopRechargeListCfg != null) {
                     activityInfo.sellingPrice = shopRechargeListCfg.getPrice().toPlainString();
                     if (player.getChannel() == ChannelType.APPLE) {
@@ -442,26 +442,37 @@ public class GrowthFundController extends BaseActivityController implements Orde
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         long activityId = Long.parseLong(req.productId);
         ActivityData activityData = activityManager.getActivityData().get(activityId);
         if (activityData == null || !checkPlayerCanJoinActivity(player, activityData)) {
+            log.warn("成长基金下单失败，活动不存在或玩家无法参与 playerId={},productId={},activityId={},activityExists={}",
+                    player.getId(), req.productId, activityId, activityData != null);
             return result;
         }
-        ShopRechargeListCfg shopRechargeListCfg = GameDataManager.getShopRechargeListCfg(activityData.getChannelCommodity());
+        ShopRechargeListCfg shopRechargeListCfg = getShopCfg(activityData);
         if (shopRechargeListCfg == null || shopRechargeListCfg.getPrice() == null) {
+            log.warn("成长基金下单失败，充值商品配置或价格为空 playerId={},productId={},activityId={},shopCfgId={},price={}",
+                    player.getId(), req.productId, activityId,
+                    shopRechargeListCfg == null ? null : shopRechargeListCfg.getId(),
+                    shopRechargeListCfg == null ? null : shopRechargeListCfg.getPrice());
             return result;
         }
 
         int tmpCode = tmpOrderHandle(corePlayerService, player, 1001, AddType.ACTIVITY_GROWTH_FUND_BUY, 0);
         if (tmpCode != Code.SUCCESS) {
             result.code = tmpCode;
+            log.warn("成长基金临时钻石购买失败 playerId={},productId={},activityId={},code={}",
+                    player.getId(), req.productId, activityId, tmpCode);
             return result;
         }
 
         result.code = Code.SUCCESS;
-        result.data = shopRechargeListCfg.getPrice();
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(shopRechargeListCfg.getPrice());
+        result.data = preGenerateOrderData;
         return result;
     }
 

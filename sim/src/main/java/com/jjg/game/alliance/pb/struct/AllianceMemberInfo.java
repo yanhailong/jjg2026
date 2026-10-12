@@ -20,7 +20,7 @@ public class AllianceMemberInfo {
     public int headImg;
     @ProtoDesc("头像框id")
     public int headFrame;
-    @ProtoDesc("玩家等级")
+    @ProtoDesc("所有场景等级之和")
     public int level;
     @ProtoDesc("职位 1盟主 3成员")
     public int position;

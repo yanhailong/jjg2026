@@ -5,6 +5,7 @@ import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Order;
 import com.jjg.game.core.data.PayType;
 import com.jjg.game.core.data.Player;
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
@@ -20,8 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
 
 /**
  * 处理现金购买特殊游客的充值到账。
@@ -46,7 +45,7 @@ public class SpecialGuestOrderService implements OrderGenerate {
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
         // 特殊游客必须先经过模拟经营购买接口校验当前展示商品，禁止通用下单接口绕过游客列表。
         log.warn("通用下单接口禁止创建特殊游客订单 playerId={},productId={}",
                 player.getId(), req.productId);

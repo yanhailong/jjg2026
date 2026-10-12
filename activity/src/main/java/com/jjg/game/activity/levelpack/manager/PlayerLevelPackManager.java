@@ -28,6 +28,7 @@ import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.manager.CoreSendMessageManager;
 import com.jjg.game.core.manager.RedDotManager;
 import com.jjg.game.core.pb.NotifyPlayerLevelUp;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.pb.reddot.RedDotDetails;
@@ -42,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -391,29 +391,38 @@ public class PlayerLevelPackManager implements GameEventListener, OrderGenerate,
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         int id = Integer.parseInt(req.productId);
         PlayerLevelPackCfg cfg = GameDataManager.getPlayerLevelPackCfg(id);
         if (cfg == null) {
+            log.warn("等级礼包下单失败，礼包配置不存在 playerId={},productId={}", player.getId(), req.productId);
             return result;
         }
         String channelCommodity = cfg.getChannelCommodity().get(player.getChannel().getValue());
         if (channelCommodity == null) {
+            log.warn("等级礼包下单失败，渠道商品ID为空 playerId={},productId={},cfgId={},channel={}",
+                    player.getId(), req.productId, cfg.getId(), player.getChannel());
             return result;
         }
         if (cfg.getPay() == null) {
+            log.warn("等级礼包下单失败，商品价格为空 playerId={},productId={},cfgId={}",
+                    player.getId(), req.productId, cfg.getId());
             return result;
         }
 
         int tmpCode = tmpOrderHandle(playerService, player, 1008, AddType.LEVEL_PACKAGE, cfg.getId() - 1);
         if (tmpCode != Code.SUCCESS) {
-            log.warn("等级礼包临时钻石购买失败 playerId={},round={}", player.getId(), cfg.getId() - 1);
+            log.warn("等级礼包临时钻石购买失败 playerId={},productId={},round={},code={}",
+                    player.getId(), req.productId, cfg.getId() - 1, tmpCode);
             return new CommonResult<>(tmpCode);
         }
 
         result.code = Code.SUCCESS;
-        result.data = cfg.getPay();
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(cfg.getPay());
+        result.data = preGenerateOrderData;
         return result;
     }
 

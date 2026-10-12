@@ -465,14 +465,14 @@ public class PlayerSessionService implements TimerListener<String> {
             checkSessionByNode();
 
             Iterator<Map.Entry<Long, String>> it1 = clusterSystem.getPlayerIdSessionMap().entrySet().iterator();
-            Set<String> removeSessionIds = new HashSet<>();
+            Map<String, PFSession> removeSession = new HashMap<>();
             while (it1.hasNext()) {
                 Map.Entry<Long, String> entry = it1.next();
                 PFSession session = clusterSystem.getSession(entry.getValue());
                 if (session == null) {
-                    removeSessionIds.add(entry.getValue());
+                    removeSession.put(entry.getValue(), session);
                 } else if (checkCacheSessionExpire(session, e.getCurrentTime())) {
-                    removeSessionIds.add(entry.getValue());
+                    removeSession.put(entry.getValue(), session);
                 }
             }
 
@@ -481,12 +481,20 @@ public class PlayerSessionService implements TimerListener<String> {
                 Map.Entry<String, PFSession> entry = it2.next();
                 PFSession pfSession = entry.getValue();
                 if (checkCacheSessionExpire(pfSession, e.getCurrentTime())) {
-                    removeSessionIds.add(pfSession.sessionId());
+                    removeSession.put(pfSession.sessionId(), pfSession);
                 }
             }
 
-            removeSessionIds.forEach(sessionId -> {
-                clusterSystem.removeSession(sessionId);
+            removeSession.forEach((k, v) -> {
+                clusterSystem.removeSession(k);
+
+                if (v != null) {
+                    SessionKickout sessionKickout = new SessionKickout();
+                    sessionKickout.sessionId = k;
+                    sessionKickout.playerId = v.playerId;
+                    sessionKickout.removeSession = true;
+                    v.send2Gate(sessionKickout);
+                }
             });
         }
     }

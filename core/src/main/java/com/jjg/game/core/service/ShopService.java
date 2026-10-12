@@ -14,6 +14,7 @@ import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.logger.CoreLogger;
 import com.jjg.game.core.pb.NotifyPayCallBack;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.utils.ConditionUtil;
@@ -54,6 +55,8 @@ public class ShopService implements OrderGenerate {
     private PlayerSessionTokenDao playerSessionTokenDao;
     //商城商品
     private Map<Long, ShopProduct> shopProductMap = Map.of();
+    //商城商品
+    private List<ShopProduct> shopProductList = Collections.emptyList();
 
     public void init() {
         //加载商城商品
@@ -67,15 +70,14 @@ public class ShopService implements OrderGenerate {
      * @return
      */
     public List<ShopProduct> getShop(Player player, int channel) {
-        if (this.shopProductMap == null || this.shopProductMap.isEmpty()) {
+        if (this.shopProductList == null || this.shopProductList.isEmpty()) {
             return null;
         }
 
         List<ShopProduct> list = new ArrayList<>();
 
         int now = TimeHelper.nowInt();
-        for (Map.Entry<Long, ShopProduct> en : this.shopProductMap.entrySet()) {
-            ShopProduct shopProduct = en.getValue();
+        for (ShopProduct shopProduct : this.shopProductList) {
             //检查是否开启
             if (!checkProductOpen(player, shopProduct, now, channel)) {
                 continue;
@@ -130,9 +132,11 @@ public class ShopService implements OrderGenerate {
         List<ShopProduct> all = shopProductDao.getAll();
         if (CollectionUtil.isNotEmpty(all)) {
             this.shopProductMap = all.stream().collect(Collectors.toUnmodifiableMap(ShopProduct::getId, Function.identity()));
-            log.info("加载商城商品数量 size = {}", this.shopProductMap.size());
+            this.shopProductList = all;
+            log.info("加载商城商品数量 mapSize = {},listSize={}", this.shopProductMap.size(), all.size());
         } else {
             this.shopProductMap = Map.of();
+            this.shopProductList = Collections.emptyList();
             log.info("清空商城商品");
         }
     }
@@ -212,8 +216,8 @@ public class ShopService implements OrderGenerate {
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         long shopProductId = Long.parseLong(req.productId);
         ShopProduct shopProduct = shopProductMap.get(shopProductId);
         if (shopProduct == null) {
@@ -236,10 +240,14 @@ public class ShopService implements OrderGenerate {
             return result;
         }
         if (shopProduct.getMoney() == null) {
+            log.warn("商城下单失败，商品价格为空 playerId={},productId={}", player.getId(), req.productId);
             return result;
         }
         result.code = Code.SUCCESS;
-        result.data = shopProduct.getMoney();
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(shopProduct.getMoney());
+        result.data = preGenerateOrderData;
         return result;
     }
 

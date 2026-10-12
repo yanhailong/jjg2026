@@ -151,7 +151,6 @@ public class PlayerPackService implements IPlayerRegister {
         }
 
         CommonResult<ItemOperationResult> result = new CommonResult<>(Code.FAIL);
-        result.data = new ItemOperationResult();
 
         List<Item> validAddItemList = new ArrayList<>(addItemList.size());
         for (Item item : addItemList) {
@@ -183,10 +182,19 @@ public class PlayerPackService implements IPlayerRegister {
         //若落在锁内，内层会读到外层尚未写回的旧背包，两者的写入将互相覆盖。
         List<Item> normalAddItemList = new ArrayList<>(validAddItemList.size());
         List<Item> specialAddItemList = splitSpecialItems(validAddItemList, normalAddItemList);
-        if (!specialAddItemList.isEmpty()
-                && !specialItemListener.addItems(playerId, specialAddItemList, addType, desc, notify)) {
-            log.error("特殊道具入账失败 playerId={},items={},addType={},desc={}", playerId, specialAddItemList, addType, desc);
-            return result;
+
+        if(!specialAddItemList.isEmpty()){
+            CommonResult<ItemOperationResult> specialAddResult = specialItemListener.addItems(playerId, specialAddItemList, addType, desc, notify);
+            if(!specialAddResult.success()){
+                log.error("特殊道具入账失败 playerId={},items={},addType={},desc={}", playerId, specialAddItemList, addType, desc);
+                return result;
+            }
+            result.data = specialAddResult.data;
+            //普通道具
+            if (normalAddItemList.isEmpty()) {
+                result.code = Code.SUCCESS;
+                return result;
+            }
         }
 
         try {
@@ -196,10 +204,6 @@ public class PlayerPackService implements IPlayerRegister {
             //异常若穿透出去就跳过了下面的补偿，特殊资源会留在账上
             log.error("添加常规道具异常 playerId={},items={},addType={},desc={}",
                     playerId, normalAddItemList, addType, desc, e);
-        }
-        //常规道具或货币入账失败(含抛异常)时撤回已入账的特殊道具，否则调用方按失败重试会重复发放
-        if (!result.success()) {
-            rollbackAddedSpecialItems(playerId, specialAddItemList);
         }
         return result;
     }
@@ -346,35 +350,6 @@ public class PlayerPackService implements IPlayerRegister {
     }
 
     /**
-     * 撤回已入账的特殊道具
-     * <p>
-     * 只能退回数值：赛季币入账时可能已推进段位并发过段位奖励、勋章激活后不可撤销，这些连带影响撤不掉。
-     * 因此无论数值是否退回成功都留痕 —— 回退成功不等于状态已还原。
-     */
-    private void rollbackAddedSpecialItems(long playerId, List<Item> addedItems) {
-        if (addedItems.isEmpty()) {
-            return;
-        }
-        boolean rolledBack = specialItemListener.removeItems(playerId, addedItems, AddType.FAIL_ROLLBACK,
-                "PlayerPackService addItems rollback");
-        log.error("添加道具失败，回滚特殊道具 playerId={},items={},数值回退={}（段位晋升、段位奖励、勋章激活等无法撤销，需人工核对）",
-                playerId, addedItems, rolledBack ? "成功" : "失败");
-    }
-
-    /**
-     * 回滚已扣除的特殊道具
-     */
-    private void rollbackRemovedSpecialItems(long playerId, List<Item> removedItems) {
-        if (removedItems.isEmpty()) {
-            return;
-        }
-        if (!specialItemListener.addItems(playerId, removedItems, AddType.FAIL_ROLLBACK,
-                "PlayerPackService removeItem rollback", false)) {
-            log.error("移除道具回滚特殊道具失败(需人工修复) playerId={},items={}", playerId, removedItems);
-        }
-    }
-
-    /**
      * 拆出由处理器承载的特殊道具，其余常规道具收集到 normalItems
      */
     private List<Item> splitSpecialItems(List<Item> items, List<Item> normalItems) {
@@ -384,9 +359,9 @@ public class PlayerPackService implements IPlayerRegister {
         }
         List<Item> specialItems = new ArrayList<>();
         for (Item item : items) {
-            if(isSpecialItem(item.getId())){
+            if (isSpecialItem(item.getId())) {
                 specialItems.add(item);
-            }else {
+            } else {
                 normalItems.add(item);
             }
         }
@@ -397,17 +372,17 @@ public class PlayerPackService implements IPlayerRegister {
      * 该道具是否由处理器承载
      */
     private boolean isSpecialItem(int itemId) {
-        if(specialItemListener == null){
+        if (specialItemListener == null) {
             return false;
         }
 
         boolean specialId = GameConstant.suportSpecialItem(itemId);
-        if(specialId){
+        if (specialId) {
             return true;
         }
 
         ItemCfg itemCfg = GameDataManager.getItemCfg(itemId);
-        if(itemCfg == null || itemCfg.getItemType() < 1){
+        if (itemCfg == null || itemCfg.getItemType() < 1) {
             return false;
         }
         return GameConstant.SIM_SPECIAL_ITEM_TYPE.contains(itemCfg.getItemType());
@@ -590,7 +565,6 @@ public class PlayerPackService implements IPlayerRegister {
             notifyItemsNotEnough(player, validRemoveItemList, addType);
             return result;
         }
-        result.data = new ItemOperationResult();
 
         long deductGoldV = 0;
         long deductDiamondV = 0;
@@ -600,12 +574,26 @@ public class PlayerPackService implements IPlayerRegister {
         //优先扣除特殊道具，剩余的常规道具再走货币与背包；与入账同理，必须在取锁前处理
         List<Item> normalRemoveItemList = new ArrayList<>(validRemoveItemList.size());
         List<Item> removedSpecialItemList = splitSpecialItems(validRemoveItemList, normalRemoveItemList);
-        if (!removedSpecialItemList.isEmpty()
-                && !specialItemListener.removeItems(playerId, removedSpecialItemList, addType, desc)) {
-            log.warn("扣除特殊道具失败 playerId={},items={},addType={}", playerId, removedSpecialItemList, addType);
-            result.code = Code.NOT_ENOUGH_ITEM;
-            notifyItemsNotEnough(player, removedSpecialItemList, addType);
-            return result;
+
+        if (!removedSpecialItemList.isEmpty()) {
+            CommonResult<ItemOperationResult> specialRemoveResult = specialItemListener.removeItems(playerId, removedSpecialItemList, addType, desc);
+            if (!specialRemoveResult.success()) {
+                log.warn("扣除特殊道具失败 playerId={},items={},addType={},code={}", playerId, removedSpecialItemList, addType, specialRemoveResult.code);
+                result.code = specialRemoveResult.code;
+                notifyItemsNotEnough(player, removedSpecialItemList, addType);
+                return result;
+            }
+            result.data = specialRemoveResult.data;
+
+            //普通道具
+            if (normalRemoveItemList.isEmpty()) {
+                result.code = Code.SUCCESS;
+                return result;
+            }
+        }
+
+        if(result.data == null){
+            result.data = new ItemOperationResult();
         }
 
         String key = getLockKey(playerId);
@@ -786,10 +774,6 @@ public class PlayerPackService implements IPlayerRegister {
             if (lock) {
                 redisLock.tryUnlock(key);
             }
-            //背包或货币未提交成功，已扣除的特殊道具要还回去
-            if (!committed) {
-                rollbackRemovedSpecialItems(playerId, removedSpecialItemList);
-            }
         }
         return result;
     }
@@ -865,7 +849,9 @@ public class PlayerPackService implements IPlayerRegister {
         return false;
     }
 
-    /** 返回满足需求的下标，一批红点只读取一次背包；不扣除任何物品。 */
+    /**
+     * 返回满足需求的下标，一批红点只读取一次背包；不扣除任何物品。
+     */
     public Set<Integer> findSatisfiedItemRequirements(Player player, List<Map<Integer, Long>> requirements) {
         Set<Integer> result = new HashSet<>();
         if (player == null || requirements == null || requirements.isEmpty()) return result;
@@ -1005,10 +991,10 @@ public class PlayerPackService implements IPlayerRegister {
      * 仅支持非货币、非特殊、可入背包道具；适用于配方合成等批量扣料并发奖场景。
      */
     public CommonResult<ItemOperationResult> exchangePackItems(Player player,
-                                                                Map<Integer, Long> requiredItems,
-                                                                Map<Integer, Long> removeItems,
-                                                                Map<Integer, Long> addItems,
-                                                                AddType addType, String desc) {
+                                                               Map<Integer, Long> requiredItems,
+                                                               Map<Integer, Long> removeItems,
+                                                               Map<Integer, Long> addItems,
+                                                               AddType addType, String desc) {
         CommonResult<ItemOperationResult> result = new CommonResult<>(Code.FAIL);
         result.data = new ItemOperationResult();
         if (player == null) {
@@ -1119,11 +1105,11 @@ public class PlayerPackService implements IPlayerRegister {
      * expectedMiningState 作为玩法版本的 CAS 条件，防止同一请求重放或并发重复发奖。
      */
     public CommonResult<ItemOperationResult> exchangeMiningItems(Player player,
-                                                                  Map<Integer, Long> removeItems,
-                                                                  Map<Integer, Long> addItems,
-                                                                  AddType addType, String desc,
-                                                                  String expectedMiningState,
-                                                                  String newMiningState) {
+                                                                 Map<Integer, Long> removeItems,
+                                                                 Map<Integer, Long> addItems,
+                                                                 AddType addType, String desc,
+                                                                 String expectedMiningState,
+                                                                 String newMiningState) {
         CommonResult<ItemOperationResult> result = new CommonResult<>(Code.FAIL);
         result.data = new ItemOperationResult();
         if (player == null) {

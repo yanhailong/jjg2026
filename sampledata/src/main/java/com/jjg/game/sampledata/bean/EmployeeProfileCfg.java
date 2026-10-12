@@ -23,6 +23,8 @@ public class EmployeeProfileCfg extends BaseCfgBean {
   protected List<Integer> DuplicatetoShard;
   /** 雇员品质 */
   protected int EmployeeQuality;
+  /** 雇员资源 */
+  protected String EmployeeResource;
   /** 雇员名称 */
   protected int NameId;
   /** 职业ID */
@@ -44,6 +46,11 @@ public class EmployeeProfileCfg extends BaseCfgBean {
   /** 返回雇员品质 */
   public int getEmployeeQuality() {
     return EmployeeQuality;
+  }
+
+  /** 返回雇员资源 */
+  public String getEmployeeResource() {
+    return EmployeeResource;
   }
 
   /** 返回雇员名称 */

@@ -23,7 +23,9 @@ import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.data.Order;
 import com.jjg.game.core.data.Player;
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.MailService;
@@ -263,26 +265,37 @@ public class DailyRechargeController extends BaseActivityController implements O
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         BaseCfgBean cfgBean = getOrderGenerateBean(player, req.productId);
         if (cfgBean instanceof DailyRechargeCfg cfg && cfg.getType() == ActivityConstant.DailyRecharge.GIFT) {
             String channelCommodity = cfg.getChannelCommodity().get(player.getChannel().getValue());
             if (channelCommodity == null) {
+                log.warn("每日充值下单失败，渠道商品ID为空 playerId={},productId={},cfgId={},channel={}",
+                        player.getId(), req.productId, cfg.getId(), player.getChannel());
                 return result;
             }
             if (cfg.getCost() == null) {
+                log.warn("每日充值下单失败，商品价格为空 playerId={},productId={},cfgId={}",
+                        player.getId(), req.productId, cfg.getId());
                 return result;
             }
 
             int tmpCode = tmpOrderHandle(corePlayerService, player, 1009, AddType.ACTIVITY_DAILY_RECHARGE_GIFT, cfg.getId() - 1);
             if (tmpCode != Code.SUCCESS) {
-                log.warn("每日充值临时钻石购买失败 playerId={},round={}", player.getId(), cfg.getId() - 1);
+                log.warn("每日充值临时钻石购买失败 playerId={},productId={},round={},code={}",
+                        player.getId(), req.productId, cfg.getId() - 1, tmpCode);
                 return new CommonResult<>(tmpCode);
             }
 
             result.code = Code.SUCCESS;
-            result.data = cfg.getCost();
+            PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+            preGenerateOrderData.setType(RechargeCfgType.MONEY);
+            preGenerateOrderData.setPrice(cfg.getCost());
+            result.data = preGenerateOrderData;
+        } else {
+            log.warn("每日充值下单失败，活动参与条件或礼包配置校验未通过 playerId={},productId={},cfgId={}",
+                    player.getId(), req.productId, cfgBean == null ? null : cfgBean.getId());
         }
         return result;
     }

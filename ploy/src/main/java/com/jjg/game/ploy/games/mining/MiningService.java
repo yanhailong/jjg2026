@@ -540,8 +540,10 @@ public class MiningService implements OrderGenerate, StandalonePloyGame {
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder request) {
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder request) {
         // 现在通过ReqMiningAction按表扣道具。保留回调接口仅用于旧版本已创建订单的履约/释放。
+        log.warn("挖矿下单失败，通用下单接口已禁用，请通过挖矿操作接口购买 playerId={},productId={}",
+                player.getId(), request.productId);
         return new CommonResult<>(Code.FORBID);
     }
 

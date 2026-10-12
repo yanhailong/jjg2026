@@ -21,6 +21,7 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.MailService;
@@ -32,12 +33,7 @@ import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -272,8 +268,8 @@ public class BuyOneGetSevenController extends BaseActivityController
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         ActivityData activityData = activityManager.getOpenActivityData(player, ActivityType.BUY_ONE_GET_SEVEN);
         if (activityData == null) {
             log.warn("买一送七下单失败，未获取到可参与的活动 playerId={},productId={}",
@@ -308,30 +304,34 @@ public class BuyOneGetSevenController extends BaseActivityController
         }
         ShopRechargeListCfg shopCfg = getShopCfg(activityData);
         if (shopCfg == null) {
-            log.warn("买一送七下单失败，未找到充值商品配置 playerId={},productId={},activityId={},channelCommodity={}",
-                    player.getId(), req.productId, activityData.getId(), activityData.getChannelCommodity());
+            log.warn("买一送七下单失败，未找到充值商品配置 playerId={},productId={},activityId={}",
+                    player.getId(), req.productId, activityData.getId());
             return result;
         }
         if (shopCfg.getPrice() == null) {
-            log.warn("买一送七下单失败，充值商品价格为空 playerId={},productId={},activityId={},channelCommodity={}",
-                    player.getId(), req.productId, activityData.getId(), activityData.getChannelCommodity());
+            log.warn("买一送七下单失败，充值商品价格为空 playerId={},productId={},activityId={}",
+                    player.getId(), req.productId, activityData.getId());
             return result;
         }
         if (StringUtils.isBlank(getChannelProductId(player, shopCfg))) {
-            log.warn("买一送七下单失败，渠道商品ID为空 playerId={},productId={},activityId={},channel={},channelCommodity={}",
-                    player.getId(), req.productId, activityData.getId(), player.getChannel(),
-                    activityData.getChannelCommodity());
+            log.warn("买一送七下单失败，渠道商品ID为空 playerId={},productId={},activityId={},channel={}",
+                    player.getId(), req.productId, activityData.getId(), player.getChannel());
             return result;
         }
 
         int tmpCode = tmpOrderHandle(corePlayerService, player, 1003, AddType.ACTIVITY_BUY_ONE_GET_SEVEN_BUY, 0);
         if (tmpCode != Code.SUCCESS) {
             result.code = tmpCode;
+            log.warn("买一送七临时钻石购买失败 playerId={},productId={},activityId={},code={}",
+                    player.getId(), req.productId, activityData.getId(), tmpCode);
             return result;
         }
 
         result.code = Code.SUCCESS;
-        result.data = shopCfg.getPrice();
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(shopCfg.getPrice());
+        result.data = preGenerateOrderData;
         return result;
     }
 
@@ -546,10 +546,6 @@ public class BuyOneGetSevenController extends BaseActivityController
 
     private long getUnlockIntervalMillis(ActivityData activityData) {
         return TimeUnit.SECONDS.toMillis(activityData.getValueParam().get(UNLOCK_INTERVAL_PARAM_INDEX));
-    }
-
-    private ShopRechargeListCfg getShopCfg(ActivityData activityData) {
-        return GameDataManager.getShopRechargeListCfg(activityData.getChannelCommodity());
     }
 
     private String getChannelProductId(Player player, ShopRechargeListCfg shopCfg) {

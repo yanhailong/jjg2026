@@ -1,25 +1,24 @@
 package com.jjg.game.sim.service;
 
 import com.jjg.game.core.constant.AddType;
-import com.jjg.game.core.service.CorePlayerService;
-import com.jjg.game.season.service.SeasonPassOrderService;
-import com.jjg.game.sim.data.ActivePassPurchase;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.*;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
+import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.OrderService;
 import com.jjg.game.sampledata.GameDataManager;
+import com.jjg.game.sim.data.ActivePassPurchase;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-
-import static com.jjg.game.sim.constant.SimConstant.ActivePass.*;
+import static com.jjg.game.sim.constant.SimConstant.ActivePass.BASIC;
+import static com.jjg.game.sim.constant.SimConstant.ActivePass.PREMIUM;
 
 /**
  * 复用通用预下单与充值回调；预下单productId为ActivePass.id_轨道(2初级/4高级)。
@@ -51,25 +50,32 @@ public class ActivePassOrderService implements OrderGenerate {
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
         int[] target = parse(req.productId);
         if (target == null) {
+            log.warn("活跃通行证下单失败，商品参数无效 playerId={},productId={}", player.getId(), req.productId);
             return new CommonResult<>(Code.PARAM_ERROR);
         }
         ActivePassPurchase result = router.execute(player.getId(), null,
                 () -> prepare(contexts.getContext(player.getId()), target[0], target[1]),
                 rpc -> rpc.prepareActivePassOrder(player.getId(), target[0], target[1]));
         if (result == null || result.code != Code.SUCCESS) {
+            log.warn("活跃通行证下单失败，预购买校验失败或所属节点未返回结果 playerId={},productId={},passId={},track={},code={}",
+                    player.getId(), req.productId, target[0], target[1], result == null ? Code.EXCEPTION : result.code);
             return new CommonResult<>(result == null ? Code.EXCEPTION : result.code);
         }
         req.productId = result.productId;
 
         int tmpCode = tmpOrderHandle(playerService, player, 1004, AddType.SIM_ACTIVE_PASS, target[1] == BASIC ? 0 : 1);
         if (tmpCode != Code.SUCCESS) {
-            log.warn("活跃通行证临时钻石购买失败 playerId={},round={}", player.getId(), target[1] == BASIC ? 0 : 1);
+            log.warn("活跃通行证临时钻石购买失败 playerId={},productId={},round={},code={}",
+                    player.getId(), req.productId, target[1] == BASIC ? 0 : 1, tmpCode);
             return new CommonResult<>(tmpCode);
         }
-        return new CommonResult<>(Code.SUCCESS, result.price);
+        PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+        preGenerateOrderData.setType(RechargeCfgType.MONEY);
+        preGenerateOrderData.setPrice(result.price);
+        return new CommonResult<>(Code.SUCCESS, preGenerateOrderData);
     }
 
     public ActivePassPurchase prepare(SimPlayerContext ctx, int passId, int track) {

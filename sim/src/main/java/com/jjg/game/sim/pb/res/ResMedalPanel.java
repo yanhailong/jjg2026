@@ -19,7 +19,7 @@ import java.util.List;
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_GAME, cmd = SimConstant.MsgBean.RES_MEDAL_PANEL, resp = true)
 @ProtoDesc("成就勋章面板返回")
 public class ResMedalPanel extends AbstractResponse {
-    @ProtoDesc("已完成成就任务数")
+    @ProtoDesc("已领取奖励的成就任务数")
     public int completedAchievementCount;
     @ProtoDesc("成就任务总数")
     public int totalAchievementCount;

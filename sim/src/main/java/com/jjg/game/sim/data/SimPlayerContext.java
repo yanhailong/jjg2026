@@ -1,12 +1,14 @@
 package com.jjg.game.sim.data;
 
 import com.alibaba.fastjson.JSONObject;
+import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PlayerController;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.sim.constant.BuildingOutputType;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -47,10 +49,18 @@ public class SimPlayerContext {
         activePassData = data;
     }
 
-    //成就徽章固定值加成缓存 (BuildingOutputType -> 固定值; 登录/成就完成后刷新; 内存态不落库)
+    //成就徽章固定值加成缓存 (BuildingOutputType -> 固定值; 登录/成就领奖后刷新; 内存态不落库)
     private Map<BuildingOutputType, Integer> medalBuffMap = new EnumMap<>(BuildingOutputType.class);
 
-    private static final int RECENT_SPIN_RESULT_MAX = 16;
+    // Slots RPC 单次等待 8s、重试一次；按约定保留 2 分钟，最多 2048 局（窗口内平均约 17 局/秒）。
+    // RPC 异步池和 Hall 都可能排队超过 2 分钟；超时或容量淘汰后，不再保证旧请求去重。
+    private static final int RECENT_SPIN_RESULT_MAX = 2048;
+    private static final long RECENT_SPIN_RESULT_TTL_MILLIS = TimeUnit.MINUTES.toMillis(2);
+    // 同玩家 RPC/tick 串行；按首次结算顺序淘汰，命中不续期，随上下文释放，不落库。
+    private final LinkedHashMap<Long, SpinResultEntry> recentSpinResults = new LinkedHashMap<>();
+
+    private record SpinResultEntry(CommonResult<SlotsSpinResult> result, long recordedAtMillis) {
+    }
 
     //赛季币结算幂等账本 (txnId -> 结算后余额; 内存态; 防扣/发赛季币的超时重试重复应用, 同玩家 RPC 串行无需加锁)
     private final LinkedHashMap<Long, Long> recentSeasonTxns = new LinkedHashMap<>();
@@ -493,6 +503,35 @@ public class SimPlayerContext {
         if (slotsSpinResult != null) {
             this.slotsStatisticsData.setAllSpendPower(this.slotsStatisticsData.getAllSpendPower() + slotsSpinResult.getCostPower());
             this.slotsStatisticsData.setAllSpendPowerGetCoin(this.slotsStatisticsData.getAllSpendPowerGetCoin() + slotsSpinResult.getSpendPowerGetCoin());
+        }
+    }
+
+    public CommonResult<SlotsSpinResult> spinResult(long spinId) {
+        cleanUpSpinResults();
+        SpinResultEntry entry = spinId == 0 ? null : recentSpinResults.get(spinId);
+        return entry == null ? null : entry.result();
+    }
+
+    public void recordSpinResult(long spinId, CommonResult<SlotsSpinResult> result) {
+        cleanUpSpinResults();
+        if (spinId == 0 || recentSpinResults.containsKey(spinId)) {
+            return;
+        }
+        if (recentSpinResults.size() >= RECENT_SPIN_RESULT_MAX) {
+            recentSpinResults.pollFirstEntry();
+        }
+        recentSpinResults.put(spinId, new SpinResultEntry(result, System.currentTimeMillis()));
+    }
+
+    /** 读写及既有玩家 tick 清理；使用系统毫秒时间，不叠加玩家 GM 时间偏移。 */
+    public void cleanUpSpinResults() {
+        long now = System.currentTimeMillis();
+        Iterator<SpinResultEntry> it = recentSpinResults.values().iterator();
+        while (it.hasNext()) {
+            if (now - it.next().recordedAtMillis() < RECENT_SPIN_RESULT_TTL_MILLIS) {
+                break;
+            }
+            it.remove();
         }
     }
 }

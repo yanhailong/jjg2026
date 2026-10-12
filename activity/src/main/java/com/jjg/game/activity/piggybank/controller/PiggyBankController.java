@@ -23,7 +23,9 @@ import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.data.Order;
 import com.jjg.game.core.data.Player;
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.MailService;
@@ -440,26 +442,37 @@ public class PiggyBankController extends BaseActivityController implements Order
     }
 
     @Override
-    public CommonResult<BigDecimal> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
-        CommonResult<BigDecimal> result = new CommonResult<>(Code.FAIL);
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        CommonResult<PreGenerateOrderData> result = new CommonResult<>(Code.FAIL);
         BaseCfgBean cfgBean = getOrderGenerateBean(player, req.productId);
         if (cfgBean instanceof PiggyBankCfg cfg) {
             String channelCommodity = cfg.getChannelCommodity().get(player.getChannel().getValue());
             if (channelCommodity == null) {
+                log.warn("储钱罐下单失败，渠道商品ID为空 playerId={},productId={},cfgId={},channel={}",
+                        player.getId(), req.productId, cfg.getId(), player.getChannel());
                 return result;
             }
             if (cfg.getPay() == null) {
+                log.warn("储钱罐下单失败，商品价格为空 playerId={},productId={},cfgId={}",
+                        player.getId(), req.productId, cfg.getId());
                 return result;
             }
 
             int tmpCode = tmpOrderHandle(corePlayerService, player, 1005, AddType.ACTIVITY_PIGGY_BANK_REWARDS, cfg.getId() - 1);
             if (tmpCode != Code.SUCCESS) {
-                log.warn("储钱罐临时钻石购买失败 playerId={},round={}", player.getId(), cfg.getId() - 1);
+                log.warn("储钱罐临时钻石购买失败 playerId={},productId={},round={},code={}",
+                        player.getId(), req.productId, cfg.getId() - 1, tmpCode);
                 return new CommonResult<>(tmpCode);
             }
 
             result.code = Code.SUCCESS;
-            result.data = cfg.getPay();
+            PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
+            preGenerateOrderData.setType(RechargeCfgType.MONEY);
+            preGenerateOrderData.setPrice(cfg.getPay());
+            result.data = preGenerateOrderData;
+        } else {
+            log.warn("储钱罐下单失败，活动参与条件或礼包配置校验未通过 playerId={},productId={},cfgId={}",
+                    player.getId(), req.productId, cfgBean == null ? null : cfgBean.getId());
         }
         return result;
     }

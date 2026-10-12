@@ -1,7 +1,9 @@
 package com.jjg.game.core.listener;
 
 import com.jjg.game.core.constant.AddType;
+import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Item;
+import com.jjg.game.core.data.ItemOperationResult;
 
 import java.util.List;
 
@@ -25,12 +27,12 @@ public interface SpecialItemListener {
      *
      * @return true 入账成功
      */
-    boolean addItems(long playerId, List<Item> items, AddType addType, String desc, boolean notify);
+    CommonResult<ItemOperationResult> addItems(long playerId, List<Item> items, AddType addType, String desc, boolean notify);
 
     /**
      * 特殊道具扣除，先校验充足再扣除，任一不足整体失败且不产生扣除
      *
      * @return true 扣除成功
      */
-    boolean removeItems(long playerId, List<Item> items, AddType addType, String desc);
+    CommonResult<ItemOperationResult> removeItems(long playerId, List<Item> items, AddType addType, String desc);
 }

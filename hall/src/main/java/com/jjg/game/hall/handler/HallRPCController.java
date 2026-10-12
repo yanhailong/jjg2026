@@ -124,9 +124,10 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
     @Override
     @RpcCallSetting(processorModKey = "#arg0")
     public CommonResult<ItemOperationResult> grantMiningRoleReward(long playerId, Map<Integer, Long> rewards,
-                                                                  AddType source, String deliveryId) {
+                                                                   AddType source, String deliveryId) {
         return simMiningRewardService.grant(playerId, rewards, source, deliveryId);
     }
+
     @Autowired
     private com.jjg.game.sim.service.SimBuildingRedDotService simBuildingRedDotService;
     @Autowired
@@ -554,14 +555,14 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
 
     @Override
     @RpcCallSetting(processorModKey = "#arg0")
-    public CommonResult<Long> deductSeasonCoin(long playerId, long amount, long transactionId) {
-        return simManager.deductSeasonCoin(playerId, amount, transactionId);
+    public CommonResult<Long> deductSeasonCoin(long playerId, long amount, long transactionId, AddType addType, String desc) {
+        return simManager.deductSeasonCoin(playerId, amount, transactionId, addType, desc);
     }
 
     @Override
     @RpcCallSetting(processorModKey = "#arg0")
-    public CommonResult<Long> addSeasonCoin(long playerId, long amount, long transactionId) {
-        return simManager.addSeasonCoin(playerId, amount, transactionId);
+    public CommonResult<Long> addSeasonCoin(long playerId, long amount, long transactionId, AddType addType, String desc) {
+        return simManager.addSeasonCoin(playerId, amount, transactionId, addType, desc);
     }
 
     @Override

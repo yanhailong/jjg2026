@@ -16,6 +16,8 @@
 
 test
 **/src/test/**
+!activity/src/test/
+!activity/src/test/**
 target
 log
 

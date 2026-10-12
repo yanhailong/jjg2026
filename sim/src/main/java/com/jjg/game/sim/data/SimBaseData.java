@@ -520,7 +520,7 @@ public class SimBaseData extends AbstractData {
             specialGuestCount = 0;
             guestOutputLimitNotified = false;
             if (guestOutputRewards != null) {
-                guestOutputRewards.clear();
+                guestOutputRewards = null;
             }
             onlineTimeResetTime = TimeHelper.getDaysTime(now, 1);
             if (loginTime > 0) {
