@@ -97,6 +97,10 @@ public enum RechargeType {
      * 新手礼包
      */
     NEW_PLAYER_GIFT(21),
+    /**
+     * 免广告礼包
+     */
+    NO_ADS(22),
     ;
     private final int type;
 

@@ -53,6 +53,7 @@ import com.jjg.game.sim.service.SimSkillService;
 import com.jjg.game.sim.service.SimTaskService;
 import com.jjg.game.sim.service.SimMiniShopService;
 import com.jjg.game.sim.service.SimNodeService;
+import com.jjg.game.sim.service.SimNoAdsService;
 import com.jjg.game.sim.service.SimVisitService;
 import com.jjg.game.sim.service.SlotsStatisticsService;
 import com.jjg.game.social.bridge.ToSocialBridge;
@@ -108,6 +109,8 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
     private SimMiniShopService simMiniShopService;
     @Autowired
     private SimNodeService simNodeService;
+    @Autowired
+    private SimNoAdsService simNoAdsService;
     @Autowired
     private SimPackService simPackService;
     @Autowired
@@ -607,6 +610,12 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
             return simPlayerGameDao.findAllLevelById(playerId);
         }
         return ctx.getSimBaseData() == null ? 0 : ctx.getSimBaseData().getAllLevel();
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public boolean enableNoads(long playerId) {
+        return simNoAdsService.enableNoads(playerId);
     }
 
     @Override

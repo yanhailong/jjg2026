@@ -240,6 +240,7 @@ public class SimManager {
                     ctx, SimConstant.GuidePath.SIM_HALL);
             res.completedGuideIds = ctx.getSimBaseData().completedGuideIds();
             res.guide = ctx.getSimBaseData().isGuide();
+            res.noads = ctx.getSimBaseData().isNoads();
             log.info("进入模拟经营大厅检查等级引导 playerId={},playerLevel={},newGroups={},pendingGroups={}",
                     playerController.playerId(), playerLevel, levelTriggeredGroups, res.guideGroupIds);
             log.info("进入模拟经营大厅检查场景累计等级引导 playerId={},allLevel={},newGroups={}",

@@ -88,6 +88,14 @@ public class SimBaseData extends AbstractData {
     //是否免广告
     private boolean noads;
 
+    public boolean isNoads() {
+        return noads;
+    }
+
+    public void setNoads(boolean noads) {
+        this.noads = noads;
+    }
+
     public void resetOnlineRewardDay(int today) {
         if (onlineRewardDay != today) {
             onlineRewardDay = today;

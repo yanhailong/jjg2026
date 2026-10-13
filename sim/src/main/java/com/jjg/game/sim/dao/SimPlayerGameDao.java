@@ -71,6 +71,14 @@ public class SimPlayerGameDao extends MongoBaseDao<SimBaseData, Long> {
         return data == null ? 0 : data.getAllLevel();
     }
 
+    /** 功能开关只需要免广告权益，避免无上下文时加载完整经营数据。 */
+    public boolean findNoadsById(long playerId) {
+        Query query = Query.query(Criteria.where("_id").is(playerId));
+        query.fields().include("noads");
+        SimBaseData data = mongoTemplate.findOne(query, SimBaseData.class);
+        return data != null && data.isNoads();
+    }
+
     /**
      * 批量读取玩家总场景等级，只投影 allLevel（默认保留 _id）。
      */

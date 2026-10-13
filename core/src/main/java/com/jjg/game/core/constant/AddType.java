@@ -154,6 +154,8 @@ public enum AddType {
     ACTIVITY_CONTINUOUS_GIFT_REWARDS(635),
     //新手礼包领奖
     ACTIVITY_STARTER_PACK_REWARDS(636),
+    //免广告礼包赠品
+    ACTIVITY_NO_ADS_REWARDS(637),
 
 
     //好友房申请庄家扣除准备金
