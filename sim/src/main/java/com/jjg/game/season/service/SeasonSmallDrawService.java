@@ -12,7 +12,7 @@ import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.season.data.SeasonSmallDrawData;
-import com.jjg.game.season.pb.res.NotifySeasonSmallDrawResult;
+import com.jjg.game.season.pb.res.ResSeasonSmallDraw;
 import com.jjg.game.season.pb.res.ResSeasonSmallDrawDailyReward;
 import com.jjg.game.season.pb.res.ResSeasonSmallDrawInfo;
 import com.jjg.game.season.pb.res.ResSeasonSmallDrawSelect;
@@ -32,7 +32,7 @@ import java.util.Map;
 import static com.jjg.game.season.service.SeasonSmallDrawConfigService.DrawDefinition;
 import static com.jjg.game.season.service.SeasonSmallDrawConfigService.RewardDefinition;
 
-/** 赛季小额抽奖：登录资格、大奖选择、每日福利与付费到账抽奖。 */
+/** 赛季小额抽奖：登录资格、大奖选择、每日福利、付费机会与主动抽奖。 */
 @Service
 public class SeasonSmallDrawService implements SimPlayerTickListener {
     private static final Logger log = LoggerFactory.getLogger(SeasonSmallDrawService.class);
@@ -178,7 +178,7 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         return response;
     }
 
-    /** 同一订单只抽一次；已付款订单不再检查当日资格，避免跨日到账被拒绝。 */
+    /** 同一订单只增加一次抽奖机会；已付款订单不再检查当日资格。 */
     public boolean receive(SimPlayerContext ctx, Order order) {
         DrawDefinition draw = current(ctx);
         SeasonPlayerData season = ctx.getSeasonPlayerData();
@@ -188,9 +188,39 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
                     ctx.playerId(), order.getId(), order.getProductId(), season.getSeasonKey());
             return false;
         }
-        if (state.getReceivedOrders().contains(order.getId())) {
-            autoSaveService.saveAndWait(season);
-            return true;
+        if (!state.getReceivedOrders().contains(order.getId())) {
+            if (draw.remainingRewardCount(state.getObtainedRewards()) <= state.drawChances()) {
+                log.error("小额抽奖到账失败，剩余奖池已全部购买 playerId={},orderId={}", ctx.playerId(), order.getId());
+                return false;
+            }
+            state.getReceivedOrders().add(order.getId());
+            state.setPurchaseChances(Math.max(0, state.getPurchaseChances() - 1));
+        }
+        autoSaveService.saveAndWait(season);
+        ResSeasonSmallDrawInfo notification = new ResSeasonSmallDrawInfo(Code.SUCCESS);
+        notification.info = assemble(ctx, draw);
+        try {
+            sender.sendTo(ctx.playerId(), notification);
+        } catch (Exception e) {
+            log.error("小额抽奖到账状态通知失败 playerId={},orderId={}", ctx.playerId(), order.getId(), e);
+        }
+        log.info("小额抽奖到账成功 playerId={},seasonKey={},orderId={},drawChances={}",
+                ctx.playerId(), season.getSeasonKey(), order.getId(), state.drawChances());
+        return true;
+    }
+
+    /** 客户端主动请求，一次成功抽奖消耗一次已付款机会。 */
+    public ResSeasonSmallDraw draw(SimPlayerContext ctx) {
+        DrawDefinition draw = current(ctx);
+        ResSeasonSmallDraw response = new ResSeasonSmallDraw(Code.NOT_FOUND);
+        if (draw == null) {
+            return response;
+        }
+        SeasonPlayerData season = ctx.getSeasonPlayerData();
+        SeasonSmallDrawData state = season.getSmallDraw();
+        if (state.drawChances() <= 0) {
+            response.code = Code.NOT_ENOUGH;
+            return response;
         }
         WeightRandom<RewardDefinition> random = WeightRandom.create();
         for (RewardDefinition candidate : draw.rewards()) {
@@ -200,34 +230,29 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         }
         RewardDefinition reward = random.next();
         if (reward == null) {
-            log.error("小额抽奖到账失败，无剩余正权重奖励 playerId={},orderId={}", ctx.playerId(), order.getId());
-            return false;
+            log.error("小额抽奖失败，无剩余正权重奖励 playerId={},drawId={}", ctx.playerId(), draw.id());
+            response.code = Code.SAMPLE_ERROR;
+            return response;
         }
         Map<Integer, Long> items = reward.items(selectedOption(state, reward));
         CommonResult<ItemOperationResult> result = playerPackService.addItems(ctx.playerId(), items,
-                AddType.SIM_SEASON_SMALL_DRAW, "season-small-draw:" + order.getId(), true);
+                AddType.SIM_SEASON_SMALL_DRAW, "season-small-draw:" + orderToken(season, draw.id())
+                        + ':' + reward.id(), true);
         if (result == null || !result.success()) {
-            log.error("小额抽奖发奖失败 playerId={},orderId={},rewardId={},code={}",
-                    ctx.playerId(), order.getId(), reward.id(), result == null ? Code.EXCEPTION : result.code);
-            return false;
+            response.code = result == null ? Code.EXCEPTION : result.code;
+            log.error("小额抽奖发奖失败 playerId={},drawId={},rewardId={},code={}",
+                    ctx.playerId(), draw.id(), reward.id(), response.code);
+            return response;
         }
         state.getObtainedRewards().add(reward.id());
-        state.getReceivedOrders().add(order.getId());
-        state.setPurchaseChances(Math.max(0, state.getPurchaseChances() - 1));
         autoSaveService.saveAndWait(season);
-        NotifySeasonSmallDrawResult notification = new NotifySeasonSmallDrawResult(Code.SUCCESS);
-        notification.orderId = order.getId();
-        notification.rewardId = reward.id();
-        notification.rewards = ItemUtils.buildItemInfo(items);
-        notification.info = assemble(ctx, draw);
-        try {
-            sender.sendTo(ctx.playerId(), notification);
-        } catch (Exception e) {
-            log.error("小额抽奖结果通知失败 playerId={},orderId={}", ctx.playerId(), order.getId(), e);
-        }
-        log.info("小额抽奖到账成功 playerId={},seasonKey={},orderId={},rewardId={},items={}",
-                ctx.playerId(), season.getSeasonKey(), order.getId(), reward.id(), items);
-        return true;
+        response.code = Code.SUCCESS;
+        response.rewardId = reward.id();
+        response.rewards = ItemUtils.buildItemInfo(items);
+        response.info = assemble(ctx, draw);
+        log.info("小额抽奖成功 playerId={},seasonKey={},drawId={},rewardId={},items={}",
+                ctx.playerId(), season.getSeasonKey(), draw.id(), reward.id(), items);
+        return response;
     }
 
     public static String orderToken(SeasonPlayerData season, int drawId) {
@@ -241,8 +266,9 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         info.drawId = draw.id();
         info.seasonKey = season.getSeasonKey();
         info.endTime = season.getEndTime();
+        info.drawChances = state.drawChances();
         info.purchaseChances = Math.max(0, Math.min(state.getPurchaseChances(),
-                draw.remainingRewardCount(state.getObtainedRewards())));
+                draw.remainingRewardCount(state.getObtainedRewards()) - info.drawChances));
         info.drawCount = state.getObtainedRewards().size();
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(draw.config().getPricePerUse());
         if (shop != null) {

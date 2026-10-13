@@ -7,7 +7,7 @@ import com.jjg.game.common.proto.ProtobufMessage;
 import java.util.List;
 
 @ProtobufMessage
-@ProtoDesc("当前赛季小额抽奖完整状态，用于展示价格、购买资格、每日福利及全部奖池格子")
+@ProtoDesc("当前赛季小额抽奖完整状态，用于展示价格、购买资格、已付款抽奖机会、每日福利及全部奖池格子")
 public class SeasonSmallDrawInfo {
     @ProtoDesc("小额抽奖配置ID，对应当前赛季已开启的SmallDraw.id；用于大奖选择及每日福利领取，通用预下单的productId传此ID的字符串")
     public int drawId;
@@ -15,7 +15,7 @@ public class SeasonSmallDrawInfo {
     public String seasonKey;
     @ProtoDesc("当前赛季及本功能的结束时间，Unix时间戳，单位毫秒")
     public long endTime;
-    @ProtoDesc("剩余可购买资格，每日登录或在线跨日增加一次；含当天的累计上限为SmallDraw.MaxCumulativeDays，且不超过未抽中且Weight大于0的奖池格子数，每次仍需付费")
+    @ProtoDesc("剩余可购买资格，每日登录或在线跨日增加一次，累计上限为SmallDraw.MaxCumulativeDays；付款到账扣减一次，且不超过剩余正权重格子数减去已付款未抽次数；此资格不能直接抽奖")
     public int purchaseChances;
     @ProtoDesc("本赛季该奖池累计已抽取的格子数，即已获得奖励数量；换季后归零")
     public int drawCount;
@@ -31,4 +31,6 @@ public class SeasonSmallDrawInfo {
     public List<SeasonSmallDrawRewardInfo> rewards;
     @ProtoDesc("当前奖池核心大奖的全部候选道具及数量，按SmallDrawReward.itemid候选顺序返回；选择请求的optionIndex对应候选下标，无核心大奖时为空列表")
     public List<ItemInfo> coreItems;
+    @ProtoDesc("已付款未抽奖次数；付款到账增加一次，客户端每次成功请求抽奖消耗一次，发奖失败不消耗；跨日保留，随赛季重置")
+    public int drawChances;
 }

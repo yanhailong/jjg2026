@@ -109,6 +109,11 @@ public class SeasonMessageHandler implements GmListener {
         execute(pc, ctx -> ctx.send(smallDrawService.claimDaily(ctx, req.drawId)));
     }
 
+    @Command(SeasonConstant.MsgBean.REQ_SEASON_SMALL_DRAW)
+    public void reqSeasonSmallDraw(PlayerController pc, ReqSeasonSmallDraw req) {
+        execute(pc, ctx -> ctx.send(smallDrawService.draw(ctx)));
+    }
+
     @Command(SeasonConstant.MsgBean.REQ_SEASON_MATCH)
     public void reqSeasonMatch(PlayerController playerController, ReqSeasonMatch req) {
         long playerId = playerController.playerId();

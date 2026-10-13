@@ -15,6 +15,9 @@ public class SeasonSmallDrawData {
     private Set<Integer> obtainedRewards = new HashSet<>();
     private Set<String> receivedOrders = new HashSet<>();
 
+    /** 已付款未抽奖次数；每个到账订单对应一次机会，每个已获得格子消耗一次机会。 */
+    public int drawChances() { return Math.max(0, receivedOrders.size() - obtainedRewards.size()); }
+
     public int getDrawId() { return drawId; }
     public void setDrawId(int drawId) { this.drawId = drawId; }
     public int getPurchaseChances() { return purchaseChances; }
