@@ -17,4 +17,6 @@ public class SeasonSmallDrawRewardInfo {
     public boolean obtained;
     @ProtoDesc("该格子当前展示的奖励道具及数量；核心大奖按当前选中候选返回，普通奖励按固定配置返回；更换候选不会重新发放已获得的奖励")
     public List<ItemInfo> items;
+    @ProtoDesc("品质")
+    public int quality;
 }

@@ -231,8 +231,9 @@ public class GoldTreasureController extends BaseActivityController implements Or
             return result;
         }
 
-        Map<Integer, PlayerActivityData> playerData = readCurrentData(player.getId(), activityData);
-        if (playerData.containsKey(detailId)) {
+        Map<Integer, PlayerActivityData> playerData = loadCurrentData(player, activityData);
+        PlayerActivityData data = playerData.get(detailId);
+        if (data != null && (data.getClaimStatus() == ActivityConstant.ClaimStatus.CAN_CLAIM || isClaimed(data))) {
             result.code = Code.REPEAT_OP;
             log.warn("黄金宝藏下单失败，该档位已有购买或领取记录 playerId={},productId={},activityId={},detailId={}",
                     player.getId(), req.productId, activityData.getId(), detailId);
@@ -263,6 +264,14 @@ public class GoldTreasureController extends BaseActivityController implements Or
             return result;
         }
         try {
+            if (data == null) {
+                // 通过下单校验即记录参与，未付款时仍保持 NOT_CLAIM。
+                playerData.put(detailId, new PlayerActivityData(activityData.getId(), activityData.getRound()));
+                if (!savePlayerData(player.getId(), activityData, playerData)) {
+                    result.code = Code.FAIL;
+                    return result;
+                }
+            }
             result.code = Code.SUCCESS;
             PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
             preGenerateOrderData.setType(RechargeCfgType.MONEY);

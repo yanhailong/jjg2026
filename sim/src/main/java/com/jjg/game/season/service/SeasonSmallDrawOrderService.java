@@ -46,7 +46,7 @@ public class SeasonSmallDrawOrderService implements OrderGenerate {
         SeasonPlayerData season = ctx.getSeasonPlayerData();
         SeasonSmallDrawData state = season.getSmallDraw();
         String productId = SeasonSmallDrawService.orderToken(season, draw.id());
-        if (state.getPurchaseChances() <= 0 || state.getObtainedRewards().size() >= draw.rewards().size()) {
+        if (state.getPurchaseChances() <= 0 || draw.remainingRewardCount(state.getObtainedRewards()) == 0) {
             return new CommonResult<>(Code.NOT_ENOUGH);
         }
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(draw.config().getPricePerUse());

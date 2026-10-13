@@ -1,5 +1,6 @@
 package com.jjg.game.season.service;
 
+import com.jjg.game.common.utils.WeightRandom;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
@@ -27,7 +28,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 import static com.jjg.game.season.service.SeasonSmallDrawConfigService.DrawDefinition;
 import static com.jjg.game.season.service.SeasonSmallDrawConfigService.RewardDefinition;
@@ -159,12 +159,11 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
             response.code = Code.REPEAT_OP;
             return response;
         }
-        Map<Integer, Long> items = dailyReward(draw);
-        if (items.isEmpty()) {
+        if (draw.config().getDailyReward().isEmpty()) {
             response.code = Code.SAMPLE_ERROR;
             return response;
         }
-        CommonResult<ItemOperationResult> result = playerPackService.addItems(ctx.playerId(), items,
+        CommonResult<ItemOperationResult> result = playerPackService.addItems(ctx.playerId(), draw.config().getDailyReward(),
                 AddType.SIM_SEASON_SMALL_DRAW, "season-small-draw-daily:" + season.getSeasonKey()
                         + ':' + season.getDailyKey(), true);
         if (result == null || !result.success()) {
@@ -174,7 +173,7 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         state.setDailyRewardDay(season.getDailyKey());
         autoSaveService.saveAndWait(season);
         response.code = Code.SUCCESS;
-        response.rewards = ItemUtils.buildItemInfo(items);
+        response.rewards = ItemUtils.buildItemInfo(draw.config().getDailyReward());
         response.info = assemble(ctx, draw);
         return response;
     }
@@ -193,13 +192,17 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
             autoSaveService.saveAndWait(season);
             return true;
         }
-        List<RewardDefinition> remaining = draw.rewards().stream()
-                .filter(reward -> !state.getObtainedRewards().contains(reward.id())).toList();
-        if (remaining.isEmpty()) {
-            log.error("小额抽奖到账失败，奖池已抽完 playerId={},orderId={}", ctx.playerId(), order.getId());
+        WeightRandom<RewardDefinition> random = WeightRandom.create();
+        for (RewardDefinition candidate : draw.rewards()) {
+            if (!state.getObtainedRewards().contains(candidate.id())) {
+                random.add(candidate, candidate.weight());
+            }
+        }
+        RewardDefinition reward = random.next();
+        if (reward == null) {
+            log.error("小额抽奖到账失败，无剩余正权重奖励 playerId={},orderId={}", ctx.playerId(), order.getId());
             return false;
         }
-        RewardDefinition reward = remaining.get(ThreadLocalRandom.current().nextInt(remaining.size()));
         Map<Integer, Long> items = reward.items(selectedOption(state, reward));
         CommonResult<ItemOperationResult> result = playerPackService.addItems(ctx.playerId(), items,
                 AddType.SIM_SEASON_SMALL_DRAW, "season-small-draw:" + order.getId(), true);
@@ -238,7 +241,8 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         info.drawId = draw.id();
         info.seasonKey = season.getSeasonKey();
         info.endTime = season.getEndTime();
-        info.purchaseChances = Math.max(0, Math.min(state.getPurchaseChances(), draw.rewards().size() - state.getObtainedRewards().size()));
+        info.purchaseChances = Math.max(0, Math.min(state.getPurchaseChances(),
+                draw.remainingRewardCount(state.getObtainedRewards())));
         info.drawCount = state.getObtainedRewards().size();
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(draw.config().getPricePerUse());
         if (shop != null) {
@@ -246,7 +250,7 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
             info.channelProductId = SeasonPassService.channelProductId(ctx.getPlayer(), shop);
         }
         info.dailyRewardClaimed = state.getDailyRewardDay() == season.getDailyKey();
-        info.dailyReward = ItemUtils.buildItemInfo(dailyReward(draw));
+        info.dailyReward = ItemUtils.buildItemInfo(draw.config().getDailyReward());
         info.coreItems = draw.rewards().stream().filter(RewardDefinition::core).findFirst()
                 .map(reward -> reward.options().stream()
                         .flatMap(items -> ItemUtils.buildItemInfo(items).stream()).toList())
@@ -255,6 +259,7 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
             SeasonSmallDrawRewardInfo entry = new SeasonSmallDrawRewardInfo();
             entry.rewardId = reward.id();
             entry.core = reward.core();
+            entry.quality = reward.quality();
             entry.obtained = state.getObtainedRewards().contains(reward.id());
             entry.items = ItemUtils.buildItemInfo(reward.items(selectedOption(state, reward)));
             return entry;
@@ -265,12 +270,5 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
     private int selectedOption(SeasonSmallDrawData state, RewardDefinition reward) {
         int selected = reward.core() ? state.getSelectedOptions().getOrDefault(reward.id(), 0) : 0;
         return selected >= 0 && selected < reward.options().size() ? selected : 0;
-    }
-
-    private Map<Integer, Long> dailyReward(DrawDefinition draw) {
-        List<Integer> reward = draw.config().getDailyReward();
-        return reward != null && reward.size() == 2 && reward.get(0) != null && reward.get(0) > 0
-                && reward.get(1) != null && reward.get(1) > 0
-                ? Map.of(reward.get(0), reward.get(1).longValue()) : Map.of();
     }
 }

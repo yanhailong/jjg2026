@@ -1,8 +1,6 @@
 package com.jjg.game.sampledata.bean;
 
 import java.util.*;
-import java.math.BigDecimal;
-
 
 
 import javax.annotation.processing.Generated;
@@ -27,14 +25,6 @@ public class StarterPackCfg extends BaseCfgBean {
   protected Map<Integer,Long> Reward2;
   /** 奖励3 */
   protected Map<Integer,Long> Reward3;
-  /** 奖励天数 */
-  protected int RewardDays;
-  /** 超值 */
-  protected BigDecimal bestValue;
-  /** 购买金额 */
-  protected BigDecimal money;
-  /** 原价值 */
-  protected BigDecimal wasPrice;
 
   /** 返回奖励1 */
   public Map<Integer,Long> getReward1() {
@@ -49,26 +39,6 @@ public class StarterPackCfg extends BaseCfgBean {
   /** 返回奖励3 */
   public Map<Integer,Long> getReward3() {
     return Reward3;
-  }
-
-  /** 返回奖励天数 */
-  public int getRewardDays() {
-    return RewardDays;
-  }
-
-  /** 返回超值 */
-  public BigDecimal getBestValue() {
-    return bestValue;
-  }
-
-  /** 返回购买金额 */
-  public BigDecimal getMoney() {
-    return money;
-  }
-
-  /** 返回原价值 */
-  public BigDecimal getWasPrice() {
-    return wasPrice;
   }
 
   @Override

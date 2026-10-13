@@ -15,7 +15,7 @@ public class SeasonSmallDrawInfo {
     public String seasonKey;
     @ProtoDesc("当前赛季及本功能的结束时间，Unix时间戳，单位毫秒")
     public long endTime;
-    @ProtoDesc("剩余可购买资格，每日登录或在线跨日增加一次；含当天的累计上限为SmallDraw.MaxCumulativeDays，且不超过剩余奖池格子数，每次仍需付费")
+    @ProtoDesc("剩余可购买资格，每日登录或在线跨日增加一次；含当天的累计上限为SmallDraw.MaxCumulativeDays，且不超过未抽中且Weight大于0的奖池格子数，每次仍需付费")
     public int purchaseChances;
     @ProtoDesc("本赛季该奖池累计已抽取的格子数，即已获得奖励数量；换季后归零")
     public int drawCount;

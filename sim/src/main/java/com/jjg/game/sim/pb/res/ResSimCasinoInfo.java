@@ -43,6 +43,8 @@ public class ResSimCasinoInfo extends AbstractResponse {
     public int togetherPlayGameType;
     @ProtoDesc("在线收益视频冷却结束时间，毫秒时间戳，0表示无冷却")
     public long adCdEndTime;
+    @ProtoDesc("是否拥有永久免广告权益")
+    public boolean noads;
 
     public ResSimCasinoInfo(int code) {
         super(code);

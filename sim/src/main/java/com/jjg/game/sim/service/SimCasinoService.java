@@ -222,6 +222,7 @@ public class SimCasinoService implements SimTaskStateReporter {
             SimBaseData base = ctx.getSimBaseData();
             base.resetOnlineRewardDay(Integer.parseInt(TimeHelper.getDate(now, "yyyyMMdd")));
             res.adCdEndTime = base.getOnlineRewardAdCdEndTime() > now ? base.getOnlineRewardAdCdEndTime() : 0;
+            res.noads = base.isNoads();
         } catch (Exception e) {
             log.error("", e);
             res.code = Code.EXCEPTION;

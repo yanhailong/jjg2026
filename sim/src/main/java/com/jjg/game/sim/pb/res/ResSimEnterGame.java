@@ -44,8 +44,6 @@ public class ResSimEnterGame extends AbstractResponse {
     public List<Integer> guideGroupIds;
     @ProtoDesc("已经完成的引导步骤ID列表，用于断线后恢复组内进度")
     public List<Integer> completedGuideIds;
-    @ProtoDesc("是否拥有永久免广告权益，来源SimBaseData.noads；true时客户端直接报告广告完成，false时正常播放广告")
-    public boolean noads;
 
 
     public ResSimEnterGame(int code) {

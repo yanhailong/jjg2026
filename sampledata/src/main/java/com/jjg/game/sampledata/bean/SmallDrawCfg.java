@@ -20,7 +20,7 @@ public class SmallDrawCfg extends BaseCfgBean {
   public static final String SHEET_NAME = "SmallDraw";
 
   /** 每日道具奖励 */
-  protected List<Integer> DailyReward;
+  protected Map<Integer,Long> DailyReward;
   /** 最大累积天数 */
   protected int MaxCumulativeDays;
   /** 单次价格 */
@@ -33,7 +33,7 @@ public class SmallDrawCfg extends BaseCfgBean {
   protected int seasonid;
 
   /** 返回每日道具奖励 */
-  public List<Integer> getDailyReward() {
+  public Map<Integer,Long> getDailyReward() {
     return DailyReward;
   }
 

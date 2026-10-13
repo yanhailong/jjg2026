@@ -1,8 +1,9 @@
 package com.jjg.game.sampledata.bean;
 
+import java.util.*;
+
+
 import javax.annotation.processing.Generated;
-import java.util.List;
-import java.util.Map;
 /**
  * 配置bean
  *
@@ -18,16 +19,30 @@ public class SmallDrawRewardCfg extends BaseCfgBean {
   /** 配置表工作薄名 */
   public static final String SHEET_NAME = "SmallDrawReward";
 
+  /** 品质 */
+  protected int Quality;
   /** 活动ID */
   protected int SmallDrawId;
+  /** 权重 */
+  protected int Weight;
   /** 道具奖励 */
   protected List<Map<Integer,Long>> itemid;
   /** 是否核心大奖 */
   protected boolean open;
 
+  /** 返回品质 */
+  public int getQuality() {
+    return Quality;
+  }
+
   /** 返回活动ID */
   public int getSmallDrawId() {
     return SmallDrawId;
+  }
+
+  /** 返回权重 */
+  public int getWeight() {
+    return Weight;
   }
 
   /** 返回道具奖励 */

@@ -13,6 +13,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** 赛季小额抽奖配置索引，配置容器热更新后才重新整理奖池。 */
 @Service
@@ -38,7 +39,8 @@ public class SeasonSmallDrawConfigService {
         Map<Integer, List<RewardDefinition>> pools = new HashMap<>();
         for (SmallDrawRewardCfg reward : rewards) {
             pools.computeIfAbsent(reward.getSmallDrawId(), ignored -> new ArrayList<>())
-                    .add(new RewardDefinition(reward.getId(), reward.getOpen(), reward.getItemid()));
+                    .add(new RewardDefinition(reward.getId(), reward.getOpen(), reward.getQuality(),
+                            reward.getWeight(), reward.getItemid()));
         }
         Map<Integer, DrawDefinition> result = new HashMap<>();
         for (SmallDrawCfg draw : draws) {
@@ -75,11 +77,12 @@ public class SeasonSmallDrawConfigService {
 
     private static RewardDefinition prepareReward(RewardDefinition reward) {
         if (reward.core()) {
-            return new RewardDefinition(reward.id(), true, reward.options().stream().map(Map::copyOf).toList());
+            return new RewardDefinition(reward.id(), true, reward.quality(), reward.weight(),
+                    reward.options().stream().map(Map::copyOf).toList());
         }
         Map<Integer, Long> items = new HashMap<>();
         reward.options().forEach(option -> option.forEach((id, count) -> items.merge(id, count, Math::addExact)));
-        return new RewardDefinition(reward.id(), false, List.of(Map.copyOf(items)));
+        return new RewardDefinition(reward.id(), false, reward.quality(), reward.weight(), List.of(Map.copyOf(items)));
     }
 
     public record DrawDefinition(SmallDrawCfg config, List<RewardDefinition> rewards) {
@@ -88,9 +91,19 @@ public class SeasonSmallDrawConfigService {
         public RewardDefinition reward(int rewardId) {
             return rewards.stream().filter(reward -> reward.id() == rewardId).findFirst().orElse(null);
         }
+
+        public int remainingRewardCount(Set<Integer> obtainedRewards) {
+            int count = 0;
+            for (RewardDefinition reward : rewards) {
+                if (reward.weight() > 0 && !obtainedRewards.contains(reward.id())) {
+                    count++;
+                }
+            }
+            return count;
+        }
     }
 
-    public record RewardDefinition(int id, boolean core, List<Map<Integer, Long>> options) {
+    public record RewardDefinition(int id, boolean core, int quality, int weight, List<Map<Integer, Long>> options) {
         public Map<Integer, Long> items(int optionIndex) {
             return options.get(core ? optionIndex : 0);
         }
