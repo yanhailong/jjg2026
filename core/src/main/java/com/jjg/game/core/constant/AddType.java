@@ -152,6 +152,8 @@ public enum AddType {
     ACTIVITY_GOLD_TREASURE_REWARDS(634),
     //连续礼包购买和终极奖励
     ACTIVITY_CONTINUOUS_GIFT_REWARDS(635),
+    //新手礼包领奖
+    ACTIVITY_STARTER_PACK_REWARDS(636),
 
 
     //好友房申请庄家扣除准备金

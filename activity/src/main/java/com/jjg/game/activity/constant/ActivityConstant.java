@@ -39,6 +39,8 @@ public interface ActivityConstant {
         int CAN_CLAIM = 2;
         //已领取
         int CLAIMED = 3;
+        //已购买
+        int PURCHASED = 4;
     }
 
     //摇钱树
@@ -356,5 +358,8 @@ public interface ActivityConstant {
         //连续礼包
         int RES_CONTINUOUS_GIFT = BASE_MSG_PREFIX | 0x90;
         int RES_CLAIM_CONTINUOUS_GIFT_REWARDS = BASE_MSG_PREFIX | 0x91;
+        //新手礼包
+        int RES_STARTER_PACK = BASE_MSG_PREFIX | 0x92;
+        int RES_CLAIM_STARTER_PACK_REWARDS = BASE_MSG_PREFIX | 0x93;
     }
 }

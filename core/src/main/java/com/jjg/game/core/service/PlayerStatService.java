@@ -249,6 +249,10 @@ public class PlayerStatService {
         }
     }
 
+    public long getLoginDays(long playerId) {
+        return getPlayer(LOGIN_DAYS, playerId);
+    }
+
     public void recordCurrencyConsume(long playerId, int itemId, long count) {
         if (count <= 0 || (itemId != GOLD_ITEM_ID && itemId != DIAMOND_ITEM_ID)) {
             return;

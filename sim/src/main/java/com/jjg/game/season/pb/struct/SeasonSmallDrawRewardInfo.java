@@ -11,7 +11,9 @@ import java.util.List;
 public class SeasonSmallDrawRewardInfo {
     @ProtoDesc("SmallDrawReward.id")
     public int rewardId;
+    @ProtoDesc("是否核心大奖")
     public boolean core;
+    @ProtoDesc("该奖励是否已获得")
     public boolean obtained;
     @ProtoDesc("核心大奖候选索引，从0开始；普通奖励固定为0")
     public int optionIndex;

@@ -18,6 +18,7 @@ import com.jjg.game.activity.piggybank.controller.PiggyBankController;
 import com.jjg.game.activity.privilegecard.controller.PrivilegeCardController;
 import com.jjg.game.activity.scratchcards.controller.ScratchCardsController;
 import com.jjg.game.activity.sharepromote.controller.SharePromoteController;
+import com.jjg.game.activity.starterpack.StarterPackController;
 import com.jjg.game.common.utils.CommonUtil;
 
 /**
@@ -76,6 +77,9 @@ public enum ActivityType {
     //连续礼包
     CONTINUOUS_GIFT(27, ContinuousGiftController.class, false, false,
             ActivityTargetType.NONE.getTargetKey(), false, false, true),
+    //新手礼包
+    STARTER_PACK(28, StarterPackController.class, true, false,
+            ActivityTargetType.LOGIN.getTargetKey(), false, false, false),
     ;
     //活动类型
     private final int type;

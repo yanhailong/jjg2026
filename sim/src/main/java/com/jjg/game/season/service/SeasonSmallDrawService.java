@@ -97,8 +97,8 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
             throw new IllegalStateException("同一赛季小额抽奖配置ID发生变化");
         }
         if (state.getLastLoginDay() != season.getDailyKey()) {
-            int carried = Math.min(state.getPurchaseChances(), Math.max(0, draw.config().getMaxCumulativeDays()));
-            state.setPurchaseChances(Math.addExact(carried, 1));
+            int limit = Math.max(0, draw.config().getMaxCumulativeDays());
+            state.setPurchaseChances(Math.min(limit, Math.addExact(state.getPurchaseChances(), 1)));
             state.setLastLoginDay(season.getDailyKey());
             autoSaveService.enqueueSave(season);
         }
