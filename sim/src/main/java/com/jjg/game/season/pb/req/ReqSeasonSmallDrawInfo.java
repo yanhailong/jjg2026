@@ -7,6 +7,6 @@ import com.jjg.game.common.proto.ProtobufMessage;
 import com.jjg.game.season.constant.SeasonConstant;
 
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SEASON, cmd = SeasonConstant.MsgBean.REQ_SEASON_SMALL_DRAW_INFO)
-@ProtoDesc("请求当前赛季小额抽奖状态")
+@ProtoDesc("查询当前赛季已开启的小额抽奖功能；无请求参数，当前赛季由服务器确定")
 public class ReqSeasonSmallDrawInfo extends AbstractMessage {
 }

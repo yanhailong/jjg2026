@@ -85,6 +85,8 @@ public class SimBaseData extends AbstractData {
     private boolean guestOutputLimitNotified;
     //slots赢奖的最高历史记录
     private long slotsAthWinCoin;
+    //是否免广告
+    private boolean noads;
 
     public void resetOnlineRewardDay(int today) {
         if (onlineRewardDay != today) {

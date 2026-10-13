@@ -247,13 +247,16 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         }
         info.dailyRewardClaimed = state.getDailyRewardDay() == season.getDailyKey();
         info.dailyReward = ItemUtils.buildItemInfo(dailyReward(draw));
+        info.coreItems = draw.rewards().stream().filter(RewardDefinition::core).findFirst()
+                .map(reward -> reward.options().stream()
+                        .flatMap(items -> ItemUtils.buildItemInfo(items).stream()).toList())
+                .orElse(List.of());
         info.rewards = draw.rewards().stream().map(reward -> {
             SeasonSmallDrawRewardInfo entry = new SeasonSmallDrawRewardInfo();
             entry.rewardId = reward.id();
             entry.core = reward.core();
             entry.obtained = state.getObtainedRewards().contains(reward.id());
-            entry.optionIndex = selectedOption(state, reward);
-            entry.items = ItemUtils.buildItemInfo(reward.items(entry.optionIndex));
+            entry.items = ItemUtils.buildItemInfo(reward.items(selectedOption(state, reward)));
             return entry;
         }).toList();
         return info;
