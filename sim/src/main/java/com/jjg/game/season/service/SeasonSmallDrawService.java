@@ -41,15 +41,18 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
     private final PlayerPackService playerPackService;
     private final SimAutoSaveService autoSaveService;
     private final SocialSender sender;
+    private final SeasonSmallDrawRedDotService redDotService;
 
     public SeasonSmallDrawService(SeasonSmallDrawConfigService configService,
                                   SeasonLifecycleService lifecycleService, PlayerPackService playerPackService,
-                                  SimAutoSaveService autoSaveService, SocialSender sender) {
+                                  SimAutoSaveService autoSaveService, SocialSender sender,
+                                  SeasonSmallDrawRedDotService redDotService) {
         this.configService = configService;
         this.lifecycleService = lifecycleService;
         this.playerPackService = playerPackService;
         this.autoSaveService = autoSaveService;
         this.sender = sender;
+        this.redDotService = redDotService;
     }
 
     public DrawDefinition current(SimPlayerContext ctx) {
@@ -63,6 +66,7 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
 
     public void onLogin(SimPlayerContext ctx) {
         current(ctx);
+        redDotService.onLogin(ctx);
     }
 
     @Override
@@ -172,6 +176,7 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         }
         state.setDailyRewardDay(season.getDailyKey());
         autoSaveService.saveAndWait(season);
+        redDotService.refresh(ctx);
         response.code = Code.SUCCESS;
         response.rewards = ItemUtils.buildItemInfo(draw.config().getDailyReward());
         response.info = assemble(ctx, draw);
@@ -197,6 +202,7 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
             state.setPurchaseChances(Math.max(0, state.getPurchaseChances() - 1));
         }
         autoSaveService.saveAndWait(season);
+        redDotService.refresh(ctx);
         ResSeasonSmallDrawInfo notification = new ResSeasonSmallDrawInfo(Code.SUCCESS);
         notification.info = assemble(ctx, draw);
         try {
@@ -246,6 +252,7 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         }
         state.getObtainedRewards().add(reward.id());
         autoSaveService.saveAndWait(season);
+        redDotService.refresh(ctx);
         response.code = Code.SUCCESS;
         response.rewardId = reward.id();
         response.rewards = ItemUtils.buildItemInfo(items);

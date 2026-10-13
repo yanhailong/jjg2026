@@ -102,6 +102,8 @@ public class SimPlayerContext {
 
     // 获取资源广告入口红点会话快照；冷却和每日次数变化时由 tick 更新。
     private Boolean onlineRewardAdRedDotSnapshot;
+    //赛季小额抽奖入口红点快照；仅内存保存，用于抑制重复推送。
+    private Boolean seasonSmallDrawRedDotSnapshot;
 
     //是否在模拟游戏场景中
     private AtomicBoolean inCasino = new AtomicBoolean(true);
@@ -162,6 +164,14 @@ public class SimPlayerContext {
 
     public void setOnlineRewardAdRedDotSnapshot(Boolean value) {
         onlineRewardAdRedDotSnapshot = value;
+    }
+
+    public Boolean getSeasonSmallDrawRedDotSnapshot() {
+        return seasonSmallDrawRedDotSnapshot;
+    }
+
+    public void setSeasonSmallDrawRedDotSnapshot(Boolean value) {
+        seasonSmallDrawRedDotSnapshot = value;
     }
 
     //联盟免费捐献红点已检查的自然日 (内存态)
