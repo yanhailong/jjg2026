@@ -13,6 +13,7 @@ import com.jjg.game.activity.continousGift.message.ResClaimContinuousGiftRewards
 import com.jjg.game.activity.continousGift.message.ResContinuousGift;
 import com.jjg.game.common.pb.AbstractResponse;
 import com.jjg.game.common.utils.TimeHelper;
+import com.jjg.game.core.base.player.IPlayerLoginSuccess;
 import com.jjg.game.core.base.reddot.IRedDotService;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
@@ -23,6 +24,7 @@ import com.jjg.game.core.pb.RechargeInfo;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.pb.reddot.RedDotDetails;
+import com.jjg.game.core.service.MailService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.core.utils.SampleDataUtils;
 import com.jjg.game.sampledata.GameDataManager;
@@ -39,11 +41,17 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class ContinuousGiftController extends BaseActivityController implements OrderGenerate, IRedDotService {
+public class ContinuousGiftController extends BaseActivityController implements OrderGenerate, IRedDotService, IPlayerLoginSuccess {
     private static final int FUNCTION_ID = 6001;
     private static final int PAID_PACK = 1;
     private static final int FINAL_REWARD = 2;
     private static final int RED_DOT_SUBMODULE = 2;
+    private static final int UNCLAIMED_REWARD_MAIL_ID = 51;
+    private final MailService mailService;
+
+    public ContinuousGiftController(MailService mailService) {
+        this.mailService = mailService;
+    }
 
     @Override
     public boolean checkPlayerCanJoinActivity(Player player, ActivityData activityData) {
@@ -184,12 +192,12 @@ public class ContinuousGiftController extends BaseActivityController implements 
             }
 
             ActivityData activityData = activityManager.getActivityData().get(activityId);
-            // 已付款订单按下单快照履约，过期或换期后不写入当前活动进度。
+            // 本期支付只记录待领取资格；过期或换期的订单补发，不写入当前活动进度。
             boolean current = isRunning(activityData) && activityData.getRound() == round;
             Map<Integer, ContinuousGiftPlayerData> playerData = current ? readCurrentData(player.getId(), activityData) : null;
             if (current) {
                 ContinuousGiftPlayerData previous = playerData.get(detailId);
-                if (isClaimed(previous)) {
+                if (isPurchased(previous)) {
                     if (order.getId().equals(previous.getOrderId())) {
                         return true;
                     }
@@ -217,28 +225,19 @@ public class ContinuousGiftController extends BaseActivityController implements 
                 ContinuousGiftPlayerData purchased = new ContinuousGiftPlayerData(activityId, round);
                 purchased.setPurchaseTime(System.currentTimeMillis());
                 purchased.setOrderId(order.getId());
-                purchased.setClaimStatus(ActivityConstant.ClaimStatus.CLAIMED);
+                purchased.setClaimStatus(ActivityConstant.ClaimStatus.CAN_CLAIM);
                 playerData.put(detailId, purchased);
                 if (!savePlayerData(player.getId(), activityData, playerData)) {
                     log.error("连续礼包支付处理失败，购买状态保存失败 playerId:{} orderId:{} activityId:{} detailId:{}",
                             player.getId(), order.getId(), activityId, detailId);
                     return false;
                 }
+                notifyPurchase(player, activityData);
+                return true;
             }
-            CommonResult<ItemOperationResult> added;
-            try {
-                added = playerPackService.addItems(player.getId(), consecutivePackCfg.getGetitem(),
-                        AddType.ACTIVITY_CONTINUOUS_GIFT_REWARDS, "order:" + order.getId());
-            } catch (Exception e) {
-                if (current) {
-                    rollbackReward(player.getId(), activityData, playerData, detailId);
-                }
-                throw e;
-            }
+            CommonResult<ItemOperationResult> added = playerPackService.addItems(player.getId(), consecutivePackCfg.getGetitem(),
+                    AddType.ACTIVITY_CONTINUOUS_GIFT_REWARDS, "order:" + order.getId());
             if (!added.success()) {
-                if (current) {
-                    rollbackReward(player.getId(), activityData, playerData, detailId);
-                }
                 log.error("连续礼包支付处理失败，奖励发放失败 playerId:{} orderId:{} activityId:{} detailId:{} code:{}",
                         player.getId(), order.getId(), activityId, detailId, added.code);
                 return false;
@@ -248,9 +247,6 @@ public class ContinuousGiftController extends BaseActivityController implements 
             logData.setRound(round);
             logData.setType(ActivityType.CONTINUOUS_GIFT);
             logReward(player, logData, added.data, consecutivePackCfg.getGetitem(), order.getPrice(), detailId);
-            if (current) {
-                notifyPurchase(player, activityData);
-            }
             return true;
         } catch (Exception e) {
             log.error("连续礼包支付处理失败 playerId:{} orderId:{}", player.getId(), order.getId(), e);
@@ -272,19 +268,24 @@ public class ContinuousGiftController extends BaseActivityController implements 
                 return res;
             }
             ConsecutivePackCfg cfg = cfgMap.get(detailId);
-            if (cfg == null || cfg.getType() != FINAL_REWARD) {
+            if (cfg == null) {
                 res.code = Code.PARAM_ERROR;
                 return res;
             }
             Map<Integer, ContinuousGiftPlayerData> playerData = readCurrentData(player.getId(), activityData);
-            if (isClaimed(playerData.get(detailId))) {
+            ContinuousGiftPlayerData previous = playerData.get(detailId);
+            if (isClaimed(previous)) {
                 res.code = Code.REPEAT_OP;
                 return res;
             }
-            if (nextPaidPack(cfgMap, playerData) != 0) {
+            if (cfg.getType() == PAID_PACK ? !isPurchased(previous) : nextPaidPack(cfgMap, playerData) != 0) {
                 return res;
             }
             ContinuousGiftPlayerData claimed = new ContinuousGiftPlayerData(activityData.getId(), activityData.getRound());
+            if (previous != null) {
+                claimed.setPurchaseTime(previous.getPurchaseTime());
+                claimed.setOrderId(previous.getOrderId());
+            }
             claimed.setClaimStatus(ActivityConstant.ClaimStatus.CLAIMED);
             playerData.put(detailId, claimed);
             if (!savePlayerData(player.getId(), activityData, playerData)) {
@@ -295,11 +296,11 @@ public class ContinuousGiftController extends BaseActivityController implements 
             try {
                 added = playerPackService.addItems(player.getId(), cfg.getGetitem(), AddType.ACTIVITY_CONTINUOUS_GIFT_REWARDS);
             } catch (Exception e) {
-                rollbackReward(player.getId(), activityData, playerData, detailId);
+                rollbackReward(player.getId(), activityData, playerData, detailId, previous);
                 throw e;
             }
             if (!added.success()) {
-                rollbackReward(player.getId(), activityData, playerData, detailId);
+                rollbackReward(player.getId(), activityData, playerData, detailId, previous);
                 res.code = added.code;
                 return res;
             }
@@ -393,8 +394,11 @@ public class ContinuousGiftController extends BaseActivityController implements 
                 info.rechargeInfo = new RechargeInfo();
                 info.rechargeInfo.type = RechargeCfgType.FREE.getType();
             }
-            if (isClaimed(playerData.get(cfg.getId()))) {
+            ContinuousGiftPlayerData data = playerData.get(cfg.getId());
+            if (isClaimed(data)) {
                 info.claimStatus = ActivityConstant.ClaimStatus.CLAIMED;
+            } else if (cfg.getType() == PAID_PACK && isPurchased(data)) {
+                info.claimStatus = ActivityConstant.ClaimStatus.CAN_CLAIM;
             } else if (cfg.getType() == PAID_PACK && cfg.getId() == nextId) {
                 if (now >= unlockTime && unlockTime < activityData.getTimeEnd()) {
                     info.claimStatus = ActivityConstant.ClaimStatus.NOT_CLAIM;
@@ -409,7 +413,7 @@ public class ContinuousGiftController extends BaseActivityController implements 
 
     private int nextPaidPack(Map<Integer, ConsecutivePackCfg> cfgMap, Map<Integer, ContinuousGiftPlayerData> playerData) {
         for (ConsecutivePackCfg cfg : cfgMap.values()) {
-            if (cfg.getType() == PAID_PACK && !isClaimed(playerData.get(cfg.getId()))) {
+            if (cfg.getType() == PAID_PACK && !isPurchased(playerData.get(cfg.getId()))) {
                 return cfg.getId();
             }
         }
@@ -422,6 +426,10 @@ public class ContinuousGiftController extends BaseActivityController implements 
 
     private boolean isClaimed(ContinuousGiftPlayerData data) {
         return data != null && data.getClaimStatus() == ActivityConstant.ClaimStatus.CLAIMED;
+    }
+
+    private boolean isPurchased(ContinuousGiftPlayerData data) {
+        return data != null && (data.getClaimStatus() == ActivityConstant.ClaimStatus.CAN_CLAIM || isClaimed(data));
     }
 
     private boolean validConfig(ActivityData activityData, Map<Integer, ConsecutivePackCfg> cfgMap) {
@@ -448,7 +456,15 @@ public class ContinuousGiftController extends BaseActivityController implements 
     private Map<Integer, ContinuousGiftPlayerData> readCurrentData(long playerId, ActivityData activityData) {
         Map<Integer, ContinuousGiftPlayerData> data = playerActivityDao.getPlayerActivityDataOrThrow(
                 playerId, ActivityType.CONTINUOUS_GIFT, activityData.getId());
-        data.values().removeIf(value -> value.getRound() != activityData.getRound());
+        if (!data.isEmpty() && data.values().iterator().next().getRound() != activityData.getRound()) {
+            if (!settlePaidRewards(playerId, activityData, data)) {
+                throw new IllegalStateException("连续礼包上期已付款奖励未补发");
+            }
+            data.clear();
+            if (!savePlayerData(playerId, activityData, data)) {
+                throw new IllegalStateException("连续礼包上期数据清理失败");
+            }
+        }
         return data;
     }
 
@@ -456,8 +472,13 @@ public class ContinuousGiftController extends BaseActivityController implements 
         return playerActivityDao.savePlayerActivityData(playerId, ActivityType.CONTINUOUS_GIFT, activityData.getId(), playerData);
     }
 
-    private void rollbackReward(long playerId, ActivityData activityData, Map<Integer, ContinuousGiftPlayerData> playerData, int detailId) {
-        playerData.remove(detailId);
+    private void rollbackReward(long playerId, ActivityData activityData, Map<Integer, ContinuousGiftPlayerData> playerData,
+                                int detailId, ContinuousGiftPlayerData previous) {
+        if (previous == null) {
+            playerData.remove(detailId);
+        } else {
+            playerData.put(detailId, previous);
+        }
         if (!savePlayerData(playerId, activityData, playerData)) {
             log.error("连续礼包发奖状态回滚失败 playerId:{} activityId:{} detailId:{}", playerId, activityData.getId(), detailId);
         }
@@ -489,8 +510,12 @@ public class ContinuousGiftController extends BaseActivityController implements 
         }
         Map<Integer, ConsecutivePackCfg> cfgMap = getDetailCfgBean(activityData);
         Map<Integer, ContinuousGiftPlayerData> playerData = readCurrentData(playerId, activityData);
-        return validConfig(activityData, cfgMap) && nextPaidPack(cfgMap, playerData) == 0
-                && cfgMap.values().stream().anyMatch(cfg -> cfg.getType() == FINAL_REWARD && !isClaimed(playerData.get(cfg.getId())));
+        if (!validConfig(activityData, cfgMap)) {
+            return false;
+        }
+        boolean allPurchased = nextPaidPack(cfgMap, playerData) == 0;
+        return cfgMap.values().stream().anyMatch(cfg -> !isClaimed(playerData.get(cfg.getId()))
+                && (cfg.getType() == PAID_PACK ? isPurchased(playerData.get(cfg.getId())) : allPurchased));
     }
 
     @Override
@@ -519,6 +544,53 @@ public class ContinuousGiftController extends BaseActivityController implements 
         super.onActivityEnd(activityData);
         long round = activityData.getRound();
         playerActivityDao.<ContinuousGiftPlayerData>clearActivityData(ActivityType.CONTINUOUS_GIFT, activityData.getId(),
-                (playerId, playerData) -> playerData.values().stream().allMatch(data -> data.getRound() == round));
+                (playerId, playerData) -> playerData.values().stream().allMatch(data -> data.getRound() == round)
+                        && settlePaidRewards(playerId, activityData, playerData));
+    }
+
+    @Override
+    public void onPlayerLoginSuccess(PlayerController playerController, Player player, Account account, boolean firstLogin) {
+        for (ActivityData activityData : activityManager.getActivityTypeData().getOrDefault(ActivityType.CONTINUOUS_GIFT, Map.of()).values()) {
+            try {
+                if (isRunning(activityData)) {
+                    readCurrentData(player.getId(), activityData);
+                } else {
+                    Map<Integer, ContinuousGiftPlayerData> playerData = playerActivityDao.getPlayerActivityDataOrThrow(
+                            player.getId(), ActivityType.CONTINUOUS_GIFT, activityData.getId());
+                    if (!playerData.isEmpty() && settlePaidRewards(player.getId(), activityData, playerData)) {
+                        playerActivityDao.deletePlayerActivityData(player.getId(), ActivityType.CONTINUOUS_GIFT, activityData.getId());
+                    }
+                }
+            } catch (Exception e) {
+                log.error("连续礼包登录补发失败 playerId:{} activityId:{}", player.getId(), activityData.getId(), e);
+            }
+        }
+    }
+
+    private boolean settlePaidRewards(long playerId, ActivityData activityData, Map<Integer, ContinuousGiftPlayerData> playerData) {
+        long activityId = activityData.getId();
+        for (Map.Entry<Integer, ContinuousGiftPlayerData> entry : playerData.entrySet()) {
+            ContinuousGiftPlayerData data = entry.getValue();
+            if (data.getClaimStatus() != ActivityConstant.ClaimStatus.CAN_CLAIM) {
+                continue;
+            }
+            ConsecutivePackCfg cfg = GameDataManager.getConsecutivePackCfg(entry.getKey());
+            if (cfg == null || cfg.getType() != PAID_PACK || CollectionUtil.isEmpty(cfg.getGetitem())) {
+                log.error("连续礼包补发配置无效 playerId:{} activityId:{} round:{} detailId:{}",
+                        playerId, activityId, data.getRound(), entry.getKey());
+                return false;
+            }
+            if (mailService.addCfgMail(playerId, UNCLAIMED_REWARD_MAIL_ID, ItemUtils.buildItems(cfg.getGetitem()),
+                    AddType.ACTIVITY_CONTINUOUS_GIFT_REWARDS, "order:" + data.getOrderId()) == null) {
+                log.error("连续礼包补发邮件失败 playerId:{} activityId:{} detailId:{}", playerId, activityId, entry.getKey());
+                return false;
+            }
+            data.setClaimStatus(ActivityConstant.ClaimStatus.CLAIMED);
+            if (!savePlayerData(playerId, activityData, playerData)) {
+                log.error("连续礼包补发状态保存失败 playerId:{} activityId:{} detailId:{}", playerId, activityId, entry.getKey());
+                return false;
+            }
+        }
+        return true;
     }
 }
