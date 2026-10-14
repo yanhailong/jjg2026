@@ -127,10 +127,10 @@ public class SeasonMatchService {
 
         SeasonPlayerData opponent = pickOpponent(candidates, cfg, expectedSpins);
         if (opponent == null) {
-            // 无人可匹配: 仅用机器人模拟展示数据, 不落库、不进匹配池
+            // 命中机器人候选时才生成展示和收益数据, 不落库。
             opponent = createRobotOpponent(data.seasonPhase().ordinal() + 1, stake, data.getTierId());
             if (opponent == null) {
-                return failStart(Code.NOT_FOUND, ctx, gameType, stake, "没有可用对手且机器人配置为空");
+                return failStart(Code.NOT_FOUND, ctx, gameType, stake, "机器人候选生成失败");
             }
             log.info("赛季匹配使用机器人对手 playerId={},robotId={},gameType={},stake={}",
                     ctx.playerId(), opponent.getPlayerId(), gameType, stake);
@@ -178,7 +178,7 @@ public class SeasonMatchService {
     }
 
     /**
-     * 从候选中加权抽取真实对手; 池为空时返回 null, 由调用方回退机器人。
+     * 真人不足时补机器人名额至候选上限; 返回 null 表示选中机器人, 由调用方生成。
      */
     private SeasonPlayerData pickOpponent(List<SeasonPlayerData> candidates, SeasonMatchCfg cfg, int expectedSpins) {
         if (candidates == null || candidates.isEmpty()) {
@@ -186,6 +186,7 @@ public class SeasonMatchService {
         }
         //查询已按 minSpins 过滤, 这里兜底复核一次
         WeightRandom<SeasonPlayerData> candidatePool = WeightRandom.create();
+        int realCandidateCount = 0;
         for (SeasonPlayerData candidate : candidates) {
             if (candidate.getRepresentativeSpinWins().size() < expectedSpins) {
                 continue;
@@ -193,8 +194,11 @@ public class SeasonMatchService {
             int weight = matchWeight(candidate, cfg, true);
             if (weight > 0) {
                 candidatePool.add(candidate, weight);
+                realCandidateCount++;
             }
         }
+        //机器人名额合并权重, 与逐个加入等价, 避免预生成未选中的机器人及模拟收益。
+        candidatePool.add(null, (CANDIDATE_LIMIT - realCandidateCount) * SeasonPolicy.RATIO_BASE);
         return candidatePool.next();
     }
 
