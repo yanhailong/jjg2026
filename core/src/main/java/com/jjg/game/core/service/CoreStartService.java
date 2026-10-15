@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 public class CoreStartService {
 
     @Autowired
+    private ServerOpenTimeService serverOpenTimeService;
+    @Autowired
     private PlayerSessionService playerSessionService;
     @Autowired
     private SampleDataManager sampleDataManager;
@@ -40,6 +42,7 @@ public class CoreStartService {
      * @param context
      */
     public void init(ApplicationContext context) {
+        serverOpenTimeService.init();
         snowflakeManager.init();
         playerSessionService.init();
         sampleDataManager.init();

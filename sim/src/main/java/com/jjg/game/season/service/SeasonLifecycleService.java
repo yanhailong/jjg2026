@@ -98,7 +98,7 @@ public class SeasonLifecycleService implements SimPlayerTickListener {
             return true;
         }
         long origin = resolveTimelineOrigin(ctx, data);
-        SeasonSnapshot snapshot = timeline.resolve(serverOpenTimeMillis(), origin, systemTime,
+        SeasonSnapshot snapshot = timeline.resolve(serverOpenTimeService.getServerOpenTimeMillis(), origin, systemTime,
                 configService.definitions());
         return data.getSeasonKey().equals(snapshot.seasonKey());
     }
@@ -123,7 +123,7 @@ public class SeasonLifecycleService implements SimPlayerTickListener {
             return snapshot(data, now);
         }
         long origin = resolveTimelineOrigin(ctx, data);
-        SeasonSnapshot snapshot = timeline.resolve(serverOpenTimeMillis(), origin, now,
+        SeasonSnapshot snapshot = timeline.resolve(serverOpenTimeService.getServerOpenTimeMillis(), origin, now,
                 configService.definitions());
         boolean changed = !snapshot.seasonKey().equals(data.getSeasonKey());
         if (changed) {
@@ -212,10 +212,6 @@ public class SeasonLifecycleService implements SimPlayerTickListener {
         origin = player.getCreateTime() * 1000L;
         data.setTimelineOrigin(origin);
         return origin;
-    }
-
-    private long serverOpenTimeMillis() {
-        return Math.multiplyExact(serverOpenTimeService.getServerOpenTimeSeconds(), 1000L);
     }
 
     private int dailyKey(long now) {

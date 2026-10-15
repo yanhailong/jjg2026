@@ -118,10 +118,6 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
      */
     private final ConditionManager conditionManager;
     /**
-     * 开服时间（秒）
-     */
-    private long startServerTime;
-    /**
      * 玩家获得数据dao
      */
     private final PlayerActivityDao playerActivityDao;
@@ -202,7 +198,6 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
             previousData.put(data.getId(), data);
         }
         previousData.putAll(activityData);
-        startServerTime = serverOpenTimeService.getServerOpenTimeSeconds();
         Map<Long, ActivityData> tempActivityData = new ConcurrentHashMap<>();
         //要添加定时器的列表 时间戳 活动id
         List<Pair<Long, Long>> timerList = new ArrayList<>();
@@ -286,7 +281,7 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
             if (activityType == null) {
                 continue;
             }
-            ActivityData data = ActivityData.getActivityData(activityConfigCfg, activityType, startServerTime);
+            ActivityData data = ActivityData.getActivityData(activityConfigCfg, activityType, this.serverOpenTimeService.getServerOpenTimeMillis());
             checkActivityTimer(data, currentTime, timerList);
             long activityInfoId = activityConfigCfg.getId();
             tempActivityData.put(activityInfoId, data);
@@ -970,7 +965,7 @@ public class ActivityManager implements TimerListener<Long>, IPlayerLoginSuccess
             }
             List<Pair<Long, Long>> timerList = new ArrayList<>(2);
             //非未开始的 或者新增直接重新构建
-            ActivityData data = ActivityData.getActivityData(activityConfigCfg, activityType, startServerTime);
+            ActivityData data = ActivityData.getActivityData(activityConfigCfg, activityType, this.serverOpenTimeService.getServerOpenTimeMillis());
             checkActivityTimer(data, currentTime, timerList);
             if (oldData != null) {
                 //移除之前的定时器

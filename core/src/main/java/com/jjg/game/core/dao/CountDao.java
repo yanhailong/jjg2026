@@ -478,6 +478,10 @@ public class CountDao {
      */
     public boolean setIfAbsent(String featureId, String customId, BigDecimal delta) {
         long deltaLong = RedisUtils.toLong(delta);
+        return setIfAbsentLong(featureId, customId, deltaLong);
+    }
+
+    public boolean setIfAbsentLong(String featureId, String customId, long deltaLong) {
         return redissonClient.getAtomicLong(getKey(featureId, customId)).compareAndSet(0, deltaLong);
     }
 
