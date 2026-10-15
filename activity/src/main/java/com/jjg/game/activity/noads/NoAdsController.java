@@ -8,6 +8,7 @@ import com.jjg.game.activity.common.data.ActivityData;
 import com.jjg.game.activity.common.data.ActivityType;
 import com.jjg.game.activity.common.data.PlayerActivityData;
 import com.jjg.game.activity.common.message.bean.BaseActivityDetailInfo;
+import com.jjg.game.activity.constant.ActivityConstant;
 import com.jjg.game.activity.noads.data.NoAdsPlayerData;
 import com.jjg.game.activity.noads.message.NoAdsDetailInfo;
 import com.jjg.game.activity.noads.message.ResNoAds;
@@ -38,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,11 +57,15 @@ public class NoAdsController extends BaseActivityController implements OrderGene
 
     @Override
     public boolean checkPlayerCanJoinActivity(Player player, ActivityData activityData) {
+        return canViewActivity(player, activityData) && !noads(player.getId());
+    }
+
+    private boolean canViewActivity(Player player, ActivityData activityData) {
         GameFunctionCfg function = GameDataManager.getGameFunctionCfg(FUNCTION_ID);
         // 直接检查配置及权益，避免GameFunctionService回调活动资格形成递归。
         return player != null && activityData != null && activityData.getType() == ActivityType.NO_ADS
                 && activityData.canRun() && function != null && function.getIsOpen()
-                && !simNoAdsListeners.isEmpty() && !noads(player.getId())
+                && !simNoAdsListeners.isEmpty()
                 && super.checkPlayerCanJoinActivity(player, activityData)
                 && conditionManager.isAchievement(player, "", function.getCondition());
     }
@@ -86,9 +92,14 @@ public class NoAdsController extends BaseActivityController implements OrderGene
 
     @Override
     public ResNoAds getPlayerActivityInfoByType(Player player, ActivityType activityType) {
-        return activityType == ActivityType.NO_ADS
-                ? buildResponse(player, activityManager.getOpenActivityData(player, activityType))
-                : new ResNoAds(Code.PARAM_ERROR);
+        if (activityType != ActivityType.NO_ADS) {
+            return new ResNoAds(Code.PARAM_ERROR);
+        }
+        // 查询保留已购买状态，不能复用会排除已购玩家的下单资格筛选。
+        ActivityData activityData = activityManager.getActivityTypeData().getOrDefault(activityType, Map.of())
+                .values().stream().filter(data -> canViewActivity(player, data))
+                .max(Comparator.comparingLong(ActivityData::getTimeStart)).orElse(null);
+        return buildResponse(player, activityData);
     }
 
     @Override
@@ -222,7 +233,7 @@ public class NoAdsController extends BaseActivityController implements OrderGene
 
     private ResNoAds buildResponse(Player player, ActivityData activityData) {
         ResNoAds res = new ResNoAds(Code.SUCCESS);
-        if (!checkPlayerCanJoinActivity(player, activityData)) {
+        if (!canViewActivity(player, activityData)) {
             return res;
         }
         if (!validConfig(player, activityData)) {
@@ -236,6 +247,15 @@ public class NoAdsController extends BaseActivityController implements OrderGene
     private NoAdsDetailInfo buildDetail(Player player, ActivityData activityData) {
         NoAdsDetailInfo info = new NoAdsDetailInfo();
         info.activityId = activityData.getId();
+        if (noads(player.getId())) {
+            info.claimStatus = ActivityConstant.ClaimStatus.PURCHASED;
+        } else {
+            PlayerActivityData purchased = playerActivityDao.getPlayerActivityDataOrThrow(
+                    player.getId(), ActivityType.NO_ADS, activityData.getId()).get(PURCHASE_KEY);
+            if (purchased != null) {
+                info.claimStatus = purchased.getClaimStatus();
+            }
+        }
         info.discountEndTime = discountEndTime(activityData);
         info.discountPercent = activityData.getBigDecimalParam().getFirst().toPlainString();
         ShopRechargeListCfg discount = getShopCfg(activityData, 0);
