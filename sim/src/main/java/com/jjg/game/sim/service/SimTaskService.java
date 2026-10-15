@@ -30,8 +30,8 @@ import com.jjg.game.sim.data.SimBaseData;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.data.SimTaskData;
 import com.jjg.game.sim.data.SpinStatInfo;
-import com.jjg.game.sim.listener.SimTaskStateReporter;
 import com.jjg.game.sim.listener.SimConditionEventListener;
+import com.jjg.game.sim.listener.SimTaskStateReporter;
 import com.jjg.game.sim.logger.SimAchievementTaskLogger;
 import com.jjg.game.sim.logger.SimMainTaskLogger;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
@@ -1049,9 +1049,10 @@ public class SimTaskService implements IRedDotService {
     }
 
     /**
-     * 成就任务列表：沿用建筑到徽章的配置映射，buildingId=0 时返回全部成就。
+     * 成就任务列表：按徽章 id 返回已接取成就组的当前节点。
      */
-    public ResSimAchievementTaskList buildAchievementTaskList(SimPlayerContext ctx, int buildingId) {
+    public ResSimAchievementTaskList buildAchievementTaskList(SimPlayerContext ctx, int medalType) {
+        medalType = 13;
         ResSimAchievementTaskList res = new ResSimAchievementTaskList(Code.SUCCESS);
         SimTaskData data = ctx.getSimTaskData();
         Player player = resolvePlayer(ctx);
@@ -1059,16 +1060,7 @@ public class SimTaskService implements IRedDotService {
             return res;
         }
 
-        int badgeId = 0;
-        if (buildingId > 0) {
-            List<MedalBuffCfg> medalBuffCfgs = simConfigCacheService.getMedalBuffCfgs(buildingId);
-            if (medalBuffCfgs == null || medalBuffCfgs.isEmpty()) {
-                log.warn("获取建筑对应的成就任务为空 playerId={},buildingId={}", ctx.playerId(), buildingId);
-                return res;
-            }
-            badgeId = medalBuffCfgs.getFirst().getMedalType();
-        }
-        if (buildingId < 0 || (badgeId > 0 && taskConfig.badge(badgeId) == null)) {
+        if (medalType <= 0 || taskConfig.badge(medalType) == null) {
             res.code = Code.PARAM_ERROR;
             return res;
         }
@@ -1077,7 +1069,7 @@ public class SimTaskService implements IRedDotService {
         List<Task> achievements = new ArrayList<>();
         for (TaskDetail node : data.getAchievementTasks().values()) {
             TaskCfg cfg = GameDataManager.getTaskCfg(node.getConfigId());
-            if (cfg != null && (badgeId == 0 || cfg.getBadgeID() == badgeId)) {
+            if (cfg != null && cfg.getBadgeID() == medalType) {
                 achievements.add(assemble(ctx, player, node, cfg));
             }
         }

@@ -80,6 +80,7 @@ public class SeasonSmallDrawRedDotService implements IRedDotService, SimPlayerTi
     }
 
     private boolean available(SimPlayerContext ctx) {
+        if (!contexts.isFunctionUnlocked(ctx.playerId(), 5004)) return false;
         SeasonPlayerData season = ctx.getSeasonPlayerData();
         if (season == null) return false;
         var draw = configService.activeDraw(season.getSeasonId());

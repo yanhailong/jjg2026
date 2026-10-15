@@ -39,6 +39,13 @@ public class SimPlayerContextRegistry implements SimPlayerContextListener {
     }
 
     @Override
+    public boolean isFunctionUnlocked(long playerId, int functionId) {
+        SimPlayerContext context = getContext(playerId);
+        return context != null && context.getSimBaseData() != null
+                && context.getSimBaseData().getUnlockedFunctionIds().contains(functionId);
+    }
+
+    @Override
     public int allLevel(Player player) {
         SimPlayerContext context = getContext(player.getId());
         if (context == null) {

@@ -9,6 +9,7 @@ import com.jjg.game.core.base.reddot.IRedDotService;
 import com.jjg.game.core.dao.RedDotDao;
 import com.jjg.game.core.data.PlayerController;
 import com.jjg.game.core.data.PlayerSessionInfo;
+import com.jjg.game.core.listener.SimPlayerContextListener;
 import com.jjg.game.core.pb.reddot.NotifyRedDot;
 import com.jjg.game.core.pb.reddot.RedDotDetails;
 import com.jjg.game.core.service.PlayerSessionService;
@@ -30,6 +31,10 @@ import java.util.concurrent.Executors;
 public class RedDotManager {
 
     private static final Logger log = LoggerFactory.getLogger(RedDotManager.class);
+    private static final int SEASON_FUNCTION_ID = 5004;
+
+    @Autowired(required = false)
+    private List<SimPlayerContextListener> simPlayerContextListeners = List.of();
 
     private final ClusterSystem clusterSystem;
     private final PlayerSessionService playerSessionService;
@@ -113,10 +118,16 @@ public class RedDotManager {
                 : NodeType.getNodeTypeByName(node.getNodeConfig().getType());
     }
 
-    private void sendRedDots(List<RedDotDetails> list, RedDotRecipient recipient) {
+    private boolean isModuleUnlocked(RedDotDetails.RedDotModule module, long playerId) {
+        return module != RedDotDetails.RedDotModule.SEASON || simPlayerContextListeners.stream()
+                .anyMatch(listener -> listener.isFunctionUnlocked(playerId, SEASON_FUNCTION_ID));
+    }
+
+    private void sendRedDots(List<RedDotDetails> list, RedDotRecipient recipient, long playerId) {
         List<RedDotDetails> supportedRedDots = new ArrayList<>(list.size());
         for (RedDotDetails details : list) {
-            if (isServiceSupported(details.getRedDotModule(), details.getRedDotSubmodule(), recipient.nodeType())) {
+            if (isModuleUnlocked(details.getRedDotModule(), playerId)
+                    && isServiceSupported(details.getRedDotModule(), details.getRedDotSubmodule(), recipient.nodeType())) {
                 supportedRedDots.add(details);
             }
         }
@@ -166,7 +177,7 @@ public class RedDotManager {
         //获取不需要存储的红点信息
         if (CollectionUtil.isNotEmpty(redDotServiceMap)) {
             for (Map.Entry<RedDotDetails.RedDotModule, Map<Integer, IRedDotService>> entry : redDotServiceMap.entrySet()) {
-                if (entry.getKey().isNeedTrusteeship()) {
+                if (entry.getKey().isNeedTrusteeship() || !isModuleUnlocked(entry.getKey(), playerId)) {
                     continue;
                 }
                 try {
@@ -284,6 +295,9 @@ public class RedDotManager {
         if (!isServiceRegistered(module, submodule)) {
             return Collections.emptyList();
         }
+        if (!isModuleUnlocked(module, playerId)) {
+            return Collections.emptyList();
+        }
         List<RedDotDetails> list = new ArrayList<>();
         //托管给红点系统的
         if (module.isNeedTrusteeship()) {
@@ -336,7 +350,17 @@ public class RedDotManager {
         if (playerId > 0) {
             RedDotRecipient recipient = resolveRecipient(playerId);
             if (recipient != null) {
-                sendRedDots(list, recipient);
+                sendRedDots(list, recipient, playerId);
+            }
+            return;
+        }
+
+        if (list.stream().anyMatch(details -> details.getRedDotModule() == RedDotDetails.RedDotModule.SEASON)) {
+            NodeType nodeType = NodeType.getNodeTypeByName(clusterSystem.nodeConfig.getType());
+            for (PFSession session : clusterSystem.getSessionMap().values()) {
+                if (session.getConnect() != null && session.getConnect().isActive()) {
+                    sendRedDots(list, new RedDotRecipient(session, nodeType, null), session.getPlayerId());
+                }
             }
             return;
         }
@@ -411,6 +435,15 @@ public class RedDotManager {
         if (serviceMap == null) {
             return;
         }
+        if (module == RedDotDetails.RedDotModule.SEASON && playerId <= 0) {
+            for (Integer submodule : submoduleList) {
+                updateRedDotByInitializeForOnlinePlayers(module, submodule);
+            }
+            return;
+        }
+        if (!isModuleUnlocked(module, playerId)) {
+            return;
+        }
         RedDotRecipient recipient = playerId > 0 ? resolveRecipient(playerId) : null;
         if (playerId > 0 && recipient == null) {
             return;
@@ -427,7 +460,7 @@ public class RedDotManager {
         if (recipient == null) {
             updateRedDot(updateList, playerId);
         } else {
-            sendRedDots(updateList, recipient);
+            sendRedDots(updateList, recipient, playerId);
         }
     }
 

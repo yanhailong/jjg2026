@@ -9,6 +9,6 @@ import com.jjg.game.sim.constant.SimConstant;
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_GAME, cmd = SimConstant.MsgBean.REQ_SIM_ACHIEVEMENT_TASK_LIST)
 @ProtoDesc("请求成就任务列表")
 public class ReqSimAchievementTaskList extends AbstractMessage {
-    @ProtoDesc("建筑id，0=全部成就")
-    public int buildingId;
+    @ProtoDesc("徽章id， MedalBuff.xlsx的medalType字段")
+    public int medalType;
 }

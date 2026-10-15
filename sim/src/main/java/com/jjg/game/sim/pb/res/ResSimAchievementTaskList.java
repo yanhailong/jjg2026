@@ -12,7 +12,7 @@ import java.util.List;
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_GAME, cmd = SimConstant.MsgBean.RES_SIM_ACHIEVEMENT_TASK_LIST, resp = true)
 @ProtoDesc("成就任务列表返回")
 public class ResSimAchievementTaskList extends AbstractResponse {
-    @ProtoDesc("已接取成就组的当前节点，按任务配置id升序；buildingId=0时返回全部已接取组")
+    @ProtoDesc("指定medalType徽章下已接取成就组的当前节点，按任务配置id升序")
     public List<Task> achievementTasks;
 
     public ResSimAchievementTaskList(int code) {
