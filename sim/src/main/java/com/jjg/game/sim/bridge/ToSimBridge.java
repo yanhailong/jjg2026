@@ -178,9 +178,6 @@ public interface ToSimBridge extends IGameRpc {
      */
     int getSimAllLevel(long playerId);
 
-    /** 在玩家所属SIM节点开启永久免广告权益，确认落库后返回true，供异节点充值回调使用。 */
-    boolean enableNoads(long playerId);
-
     /**
      * 跨节点入账 sim 特殊资源 (能量/知名度/曝光度/赛季币/勋章)。
      * <p>

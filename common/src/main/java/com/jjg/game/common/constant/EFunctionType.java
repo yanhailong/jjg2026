@@ -66,7 +66,12 @@ public enum EFunctionType {
     // 限时礼包
     LIMITED_TIME_GIFT(119),
     // 财富轮盘
-    WEALTH_ROULETTE(120);
+    WEALTH_ROULETTE(120),
+    // 免广告礼包
+    NO_ADS(5019),
+
+
+    ;
 
     // 功能ID
     private final int functionId;

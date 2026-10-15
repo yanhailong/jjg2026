@@ -20,6 +20,7 @@ import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PlayerController;
 import com.jjg.game.core.listener.ActivityOpenListener;
 import com.jjg.game.core.listener.GameFunctionListener;
+import com.jjg.game.core.listener.SimNoAdsListener;
 import com.jjg.game.core.manager.ConditionManager;
 import com.jjg.game.core.pb.NotifyOpenFunction;
 import com.jjg.game.sampledata.GameDataManager;
@@ -207,6 +208,11 @@ public class GameFunctionService implements GameEventListener {
      */
     public boolean checkGameFunctionOpen(Player player, GameFunctionCfg functionCfg) {
         if (player == null || functionCfg == null || !functionCfg.getIsOpen()) {
+            return false;
+        }
+        if (functionCfg.getId() == EFunctionType.NO_ADS.getFunctionId()
+                && SystemInterfaceHolder.getGameSysInterface(SimNoAdsListener.class).stream()
+                .anyMatch(listener -> listener.noads(player.getId()))) {
             return false;
         }
         int activityType = functionCfg.getFunctionType();

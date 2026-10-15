@@ -159,6 +159,13 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private int buildUpgradeCDProp = 0;
     private int buildUpgradeCDClearMs = 0;
 
+    //免广告礼包：购买后附赠奖励
+    private Map<Integer, Long> noAdsRewardsMap = Map.of();
+    //免广告礼包：折扣后的价格,ShopRechargeList.id
+    private int noadsAfterPriceId = 0;
+    //免广告礼包：原价，ShopRechargeList.id
+    private int noadsOriginPriceId = 0;
+
     @Autowired
     public SimConfigCacheService(ConditionRuleRegistry conditionRules,
                                  ConditionParser conditionParser) {
@@ -635,6 +642,24 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
             String[] s = buildUpgradeCDCfg.getValue().split("_");
             this.buildUpgradeCDProp = Integer.parseInt(s[0]);
             this.buildUpgradeCDClearMs = Integer.parseInt(s[1]) * 60000;
+        }
+
+        //免广告
+        GlobalConfigCfg noAdsRewardsCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.NO_ADS_REWARDS);
+        if(noAdsRewardsCfg != null){
+            Map<Integer,Long> tmpNoAdsRewardsMap = new LinkedHashMap<>();
+            String[] split = noAdsRewardsCfg.getValue().split("\\|");
+            for(String s : split){
+                String[] s1 = s.split("_");
+                tmpNoAdsRewardsMap.put(Integer.parseInt(s1[0]), Long.parseLong(s1[1]));
+            }
+            this.noAdsRewardsMap = tmpNoAdsRewardsMap;
+        }
+        GlobalConfigCfg noAdsPriceCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.NO_ADS_PRICE);
+        if(noAdsPriceCfg != null){
+            String[] split = noAdsPriceCfg.getValue().split("_");
+            this.noadsAfterPriceId = Integer.parseInt(split[0]);
+            this.noadsOriginPriceId = Integer.parseInt(split[1]);
         }
     }
 
@@ -1364,5 +1389,17 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
             }
         }
         return null;
+    }
+
+    public Map<Integer, Long> getNoAdsRewardsMap() {
+        return noAdsRewardsMap;
+    }
+
+    public int getNoadsAfterPriceId() {
+        return noadsAfterPriceId;
+    }
+
+    public int getNoadsOriginPriceId() {
+        return noadsOriginPriceId;
     }
 }

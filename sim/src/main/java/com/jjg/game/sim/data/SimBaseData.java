@@ -87,6 +87,16 @@ public class SimBaseData extends AbstractData {
     private long slotsAthWinCoin;
     //是否免广告
     private boolean noads;
+    // 已发放免广告赠品的订单，权益落库重试时不重复发奖。
+    private String noAdsOrderId;
+
+    public String getNoAdsOrderId() {
+        return noAdsOrderId;
+    }
+
+    public void setNoAdsOrderId(String noAdsOrderId) {
+        this.noAdsOrderId = noAdsOrderId;
+    }
 
     public boolean isNoads() {
         return noads;

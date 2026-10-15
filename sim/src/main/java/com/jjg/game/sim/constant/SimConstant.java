@@ -316,6 +316,10 @@ public interface SimConstant {
         //领取特殊游客奖励
         int REQ_SPECIAL_GUEST_REWARDS = BASE_MSG_PREFIX | 0xA2;
         int RES_SPECIAL_GUEST_REWARDS = BASE_MSG_PREFIX | 0xA3;
+
+        //获取免广告信息
+        int REQ_NO_ADS_INFO = BASE_MSG_PREFIX | 0xA4;
+        int RES_NO_ADS_INFO = BASE_MSG_PREFIX | 0xA5;
     }
 
     interface SpecialGuest {
@@ -380,15 +384,25 @@ public interface SimConstant {
      * 细分运营数据看板配置。
      */
     interface Dashboard {
-        /** BUILDING 红点模块下的数据看板入口感叹号子模块。 */
+        /**
+         * BUILDING 红点模块下的数据看板入口感叹号子模块。
+         */
         int RED_DOT_WARNING = 2;
-        /** 当前容纳人数超过总容纳人数该比例时显示红色底板。 */
+        /**
+         * 当前容纳人数超过总容纳人数该比例时显示红色底板。
+         */
         int GLOBAL_CAPACITY_OVERLOAD_RATE_ID = 331;
-        /** 游戏机台当前实际人数低于标准容纳人数该比例时提示收益过低。 */
+        /**
+         * 游戏机台当前实际人数低于标准容纳人数该比例时提示收益过低。
+         */
         int GLOBAL_GAME_CAPACITY_LOW_RATE_ID = 332;
-        /** 当前获客人数低于标准获客人数该比例时提示运营部等级过低。 */
+        /**
+         * 当前获客人数低于标准获客人数该比例时提示运营部等级过低。
+         */
         int GLOBAL_ACQUISITION_LOW_RATE_ID = 333;
-        /** 当前满意度低于标准满意度该比例时提示接待区等级过低。 */
+        /**
+         * 当前满意度低于标准满意度该比例时提示接待区等级过低。
+         */
         int GLOBAL_SATISFACTION_LOW_RATE_ID = 334;
 
         int DEFAULT_CAPACITY_OVERLOAD_RATE = 80;
@@ -532,6 +546,15 @@ public interface SimConstant {
 
         int PURCHASE_LIMIT = 350;
         int PURCHASE_PRICE = 351;
+
+        //免广告活动礼包：折扣剩余时间（单位秒）
+        int NO_ADS_PROP_TIME = 353;
+        //免广告活动礼包：折扣比例（百分比）
+        int NO_ADS_PROP_NUM = 354;
+        //免广告活动礼包：购买后附赠奖励：道具id_数量
+        int NO_ADS_REWARDS = 355;
+        //免广告活动礼包：折扣后的价格_原价
+        int NO_ADS_PRICE = 356;
     }
 
     /**
@@ -609,7 +632,7 @@ public interface SimConstant {
         int TYPE_EMPLOYEE = 2;
     }
 
-    interface ActivePass{
+    interface ActivePass {
         int FREE = 1;
         int BASIC = 2;
         int PREMIUM = 4;

@@ -1,78 +1,172 @@
 package com.jjg.game.sim.service;
 
-import com.jjg.game.common.cluster.ClusterClient;
-import com.jjg.game.common.config.NodeConfig;
-import com.jjg.game.common.curator.NodeType;
-import com.jjg.game.common.rpc.ClusterRpcReference;
-import com.jjg.game.common.rpc.GameRpcContext;
-import com.jjg.game.common.rpc.RpcReqParameterBuilder;
+import com.jjg.game.common.cluster.ClusterSystem;
+import com.jjg.game.common.constant.EFunctionType;
+import com.jjg.game.core.constant.AddType;
+import com.jjg.game.core.constant.Code;
+import com.jjg.game.core.data.*;
+import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.listener.SimNoAdsListener;
-import com.jjg.game.sim.bridge.ToSimBridge;
+import com.jjg.game.core.pb.NotifyOpenFunction;
+import com.jjg.game.core.pb.RechargeCfgType;
+import com.jjg.game.core.pb.RechargeType;
+import com.jjg.game.core.pb.ReqGenerateOrder;
+import com.jjg.game.core.service.GameFunctionService;
+import com.jjg.game.core.service.PlayerPackService;
+import com.jjg.game.core.utils.ItemUtils;
+import com.jjg.game.core.utils.SampleDataUtils;
+import com.jjg.game.sampledata.GameDataManager;
+import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
+import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.dao.SimPlayerGameDao;
 import com.jjg.game.sim.data.SimBaseData;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
+import com.jjg.game.sim.pb.res.ResNoAds;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-/** 永久免广告权益的SIM数据访问与落库，复用现有节点路由和付费保存队列。 */
-@Service
-public class SimNoAdsService implements SimNoAdsListener {
-    private final SimPlayerContextRegistry contexts;
-    private final SimPlayerGameDao dao;
-    private final SimAutoSaveService autoSaveService;
-    private final SimNodeService nodes;
-    private final NodeConfig nodeConfig;
-    @ClusterRpcReference
-    private ToSimBridge bridge;
+import java.util.List;
 
-    public SimNoAdsService(SimPlayerContextRegistry contexts, SimPlayerGameDao dao,
-                           SimAutoSaveService autoSaveService, SimNodeService nodes, NodeConfig nodeConfig) {
-        this.contexts = contexts;
-        this.dao = dao;
+/** 免广告功能：信息查询、充值下单及支付交付。 */
+@Service
+public class SimNoAdsService implements OrderGenerate, SimNoAdsListener {
+    private static final Logger log = LoggerFactory.getLogger(SimNoAdsService.class);
+
+    private final SimPlayerContextRegistry simPlayerContextRegistry;
+    private final SimPlayerGameDao simPlayerGameDao;
+    private final SimAutoSaveService autoSaveService;
+    private final SimConfigCacheService simConfigCacheService;
+    private final GameFunctionService gameFunctionService;
+    private final PlayerPackService playerPackService;
+    private final ClusterSystem clusterSystem;
+
+    public SimNoAdsService(SimPlayerContextRegistry simPlayerContextRegistry, SimPlayerGameDao simPlayerGameDao,
+                           SimAutoSaveService autoSaveService, SimConfigCacheService simConfigCacheService,
+                           GameFunctionService gameFunctionService, PlayerPackService playerPackService,
+                           ClusterSystem clusterSystem) {
+        this.simPlayerContextRegistry = simPlayerContextRegistry;
+        this.simPlayerGameDao = simPlayerGameDao;
         this.autoSaveService = autoSaveService;
-        this.nodes = nodes;
-        this.nodeConfig = nodeConfig;
+        this.simConfigCacheService = simConfigCacheService;
+        this.gameFunctionService = gameFunctionService;
+        this.playerPackService = playerPackService;
+        this.clusterSystem = clusterSystem;
+    }
+
+    public ResNoAds noAds(SimPlayerContext ctx) {
+        Player player = ctx.getPlayer();
+        ResNoAds res = new ResNoAds(Code.SUCCESS);
+        ShopRechargeListCfg discount = noAdsShop(simConfigCacheService.getNoadsAfterPriceId(), player);
+        ShopRechargeListCfg original = noAdsShop(simConfigCacheService.getNoadsOriginPriceId(), player);
+        if (discount == null || original == null) {
+            res.code = Code.SAMPLE_ERROR;
+            return res;
+        }
+        res.items = ItemUtils.buildItemInfo(simConfigCacheService.getNoAdsRewardsMap());
+        res.discountEndTime = noAdsDiscountEndTime(player);
+        res.discountPercent = String.valueOf(SampleDataUtils.getIntGlobalData(SimConstant.Global.NO_ADS_PROP_NUM));
+        res.discountPrice = discount.getPrice().toPlainString();
+        res.originalPrice = original.getPrice().toPlainString();
+        ShopRechargeListCfg current = System.currentTimeMillis() < res.discountEndTime ? discount : original;
+        res.rechargeInfo = SampleDataUtils.transRechargeCfgToRechargeInfo(current.getId(), player.getChannel());
+        return res;
     }
 
     @Override
     public boolean noads(long playerId) {
-        SimPlayerContext context = contexts.getContext(playerId);
-        // 付费权益确认落库后才成功返回，非归属节点可直接读此永久字段，无需查询RPC。
-        return context == null ? dao.findNoadsById(playerId) : context.getSimBaseData().isNoads();
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
+        return ctx == null ? simPlayerGameDao.findNoadsById(playerId) : ctx.getSimBaseData().isNoads();
     }
 
     @Override
-    public boolean enableNoads(long playerId) {
-        SimPlayerContext context = contexts.getContext(playerId);
-        if (context == null) {
-            // Hall登录先创建SIM上下文再补发离线充值；上下文缺失时交由既有充值机制重试。
-            if (NodeType.HALL.name().equalsIgnoreCase(nodeConfig.getType())) {
-                return false;
-            }
-            ClusterClient client = nodes.getSimClusterClient(playerId, null);
-            if (client == null) {
-                return false;
-            }
-            GameRpcContext rpcContext = GameRpcContext.getContext();
-            RpcReqParameterBuilder previous = rpcContext.getReqParameterBuilder();
-            try {
-                rpcContext.withReqParameterBuilder(RpcReqParameterBuilder.create()
-                        .addClusterClient(client).setTryMillisPerClient(1000));
-                return bridge.enableNoads(playerId);
-            } finally {
-                rpcContext.setReqParameterBuilder(previous);
-            }
+    public RechargeType getRechargeType() {
+        return RechargeType.NO_ADS;
+    }
+
+    @Override
+    public CommonResult<PreGenerateOrderData> generateOrderDetailInfo(Player player, ReqGenerateOrder req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(player.getId());
+        if (ctx == null || !gameFunctionService.checkGameFunctionOpen(player, EFunctionType.NO_ADS, true, false)) {
+            return new CommonResult<>(Code.ERROR_REQ);
         }
-        SimBaseData base = context.getSimBaseData();
-        boolean previous = base.isNoads();
-        base.setNoads(true);
-        try {
-            // 与自动落库共用FIFO队列，避免异步旧快照覆盖付费权益。
-            autoSaveService.saveAndWait(base);
+        if (ctx.getSimBaseData().isNoads() || ctx.getSimBaseData().getNoAdsOrderId() != null) {
+            return new CommonResult<>(Code.REPEAT_OP);
+        }
+        int shopId = System.currentTimeMillis() < noAdsDiscountEndTime(player)
+                ? simConfigCacheService.getNoadsAfterPriceId() : simConfigCacheService.getNoadsOriginPriceId();
+        ShopRechargeListCfg shop = noAdsShop(shopId, player);
+        if (shop == null) {
+            return new CommonResult<>(Code.SAMPLE_ERROR);
+        }
+        PreGenerateOrderData data = new PreGenerateOrderData();
+        data.setType(RechargeCfgType.MONEY);
+        data.setPrice(shop.getPrice());
+        data.setOrderProductId(String.valueOf(shop.getId()));
+        return new CommonResult<>(Code.SUCCESS, data);
+    }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, Order order) {
+        if (player == null || order == null || order.getPlayerId() != player.getId()
+                || order.getRechargeType() != RechargeType.NO_ADS || StringUtils.isBlank(order.getId())
+                || order.getOrderStatus() != OrderStatus.PROCESSING) {
+            return false;
+        }
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(player.getId());
+        if (ctx == null) {
+            return false;
+        }
+        SimBaseData base = ctx.getSimBaseData();
+        if (base.isNoads()) {
             return true;
-        } catch (RuntimeException e) {
-            base.setNoads(previous);
-            throw e;
         }
+        try {
+            String deliveredOrder = base.getNoAdsOrderId();
+            if (deliveredOrder != null && !deliveredOrder.equals(order.getId())) {
+                return false;
+            }
+            if (deliveredOrder == null) {
+                if (!playerPackService.addItems(player.getId(), simConfigCacheService.getNoAdsRewardsMap(),
+                        AddType.SIM_NO_ADS_REWARDS, order.getId()).success()) {
+                    return false;
+                }
+                base.setNoAdsOrderId(order.getId());
+            }
+            base.setNoads(true);
+            // 赠品记录和权益一并落库；失败保留发货记录，重试时不重复发奖。
+            autoSaveService.saveAndWait(base);
+        } catch (Exception e) {
+            base.setNoads(false);
+            log.error("免广告礼包交付失败 playerId={},orderId={}", player.getId(), order.getId(), e);
+            return false;
+        }
+        try {
+            NotifyOpenFunction notify = new NotifyOpenFunction();
+            notify.closeFunctionIdList = List.of(EFunctionType.NO_ADS.getFunctionId());
+            clusterSystem.sendToPlayer(notify, player.getId());
+            ResNoAds res = noAds(ctx);
+            res.orderId = order.getId();
+            clusterSystem.sendToPlayer(res, player.getId());
+        } catch (Exception e) {
+            log.error("免广告礼包购买成功后推送失败 playerId={},orderId={}", player.getId(), order.getId(), e);
+        }
+        return true;
+    }
+
+    private long noAdsDiscountEndTime(Player player) {
+        return (player.getCreateTime() + SampleDataUtils.getIntGlobalData(SimConstant.Global.NO_ADS_PROP_TIME)) * 1000L;
+    }
+
+    private ShopRechargeListCfg noAdsShop(int shopId, Player player) {
+        ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(shopId);
+        if (shop == null || shop.getType() != RechargeCfgType.MONEY.getType()
+                || shop.getPrice() == null || shop.getPrice().signum() <= 0
+                || StringUtils.isBlank(player.getChannel() == ChannelType.APPLE ? shop.getIosShopId() : shop.getGoogleShopId())) {
+            return null;
+        }
+        return shop;
     }
 }

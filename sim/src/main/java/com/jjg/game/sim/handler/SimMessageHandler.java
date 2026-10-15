@@ -84,6 +84,8 @@ public class SimMessageHandler implements GmListener {
     @Autowired
     private SimMiniShopService miniShopService;
     @Autowired
+    private SimNoAdsService noAdsService;
+    @Autowired
     private SimTaskService taskService;
     @Autowired
     private SimMedalService medalService;
@@ -1133,6 +1135,15 @@ public class SimMessageHandler implements GmListener {
     public void reqExitVisitTrial(PlayerController playerController, ReqExitVisitTrial req) {
         sendVisit(playerController, () -> visitService.exitTrial(playerController.playerId()),
                 ResVisitTrial::new);
+    }
+
+    /**
+     * 获取免广告信息
+     */
+    @Command(SimConstant.MsgBean.REQ_NO_ADS_INFO)
+    public void reqNoAds(PlayerController playerController, ReqNoAds req) {
+        execute(playerController, ctx -> ctx.send(noAdsService.noAds(ctx)),
+                ResNoAds.class);
     }
 
     //--------------------------拜访相关 end--------------------------

@@ -12,7 +12,6 @@ import com.jjg.game.activity.dailyrecharge.controller.DailyRechargeController;
 import com.jjg.game.activity.firstpayment.controller.FirstPaymentController;
 import com.jjg.game.activity.goldTreasure.GoldTreasureController;
 import com.jjg.game.activity.grandroulette.controller.GrandRouletteController;
-import com.jjg.game.activity.noads.NoAdsController;
 import com.jjg.game.activity.growthfund.controller.GrowthFundController;
 import com.jjg.game.activity.officialawards.controller.OfficialAwardsController;
 import com.jjg.game.activity.piggybank.controller.PiggyBankController;
@@ -75,9 +74,6 @@ public enum ActivityType {
     //广告福利
     ADS_REWARD(25, AdsRewardController.class, false, false,
             ActivityTargetType.NONE.getTargetKey(), true, false, true),
-    //免广告礼包，永久权益及发货记录不随活动结束清除。
-    NO_ADS(26, NoAdsController.class, false, false,
-            ActivityTargetType.NONE.getTargetKey(), false, false, false),
     //连续礼包
     CONTINUOUS_GIFT(27, ContinuousGiftController.class, false, false,
             ActivityTargetType.NONE.getTargetKey(), false, false, true),

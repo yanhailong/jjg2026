@@ -361,7 +361,5 @@ public interface ActivityConstant {
         //新手礼包
         int RES_STARTER_PACK = BASE_MSG_PREFIX | 0x92;
         int RES_CLAIM_STARTER_PACK_REWARDS = BASE_MSG_PREFIX | 0x93;
-        //免广告礼包信息及购买成功推送
-        int RES_NO_ADS = BASE_MSG_PREFIX | 0x94;
     }
 }
