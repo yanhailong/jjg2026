@@ -1052,7 +1052,6 @@ public class SimTaskService implements IRedDotService {
      * 成就任务列表：按徽章 id 返回已接取成就组的当前节点。
      */
     public ResSimAchievementTaskList buildAchievementTaskList(SimPlayerContext ctx, int medalType) {
-        medalType = 13;
         ResSimAchievementTaskList res = new ResSimAchievementTaskList(Code.SUCCESS);
         SimTaskData data = ctx.getSimTaskData();
         Player player = resolvePlayer(ctx);
