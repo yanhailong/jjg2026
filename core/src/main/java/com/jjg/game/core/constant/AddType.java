@@ -347,6 +347,10 @@ public enum AddType {
     SIM_SEASON_PASS(1829),
     //赛季小额抽奖
     SIM_SEASON_SMALL_DRAW(1830),
+    //关卡游戏过关
+    SIM_PASS_CHAPTER(1831),
+    //点亮格子
+    SIM_CHAPTER_LIGHT_GIRD(1832),
 
     //创建联盟
     ALLIANCE_CREATE(2001),

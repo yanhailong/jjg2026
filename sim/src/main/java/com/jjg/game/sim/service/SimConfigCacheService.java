@@ -166,6 +166,10 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     //免广告礼包：原价，ShopRechargeList.id
     private int noadsOriginPriceId = 0;
 
+    //关卡id -> 章节id
+    private Map<Integer, Integer> levelToChapterIdMap = null;
+    private List<Integer> allChapterLevels = null;
+
     @Autowired
     public SimConfigCacheService(ConditionRuleRegistry conditionRules,
                                  ConditionParser conditionParser) {
@@ -213,6 +217,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         loadDropItemConfig();
 
         loadShopMiniConfig();
+
+        loadChapterConfig();
     }
 
     /**
@@ -646,17 +652,17 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
         //免广告
         GlobalConfigCfg noAdsRewardsCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.NO_ADS_REWARDS);
-        if(noAdsRewardsCfg != null){
-            Map<Integer,Long> tmpNoAdsRewardsMap = new LinkedHashMap<>();
+        if (noAdsRewardsCfg != null) {
+            Map<Integer, Long> tmpNoAdsRewardsMap = new LinkedHashMap<>();
             String[] split = noAdsRewardsCfg.getValue().split("\\|");
-            for(String s : split){
+            for (String s : split) {
                 String[] s1 = s.split("_");
                 tmpNoAdsRewardsMap.put(Integer.parseInt(s1[0]), Long.parseLong(s1[1]));
             }
             this.noAdsRewardsMap = tmpNoAdsRewardsMap;
         }
         GlobalConfigCfg noAdsPriceCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.NO_ADS_PRICE);
-        if(noAdsPriceCfg != null){
+        if (noAdsPriceCfg != null) {
             String[] split = noAdsPriceCfg.getValue().split("_");
             this.noadsAfterPriceId = Integer.parseInt(split[0]);
             this.noadsOriginPriceId = Integer.parseInt(split[1]);
@@ -878,6 +884,24 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         this.tmpShopMiniCfgMap = tmpShopMiniCfgMap;
     }
 
+    private void loadChapterConfig() {
+        Map<Integer, Integer> tmpLevelToChapterIdMap = new HashMap<>();
+        List<Integer> tmpAllChapterLevels = new ArrayList<>();
+        for (ChapterCfg cfg : GameDataManager.getChapterCfgList().stream()
+                .sorted(Comparator.comparingInt(ChapterCfg::getId)).toList()) {
+            if (cfg.getLevelId() == null || cfg.getLevelId().isEmpty()) {
+                continue;
+            }
+
+            for (int levelId : cfg.getLevelId()) {
+                tmpLevelToChapterIdMap.put(levelId, cfg.getId());
+            }
+            tmpAllChapterLevels.addAll(cfg.getLevelId());
+        }
+        this.levelToChapterIdMap = tmpLevelToChapterIdMap;
+        this.allChapterLevels = tmpAllChapterLevels;
+    }
+
     @Override
     public void initSampleCallbackCollector() {
         addInitSampleFileObserveWithCallBack(CasinoStatsSheetCfg.EXCEL_NAME, this::loadCasinoStatsSheetCfg);
@@ -916,6 +940,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
         addInitSampleFileObserveWithCallBack(DropItemCfg.EXCEL_NAME, this::loadDropItemConfig);
         addInitSampleFileObserveWithCallBack(ShopMiniCfg.EXCEL_NAME, this::loadShopMiniConfig);
+
+        addInitSampleFileObserveWithCallBack(ChapterCfg.EXCEL_NAME, this::loadChapterConfig);
     }
 
     // ---------------------------------------------------------------------
@@ -1368,6 +1394,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
     /**
      * 获取迷你商店配置
+     *
      * @param itemId
      * @param level
      * @return
@@ -1401,5 +1428,35 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
     public int getNoadsOriginPriceId() {
         return noadsOriginPriceId;
+    }
+
+    public int getLevelIdByChapterId(int levelId) {
+        if (this.levelToChapterIdMap == null || this.levelToChapterIdMap.isEmpty()) {
+            return 0;
+        }
+
+        return this.levelToChapterIdMap.getOrDefault(levelId, 0);
+    }
+
+    public int getNextChapterLevelId(int levelId) {
+        if (this.allChapterLevels == null || this.allChapterLevels.isEmpty()) {
+            return 0;
+        }
+
+        if (levelId == 0) {
+            return this.allChapterLevels.getFirst();
+        }
+
+        int index = this.allChapterLevels.indexOf(levelId);
+        if (index < 0) {
+            return 0;
+        }
+
+        int nextIndexId = index + 1;
+        if (nextIndexId >= this.allChapterLevels.size()) {
+            return 0;
+        }
+
+        return this.allChapterLevels.get(nextIndexId);
     }
 }

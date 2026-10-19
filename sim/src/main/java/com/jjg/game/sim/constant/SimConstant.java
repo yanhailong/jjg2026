@@ -320,6 +320,18 @@ public interface SimConstant {
         //获取免广告信息
         int REQ_NO_ADS_INFO = BASE_MSG_PREFIX | 0xA4;
         int RES_NO_ADS_INFO = BASE_MSG_PREFIX | 0xA5;
+
+        //获取关卡信息
+        int REQ_CHAPTER_INFO = BASE_MSG_PREFIX | 0xA6;
+        int RES_CHAPTER_INFO = BASE_MSG_PREFIX | 0xA7;
+
+        //通关关卡
+        int REQ_PASS_CHAPTER_LEVEL = BASE_MSG_PREFIX | 0xA8;
+        int RES_PASS_CHAPTER_LEVEL = BASE_MSG_PREFIX | 0xA9;
+
+        //关卡游戏点亮格子
+        int REQ_CHAPTER_LIGHT_GIRD = BASE_MSG_PREFIX | 0xAA;
+        int RES_CHAPTER_LIGHT_GIRD = BASE_MSG_PREFIX | 0xAB;
     }
 
     interface SpecialGuest {
@@ -573,6 +585,8 @@ public interface SimConstant {
         int ID_SEASON_COIN = GameConstant.Item.ID_SEASON_COIN;
         //场景经验
         int CASINO_EXP = 1022505;
+        //雇员经验，同时作为关卡战斗力
+        int ID_EMPLOYEE_EXP = 1022506;
 
         //联盟-声誉值
         int ID_ALLIANCE_REPUTATION = 1024011;

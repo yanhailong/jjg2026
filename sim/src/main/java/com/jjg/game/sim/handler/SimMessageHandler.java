@@ -109,6 +109,8 @@ public class SimMessageHandler implements GmListener {
     private ActivePassService activePassService;
     @ClusterRpcReference
     private ToSimBridge toSimBridge;
+    @Autowired
+    private SimChapterService simChapterService;
 
     @Command(SimConstant.MsgBean.REQ_BUY_MINI_SHOP)
     public void reqBuyMiniShop(PlayerController playerController, ReqBuyMiniShop req) {
@@ -1147,6 +1149,38 @@ public class SimMessageHandler implements GmListener {
     }
 
     //--------------------------拜访相关 end--------------------------
+
+
+    //--------------------------关卡相关 begin--------------------------
+
+    /**
+     * 获取章节信息
+     */
+    @Command(SimConstant.MsgBean.REQ_CHAPTER_INFO)
+    public void reqChapterInfo(PlayerController playerController, ReqChapterInfo req) {
+        execute(playerController, ctx -> ctx.send(simChapterService.getResChapterInfo(ctx)),
+                ResChapterInfo.class);
+    }
+
+    /**
+     * 通关关卡
+     */
+    @Command(SimConstant.MsgBean.REQ_PASS_CHAPTER_LEVEL)
+    public void reqPassChapterLevel(PlayerController playerController, ReqPassChapterLevel req) {
+        execute(playerController, ctx -> ctx.send(simChapterService.passChapterLevel(ctx, req.levelId)),
+                ResPassChapterLevel.class);
+    }
+
+    /**
+     * 关卡游戏点亮格子
+     */
+    @Command(SimConstant.MsgBean.REQ_CHAPTER_LIGHT_GIRD)
+    public void reqChapterLightGird(PlayerController playerController, ReqChapterLightGird req) {
+        execute(playerController, ctx -> ctx.send(simChapterService.lightGird(ctx, req.levelId, req.girdIndex)),
+                ResChapterLightGird.class);
+    }
+
+    //--------------------------关卡相关 end--------------------------
 
 
     @Override

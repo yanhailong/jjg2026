@@ -149,6 +149,8 @@ public class GameDataManager {
     containerMap.put(CashcowCfg.class, new CashcowCfgContainer());
     containerMap.put(CasinoListCfg.class, new CasinoListCfgContainer());
     containerMap.put(CasinoStatsSheetCfg.class, new CasinoStatsSheetCfgContainer());
+    containerMap.put(ChapterCfg.class, new ChapterCfgContainer());
+    containerMap.put(ChapterLevelCfg.class, new ChapterLevelCfgContainer());
     containerMap.put(ChessJackStrategyCfg.class, new ChessJackStrategyCfgContainer());
     containerMap.put(ChessRobotCfg.class, new ChessRobotCfgContainer());
     containerMap.put(ChessTexasStrategyCfg.class, new ChessTexasStrategyCfgContainer());
@@ -1042,6 +1044,30 @@ public class GameDataManager {
 
   public static List<CasinoStatsSheetCfg> getCasinoStatsSheetCfgList() {
     return getInstance().getCfgContainer(CasinoStatsSheetCfg.class).getCfgBeanList();
+  }
+
+  public static ChapterCfg getChapterCfg(int key) {
+    return getInstance().getCfgContainer(ChapterCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, ChapterCfg> getChapterCfgMap() {
+    return getInstance().getCfgContainer(ChapterCfg.class).getCfgBeanMap();
+  }
+
+  public static List<ChapterCfg> getChapterCfgList() {
+    return getInstance().getCfgContainer(ChapterCfg.class).getCfgBeanList();
+  }
+
+  public static ChapterLevelCfg getChapterLevelCfg(int key) {
+    return getInstance().getCfgContainer(ChapterLevelCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, ChapterLevelCfg> getChapterLevelCfgMap() {
+    return getInstance().getCfgContainer(ChapterLevelCfg.class).getCfgBeanMap();
+  }
+
+  public static List<ChapterLevelCfg> getChapterLevelCfgList() {
+    return getInstance().getCfgContainer(ChapterLevelCfg.class).getCfgBeanList();
   }
 
   public static ChessJackStrategyCfg getChessJackStrategyCfg(int key) {

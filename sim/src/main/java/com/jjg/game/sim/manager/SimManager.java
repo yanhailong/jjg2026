@@ -109,6 +109,8 @@ public class SimManager {
     @Autowired
     private SimSkillsDao simSkillsDao;
     @Autowired
+    private SimChapterDao simChapterDao;
+    @Autowired
     private SimDropService simDropService;
     @Autowired
     private SimStatsService simStatsService;
@@ -652,6 +654,9 @@ public class SimManager {
                 }
                 if (ctx.getActivePassData() != null) {
                     activePassDao.save(ctx.getActivePassData());
+                }
+                if (ctx.getSimChapterData() != null) {
+                    simChapterDao.save(ctx.getSimChapterData());
                 }
                 //落库完成后再删路由; 玩家可能在复活等待超时后已重建 ctx, 此时路由必须保留
                 if (simPlayerContextRegistry.getContext(playerId) == null) {

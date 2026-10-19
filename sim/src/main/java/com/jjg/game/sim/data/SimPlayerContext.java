@@ -109,6 +109,8 @@ public class SimPlayerContext {
     private AtomicBoolean inCasino = new AtomicBoolean(true);
     //slots统计信息
     private SlotsStatisticsData slotsStatisticsData;
+    //关卡信息
+    private SimChapterData simChapterData;
 
     public boolean isBuildingRedDotDirty() {
         return buildingRedDotDirty;
@@ -533,7 +535,9 @@ public class SimPlayerContext {
         recentSpinResults.put(spinId, new SpinResultEntry(result, System.currentTimeMillis()));
     }
 
-    /** 读写及既有玩家 tick 清理；使用系统毫秒时间，不叠加玩家 GM 时间偏移。 */
+    /**
+     * 读写及既有玩家 tick 清理；使用系统毫秒时间，不叠加玩家 GM 时间偏移。
+     */
     public void cleanUpSpinResults() {
         long now = System.currentTimeMillis();
         Iterator<SpinResultEntry> it = recentSpinResults.values().iterator();
@@ -543,5 +547,13 @@ public class SimPlayerContext {
             }
             it.remove();
         }
+    }
+
+    public SimChapterData getSimChapterData() {
+        return simChapterData;
+    }
+
+    public void setSimChapterData(SimChapterData simChapterData) {
+        this.simChapterData = simChapterData;
     }
 }
