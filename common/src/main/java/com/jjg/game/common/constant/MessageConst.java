@@ -207,6 +207,8 @@ public interface MessageConst {
         int DOU_XIAN_TYPE = 0x5C;
         //赛季
         int SEASON = 0x5D;
+        //模拟经营中的小游戏
+        int SIM_MINI_GAME = 0x5E;
     }
 
     interface ToClientConst {

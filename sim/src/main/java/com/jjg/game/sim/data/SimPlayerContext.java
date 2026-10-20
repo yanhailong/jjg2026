@@ -4,6 +4,8 @@ import com.alibaba.fastjson.JSONObject;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PlayerController;
+import com.jjg.game.minigame.data.CheaterHuntData;
+import com.jjg.game.minigame.data.CheaterHuntRound;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.sim.constant.BuildingOutputType;
 
@@ -111,6 +113,26 @@ public class SimPlayerContext {
     private SlotsStatisticsData slotsStatisticsData;
     //关卡信息
     private SimChapterData simChapterData;
+    //找老千小游戏玩家数据，首次访问时加载，随会话释放
+    private CheaterHuntData cheaterHuntData;
+    //找老千本局内存状态，退出小游戏或释放会话时丢弃
+    private CheaterHuntRound cheaterHuntRound;
+
+    public CheaterHuntData getCheaterHuntData() {
+        return cheaterHuntData;
+    }
+
+    public void setCheaterHuntData(CheaterHuntData cheaterHuntData) {
+        this.cheaterHuntData = cheaterHuntData;
+    }
+
+    public CheaterHuntRound getCheaterHuntRound() {
+        return cheaterHuntRound;
+    }
+
+    public void setCheaterHuntRound(CheaterHuntRound cheaterHuntRound) {
+        this.cheaterHuntRound = cheaterHuntRound;
+    }
 
     public boolean isBuildingRedDotDirty() {
         return buildingRedDotDirty;

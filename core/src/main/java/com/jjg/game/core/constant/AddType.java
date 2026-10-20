@@ -351,6 +351,8 @@ public enum AddType {
     SIM_PASS_CHAPTER(1831),
     //点亮格子
     SIM_CHAPTER_LIGHT_GIRD(1832),
+    //找老千小游戏消耗、通关奖励及每日赠送
+    SIM_CHEATER_HUNT(1833),
 
     //创建联盟
     ALLIANCE_CREATE(2001),

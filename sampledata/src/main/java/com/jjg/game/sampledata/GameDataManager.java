@@ -151,6 +151,8 @@ public class GameDataManager {
     containerMap.put(CasinoStatsSheetCfg.class, new CasinoStatsSheetCfgContainer());
     containerMap.put(ChapterCfg.class, new ChapterCfgContainer());
     containerMap.put(ChapterLevelCfg.class, new ChapterLevelCfgContainer());
+    containerMap.put(CheaterHuntLevelCfg.class, new CheaterHuntLevelCfgContainer());
+    containerMap.put(CheaterHuntMapCfg.class, new CheaterHuntMapCfgContainer());
     containerMap.put(ChessJackStrategyCfg.class, new ChessJackStrategyCfgContainer());
     containerMap.put(ChessRobotCfg.class, new ChessRobotCfgContainer());
     containerMap.put(ChessTexasStrategyCfg.class, new ChessTexasStrategyCfgContainer());
@@ -1068,6 +1070,30 @@ public class GameDataManager {
 
   public static List<ChapterLevelCfg> getChapterLevelCfgList() {
     return getInstance().getCfgContainer(ChapterLevelCfg.class).getCfgBeanList();
+  }
+
+  public static CheaterHuntLevelCfg getCheaterHuntLevelCfg(int key) {
+    return getInstance().getCfgContainer(CheaterHuntLevelCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, CheaterHuntLevelCfg> getCheaterHuntLevelCfgMap() {
+    return getInstance().getCfgContainer(CheaterHuntLevelCfg.class).getCfgBeanMap();
+  }
+
+  public static List<CheaterHuntLevelCfg> getCheaterHuntLevelCfgList() {
+    return getInstance().getCfgContainer(CheaterHuntLevelCfg.class).getCfgBeanList();
+  }
+
+  public static CheaterHuntMapCfg getCheaterHuntMapCfg(int key) {
+    return getInstance().getCfgContainer(CheaterHuntMapCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, CheaterHuntMapCfg> getCheaterHuntMapCfgMap() {
+    return getInstance().getCfgContainer(CheaterHuntMapCfg.class).getCfgBeanMap();
+  }
+
+  public static List<CheaterHuntMapCfg> getCheaterHuntMapCfgList() {
+    return getInstance().getCfgContainer(CheaterHuntMapCfg.class).getCfgBeanList();
   }
 
   public static ChessJackStrategyCfg getChessJackStrategyCfg(int key) {

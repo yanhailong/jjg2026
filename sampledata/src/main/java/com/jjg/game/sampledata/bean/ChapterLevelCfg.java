@@ -27,6 +27,8 @@ public class ChapterLevelCfg extends BaseCfgBean {
   protected Map<Integer,Long> consumableItems;
   /** 奖励是否在章节地图上展示 */
   protected int display;
+  /** 失败提升战力列表 */
+  protected Map<Integer,Long> failList;
   /** 等级条件 */
   protected int levelLimit;
   /** 关卡类型 */
@@ -64,6 +66,11 @@ public class ChapterLevelCfg extends BaseCfgBean {
   /** 返回奖励是否在章节地图上展示 */
   public int getDisplay() {
     return display;
+  }
+
+  /** 返回失败提升战力列表 */
+  public Map<Integer,Long> getFailList() {
+    return failList;
   }
 
   /** 返回等级条件 */
