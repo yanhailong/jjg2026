@@ -130,53 +130,53 @@ public abstract class BaseCfgContainer<T extends BaseCfgBean> {
     Map<String, String> md5HexMap = new ConcurrentHashMap<>(excelFileList.size());
     for (File file : excelFileList) {
       // 给文件的md5赋值
-      String md5Hex = DigestUtils.md5Hex(Files.newInputStream(file.toPath()));
-      md5HexMap.put(file.getName(), md5Hex);
+      try (var input = Files.newInputStream(file.toPath())) {
+        md5HexMap.put(file.getName(), DigestUtils.md5Hex(input));
+      }
       // 文件中途发生异常不跳出,继续向后面遍历
-      Workbook wb = WorkbookFactory.create(file, null, true);
-      Sheet sheet = wb.getSheetAt(0);
-      Map<Integer, ExcelFieldInfo> excelFieldInfoMap = loadFieldInfo(sheet, sheet.getRow(0));
-      // 获取子类中字段信息
-      Map<String, Field> cfgBeanFieldMap = getAllFieldsMap();
-      // 单元格跳过列表
-      Set<Integer> skipCellList = getSkipCellList(sheet);
-      // 检查是否所有字段都在配置表中, 如果没有则抛出异常
-      checkExcelFieldMatchBeanField(excelFieldInfoMap, cfgBeanFieldMap, sheet, file);
-      // 是否有异常
-      boolean hasException = false;
-      for (int i = getDataStartRow(); i <= sheet.getLastRowNum(); i++) {
-        try {
-          T cfgBean = createNewBean();
-          Row row = sheet.getRow(i);
-          // 检查是否是空行
-          if (isBlankRow(row)) {
-            continue;
+      try (Workbook wb = WorkbookFactory.create(file, null, true)) {
+        Sheet sheet = wb.getSheetAt(0);
+        Map<Integer, ExcelFieldInfo> excelFieldInfoMap = loadFieldInfo(sheet, sheet.getRow(0));
+        // 获取子类中字段信息
+        Map<String, Field> cfgBeanFieldMap = getAllFieldsMap();
+        // 单元格跳过列表
+        Set<Integer> skipCellList = getSkipCellList(sheet);
+        // 检查是否所有字段都在配置表中, 如果没有则抛出异常
+        checkExcelFieldMatchBeanField(excelFieldInfoMap, cfgBeanFieldMap, sheet, file);
+        // 是否有异常
+        boolean hasException = false;
+        for (int i = getDataStartRow(); i <= sheet.getLastRowNum(); i++) {
+          try {
+            T cfgBean = createNewBean();
+            Row row = sheet.getRow(i);
+            // 检查是否是空行
+            if (isBlankRow(row)) {
+              continue;
+            }
+            // 处理单行数据
+            handleRowData(row, cfgBean, cfgBeanFieldMap, excelFieldInfoMap, skipCellList);
+            // 不能有重复的ID
+            if (!tempCfgMap.containsKey(cfgBean.getId())) {
+              // 添加bean
+              tempCfgMap.put(cfgBean.getId(), cfgBean);
+            } else {
+              throw new ExcelDataParseException(file.getName(), "出现重复的ID: " + cfgBean.getId());
+            }
+          } catch (Exception e) {
+            // 收集其他的异常
+            exceptionCollectors.add(e);
+            hasException = true;
           }
-          // 处理单行数据
-          handleRowData(row, cfgBean, cfgBeanFieldMap, excelFieldInfoMap, skipCellList);
-          // 不能有重复的ID
-          if (!tempCfgMap.containsKey(cfgBean.getId())) {
-            // 添加bean
-            tempCfgMap.put(cfgBean.getId(), cfgBean);
-          } else {
-            throw new ExcelDataParseException(file.getName(), "出现重复的ID: " + cfgBean.getId());
+        }
+        // 有异常直接跳过
+        if (!hasException) {
+          if (tempCfgMap.isEmpty()) {
+            logger.warn("容器{} 加载数据为空", getClass().getSimpleName());
           }
-        } catch (Exception e) {
-          // 收集其他的异常
-          exceptionCollectors.add(e);
-          hasException = true;
+          // 设置为不可变map
+          cfgBeanMap = Collections.unmodifiableMap(tempCfgMap);
         }
       }
-      // 有异常直接跳过
-      if (!hasException) {
-        if (tempCfgMap.isEmpty()) {
-          logger.warn("容器{} 加载数据为空", getClass().getSimpleName());
-        }
-        // 设置为不可变map
-        cfgBeanMap = Collections.unmodifiableMap(tempCfgMap);
-      }
-      // 关闭工作薄
-      wb.close();
     }
     if (!exceptionCollectors.isEmpty()) {
       // 将异常列表传递出去

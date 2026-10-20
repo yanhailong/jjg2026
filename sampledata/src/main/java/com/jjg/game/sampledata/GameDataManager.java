@@ -46,7 +46,7 @@ public class GameDataManager {
   private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
   /** cfgBean和container之间的绑定关系 */
-  private Map<Class<? extends BaseCfgBean>, BaseCfgContainer<?>> cfgBeanContainerRelator = Collections.emptyMap();
+  private volatile Map<Class<? extends BaseCfgBean>, BaseCfgContainer<?>> cfgBeanContainerRelator = Collections.emptyMap();
 
   /** 默认的监听器 */
   private static final IContainerEachLoadListener DEFAULT_LISTENER;
@@ -279,6 +279,37 @@ public class GameDataManager {
     return containerMap;
   }
 
+  /** 提交已完成解析和业务校验的容器，不再次读取 Excel。 */
+  public synchronized void applyParsedContainers(
+      Map<Class<? extends BaseCfgBean>, BaseCfgContainer<?>> replacements) {
+    if (replacements == null) {
+      throw new IllegalArgumentException("replacement containers must not be null");
+    }
+    Map<Class<? extends BaseCfgBean>, BaseCfgContainer<?>> updates =
+        new java.util.HashMap<>(replacements);
+    if (updates.isEmpty()) {
+      return;
+    }
+    Map<Class<? extends BaseCfgBean>, BaseCfgContainer<?>> knownContainers = initAllContainer();
+    for (Map.Entry<Class<? extends BaseCfgBean>, BaseCfgContainer<?>> entry : updates.entrySet()) {
+      Class<? extends BaseCfgBean> type = entry.getKey();
+      BaseCfgContainer<?> replacement = entry.getValue();
+      BaseCfgContainer<?> knownContainer = type == null ? null : knownContainers.get(type);
+      if (knownContainer == null || replacement == null
+          || !knownContainer.getClass().isInstance(replacement)) {
+        throw new IllegalArgumentException("unknown or mismatched configuration container: " + type);
+      }
+    }
+    if (cfgBeanContainerRelator.isEmpty() && !updates.keySet().equals(knownContainers.keySet())) {
+      throw new IllegalArgumentException("initial configuration must contain every known container");
+    }
+    Map<Class<? extends BaseCfgBean>, BaseCfgContainer<?>> next =
+        new ConcurrentHashMap<>(cfgBeanContainerRelator);
+    next.putAll(updates);
+    cfgBeanContainerRelator = Collections.unmodifiableMap(next);
+    loadAllFinished = true;
+  }
+
   /** 加载每个数据时的数据监听器 */
   public interface IContainerEachLoadListener {
 
@@ -477,8 +508,8 @@ public class GameDataManager {
       String resourcePath, List<File> changeFileList) throws Exception {
     Function<File, String> valueMapper =
         t -> {
-          try {
-            return DigestUtils.md5Hex(Files.newInputStream(t.toPath()));
+          try (var input = Files.newInputStream(t.toPath())) {
+            return DigestUtils.md5Hex(input);
           } catch (IOException e) {
             return "";
           }
@@ -530,14 +561,14 @@ public class GameDataManager {
         loadSuccessBeanClasses.add(baseCfgContainer.getKey());
       }
     }
-    // 为了不多次放表 如果有加载成功的还是将加载成功的表放入内存中
+    if (!exceptions.isEmpty()) {
+      throw new Exception(formatExceptionMsg(exceptions));
+    }
+    // 所有变化表均加载成功后再一次性发布。
     if (!loadSuccessBeanClasses.isEmpty()) {
       cfgBeanContainerRelator = Collections.unmodifiableMap(cfgBeanContainerRelatorTemp);
       logger.info("配置表热更结束,替换配置表: " + String.join(",", changedFileNameList) + " 成功");
       return loadSuccessBeanClasses;
-    }
-    if(!exceptions.isEmpty()){
-      throw new Exception(formatExceptionMsg(exceptions));
     }
     return loadSuccessBeanClasses;
   }
