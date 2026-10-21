@@ -8,22 +8,27 @@ import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.utils.ItemUtils;
+import com.jjg.game.minigame.constant.MiniGameConstant;
 import com.jjg.game.minigame.constant.MiniGameConstant.RoundState;
 import com.jjg.game.minigame.dao.CheaterHuntDao;
 import com.jjg.game.minigame.data.CheaterHuntData;
 import com.jjg.game.minigame.data.CheaterHuntRound;
 import com.jjg.game.minigame.pb.res.*;
 import com.jjg.game.minigame.pb.struct.CheaterHuntInfo;
+import com.jjg.game.minigame.pb.struct.CheaterHuntSimpleInfo;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.CheaterHuntLevelCfg;
 import com.jjg.game.sampledata.bean.CheaterHuntMapCfg;
+import com.jjg.game.sampledata.bean.GlobalConfigCfg;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.service.SimAutoSaveService;
+import com.jjg.game.sim.service.SimChapterService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -37,12 +42,14 @@ public class SimMiniGameService {
     private final CheaterHuntDao dao;
     private final SimAutoSaveService autoSaveService;
     private final PlayerPackService playerPackService;
+    private final SimChapterService chapterService;
 
     public SimMiniGameService(CheaterHuntDao dao, SimAutoSaveService autoSaveService,
-                              PlayerPackService playerPackService) {
+                              PlayerPackService playerPackService, SimChapterService chapterService) {
         this.dao = dao;
         this.autoSaveService = autoSaveService;
         this.playerPackService = playerPackService;
+        this.chapterService = chapterService;
     }
 
     /** 登录结算当天赠送，离线日期不累计补发。 */
@@ -57,10 +64,31 @@ public class SimMiniGameService {
         }
     }
 
-    /** 开局按关卡随机场景及不重复点位，进入本身不扣道具。 */
+    /** 进入只返回总览，不创建单局或消耗解锁道具。 */
     public ResEnterCheaterHuntGame enter(SimPlayerContext ctx) {
         CheaterHuntData data = data(ctx);
         ResEnterCheaterHuntGame res = new ResEnterCheaterHuntGame(grantDaily(ctx, data, System.currentTimeMillis()));
+        res.openOneClickPass = openOneClickPass(ctx);
+        List<CheaterHuntLevelCfg> levels = levels();
+        res.allLevels = levels.size();
+        res.levelSimpleInfoList = new ArrayList<>(levels.size());
+        for (CheaterHuntLevelCfg cfg : levels) {
+            CheaterHuntSimpleInfo info = new CheaterHuntSimpleInfo();
+            info.levelId = cfg.getId();
+            info.levelLangId = cfg.getMapNameLocalization();
+            info.pass = data.getPassedLevels().contains(cfg.getId());
+            if (info.pass) {
+                res.passLevels++;
+            }
+            res.levelSimpleInfoList.add(info);
+        }
+        return res;
+    }
+
+    /** 按当前已解锁关卡随机场景及不重复点位，开局本身不扣道具。 */
+    public ResCheaterHuntGameInfo gameInfo(SimPlayerContext ctx) {
+        CheaterHuntData data = data(ctx);
+        ResCheaterHuntGameInfo res = new ResCheaterHuntGameInfo(grantDaily(ctx, data, System.currentTimeMillis()));
         if (res.code == Code.SUCCESS) {
             if (canStart(ctx)) {
                 CheaterHuntLevelCfg cfg = level(ctx, data.getLevelId());
@@ -90,6 +118,40 @@ public class SimMiniGameService {
             }
         }
         res.info = assemble(ctx, data);
+        return res;
+    }
+
+    /** 仅扣除下一关的解锁道具，成功后推进解锁进度，不创建单局。 */
+    public ResUnlockNextLevel unlockNextLevel(SimPlayerContext ctx) {
+        CheaterHuntData data = data(ctx);
+        ResUnlockNextLevel res = new ResUnlockNextLevel(Code.SUCCESS);
+        CheaterHuntLevelCfg current = GameDataManager.getCheaterHuntLevelCfg(data.getLevelId());
+        List<CheaterHuntLevelCfg> levels = levels();
+        int index = levels.indexOf(current);
+        if (index < 0) {
+            log.warn("找老千解锁进度配置不存在 playerId={},levelId={}", ctx.playerId(), data.getLevelId());
+            res.code = Code.SAMPLE_ERROR;
+        } else if (index + 1 >= levels.size() || !canStart(ctx)) {
+            res.code = Code.REPEAT_OP;
+        } else {
+            CheaterHuntLevelCfg next = level(ctx, levels.get(index + 1).getId());
+            if (next == null || !validUnlockItems(next.getClearCount())) {
+                log.warn("找老千解锁条件配置错误 playerId={},levelId={}", ctx.playerId(), levels.get(index + 1).getId());
+                res.code = Code.SAMPLE_ERROR;
+            } else {
+                CommonResult<ItemOperationResult> cost = playerPackService.removeItems(
+                        ctx.getPlayer(), next.getClearCount(), AddType.SIM_CHEATER_HUNT);
+                res.code = cost.code;
+                if (cost.success()) {
+                    data.setLevelId(next.getId());
+                    autoSaveService.enqueueSave(data);
+                } else {
+                    log.warn("找老千解锁道具扣除失败 playerId={},levelId={},code={}",
+                            ctx.playerId(), next.getId(), cost.code);
+                }
+            }
+        }
+        res.levelId = data.getLevelId();
         return res;
     }
 
@@ -150,7 +212,7 @@ public class SimMiniGameService {
         return res;
     }
 
-    /** 一键通关从开始页发起，消耗一次配置道具，共用正常通关的发奖和晋级。 */
+    /** 一键通关从开始页发起，校验章节门槛后消耗道具，共用正常通关的发奖路径。 */
     public ResQuickClearCheaterHuntGame quickClear(SimPlayerContext ctx) {
         CheaterHuntData data = data(ctx);
         ResQuickClearCheaterHuntGame res = new ResQuickClearCheaterHuntGame(Code.SUCCESS);
@@ -159,6 +221,9 @@ public class SimMiniGameService {
             res.code = grantDaily(ctx, data, System.currentTimeMillis());
             if (res.code == Code.SUCCESS && !canStart(ctx)) {
                 res.code = Code.REPEAT_OP;
+            }
+            if (res.code == Code.SUCCESS && !openOneClickPass(ctx)) {
+                res.code = Code.NOT_UNLOCKED;
             }
             if (res.code == Code.SUCCESS) {
                 CheaterHuntLevelCfg cfg = level(ctx, data.getLevelId());
@@ -303,16 +368,10 @@ public class SimMiniGameService {
         return round != null && round.getState() == RoundState.REWARD_PENDING;
     }
 
-    /** 达标即发奖并计次；末关保留进度供重复挑战，下一关完全沿配置列表顺序。 */
+    /** 达标即发奖并记录实际通关，解锁进度只能由解锁请求推进。 */
     private int settle(SimPlayerContext ctx, CheaterHuntData data, CheaterHuntRound round) {
         CheaterHuntLevelCfg cfg = level(ctx, round.getLevelId());
         if (cfg == null) {
-            return Code.SAMPLE_ERROR;
-        }
-        List<CheaterHuntLevelCfg> levels = GameDataManager.getCheaterHuntLevelCfgList();
-        int index = levels.indexOf(cfg);
-        if (index < 0) {
-            log.warn("找老千关卡不在配置列表 playerId={},levelId={}", ctx.playerId(), cfg.getId());
             return Code.SAMPLE_ERROR;
         }
         CommonResult<ItemOperationResult> reward = playerPackService.addItems(
@@ -323,13 +382,7 @@ public class SimMiniGameService {
             return reward.code;
         }
         round.setState(RoundState.CLEARED);
-        int cleared = Math.min(data.getClearCount(), cfg.getClearCount() - 1) + 1;
-        if (cleared >= cfg.getClearCount() && index + 1 < levels.size()) {
-            data.setLevelId(levels.get(index + 1).getId());
-            data.setClearCount(0);
-        } else {
-            data.setClearCount(cleared);
-        }
+        data.getPassedLevels().add(cfg.getId());
         autoSaveService.enqueueSave(data);
         return Code.SUCCESS;
     }
@@ -339,13 +392,32 @@ public class SimMiniGameService {
         CheaterHuntLevelCfg cfg = GameDataManager.getCheaterHuntLevelCfg(levelId);
         if (cfg == null || cfg.getUseCase() == null || cfg.getUseCase().isEmpty()
                 || cfg.getDrawCount() <= 0 || cfg.getTargetCount() <= 0 || cfg.getTargetCount() > cfg.getDrawCount()
-                || cfg.getClearCount() <= 0 || (cfg.getTimeLimit() != -1 && cfg.getTimeLimit() <= 0)
+                || (cfg.getTimeLimit() != -1 && cfg.getTimeLimit() <= 0)
                 || cfg.getCostItemCount() < 0 || !validItems(cfg.getCostItemID())
                 || !validItems(cfg.getDailyFreeItemCount()) || !validItems(cfg.getClearReward())) {
             log.warn("找老千关卡配置错误 playerId={},levelId={}", ctx.playerId(), levelId);
             return null;
         }
         return cfg;
+    }
+
+    /** 配置容器不保证行序，关卡等级决定解锁顺序，同级以ID确定顺序。 */
+    private List<CheaterHuntLevelCfg> levels() {
+        return GameDataManager.getCheaterHuntLevelCfgList().stream()
+                .sorted(Comparator.comparingInt(CheaterHuntLevelCfg::getLevel)
+                        .thenComparingInt(CheaterHuntLevelCfg::getId)).toList();
+    }
+
+    /** 章节服务负责懒加载；已加载的进度直接复用，不触碰章节数据访问层。 */
+    private boolean openOneClickPass(SimPlayerContext ctx) {
+        GlobalConfigCfg cfg = GameDataManager.getGlobalConfigCfg(MiniGameConstant.QUICK_CLEAR_CHAPTER_GLOBAL_ID);
+        if (cfg == null || cfg.getIntValue() <= 0) {
+            return false;
+        }
+        if (ctx.getSimChapterData() == null && chapterService.getResChapterInfo(ctx).code != Code.SUCCESS) {
+            return false;
+        }
+        return ctx.getSimChapterData().getLevelId() >= cfg.getIntValue();
     }
 
     /** 场景必须容纳配置要求的全部随机作弊点。 */
@@ -364,11 +436,16 @@ public class SimMiniGameService {
                 e.getKey() != null && e.getKey() > 0 && e.getValue() != null && e.getValue() > 0);
     }
 
+    /** 解锁条件允许零消耗，已配置的道具ID必须有效，数量不能为负。 */
+    private boolean validUnlockItems(Map<Integer, Long> items) {
+        return items != null && items.entrySet().stream().allMatch(e ->
+                e.getKey() != null && e.getKey() > 0 && e.getValue() != null && e.getValue() >= 0);
+    }
+
     /** 返回点位列表快照，避免后续寻找操作改变正在发送的响应。 */
     private CheaterHuntInfo assemble(SimPlayerContext ctx, CheaterHuntData data) {
         CheaterHuntInfo info = new CheaterHuntInfo();
         info.levelId = data.getLevelId();
-        info.clearCount = data.getClearCount();
         info.serverTime = System.currentTimeMillis();
         CheaterHuntRound round = ctx.getCheaterHuntRound();
         if (round != null) {

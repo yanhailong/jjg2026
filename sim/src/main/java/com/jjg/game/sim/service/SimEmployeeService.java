@@ -695,4 +695,44 @@ public class SimEmployeeService implements SimTaskStateReporter {
         }
         ctx.send(res);
     }
+
+    /**
+     * 计算雇员战力
+     *
+     * @param simEmployeeData
+     * @return
+     */
+    public long calCombatPower(SimEmployeeData simEmployeeData) {
+        EmployeeLevelCfg cfg = configCache.getEmployeeLevelCfgByIdAndLevel(simEmployeeData.getEmployeeId(), simEmployeeData.getLevel());
+        if (cfg == null || cfg.getAttributeValue() == null || cfg.getAttributeValue().isEmpty()) {
+            return 0;
+        }
+
+        long combatPower = 0;
+        for (Map.Entry<Integer, Integer> en : cfg.getAttributeValue().entrySet()) {
+            combatPower += en.getValue();
+        }
+
+        simEmployeeData.setLastCombatPower(combatPower);
+        return combatPower;
+    }
+
+    /**
+     * 计算所有雇员的战力之和
+     *
+     * @param ctx
+     * @return
+     */
+    public long calAllCombatPower(SimPlayerContext ctx) {
+        if (ctx.getEmployeeMap() == null || ctx.getEmployeeMap().isEmpty()) {
+            return 0;
+        }
+
+        long combatPower = 0;
+        for (Map.Entry<Integer, SimEmployeeData> en : ctx.getEmployeeMap().entrySet()) {
+            combatPower += calCombatPower(en.getValue());
+        }
+
+        return combatPower;
+    }
 }

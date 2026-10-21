@@ -8,10 +8,8 @@ import java.util.List;
 @ProtobufMessage
 @ProtoDesc("找老千关卡进度及当前单局")
 public class CheaterHuntInfo {
-    @ProtoDesc("当前进度关卡ID，对应CheaterHuntLevel.id；通关晋级后为下一局关卡")
+    @ProtoDesc("当前已解锁关卡ID，对应CheaterHuntLevel.id；仅解锁下一关后推进")
     public int levelId;
-    @ProtoDesc("当前进度关卡已累计通关次数")
-    public int clearCount;
     @ProtoDesc("单局标识，无单局为0；找点及退出时原样传回")
     public long roundId;
     @ProtoDesc("当前单局关卡ID，无单局为0")

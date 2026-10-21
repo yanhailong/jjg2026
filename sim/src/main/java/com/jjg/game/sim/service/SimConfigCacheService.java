@@ -969,6 +969,19 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return employeeLevelCfgMap;
     }
 
+    public EmployeeLevelCfg getEmployeeLevelCfgByIdAndLevel(int employeeId, int level) {
+        if(this.employeeLevelCfgMap == null || this.employeeLevelCfgMap.isEmpty()){
+            return null;
+        }
+
+        Map<Integer, EmployeeLevelCfg> tmpMap = this.employeeLevelCfgMap.get(employeeId);
+        if(tmpMap == null || tmpMap.isEmpty()){
+            return null;
+        }
+
+        return tmpMap.get(level);
+    }
+
     public Map<Integer, Map<Integer, EmployeeStarCfg>> getEmployeeStarCfgMap() {
         return employeeStarCfgMap;
     }

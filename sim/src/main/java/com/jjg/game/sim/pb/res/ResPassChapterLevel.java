@@ -6,6 +6,7 @@ import com.jjg.game.common.pb.ItemInfo;
 import com.jjg.game.common.proto.ProtoDesc;
 import com.jjg.game.common.proto.ProtobufMessage;
 import com.jjg.game.sim.constant.SimConstant;
+import com.jjg.game.sim.pb.struct.ChapterPKInfo;
 
 import java.util.List;
 
@@ -14,6 +15,8 @@ import java.util.List;
 public class ResPassChapterLevel extends AbstractResponse {
     @ProtoDesc("通关奖励")
     public List<ItemInfo> rewards;
+    @ProtoDesc("pk信息，没有pk环节的时候该值为空")
+    public ChapterPKInfo chapterPKInfo;
 
     public ResPassChapterLevel(int code) {
         super(code);

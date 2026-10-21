@@ -19,8 +19,8 @@ public class CheaterHuntLevelCfg extends BaseCfgBean {
   /** 配置表工作薄名 */
   public static final String SHEET_NAME = "CheaterHuntLevel";
 
-  /** 升级需要的游戏通关次数 */
-  protected int ClearCount;
+  /** 地图解锁条件 */
+  protected Map<Integer,Long> ClearCount;
   /** 通关奖励 */
   protected Map<Integer,Long> ClearReward;
   /** 无效点击扣除倒计时 */
@@ -33,6 +33,8 @@ public class CheaterHuntLevelCfg extends BaseCfgBean {
   protected int DrawCount;
   /** 等级 */
   protected int Level;
+  /** 地图名称多语言 */
+  protected int MapNameLocalization;
   /** 作弊点寻找个数 */
   protected int TargetCount;
   /** 倒计时时长 */
@@ -40,8 +42,8 @@ public class CheaterHuntLevelCfg extends BaseCfgBean {
   /** 使用场景 */
   protected List<Integer> UseCase;
 
-  /** 返回升级需要的游戏通关次数 */
-  public int getClearCount() {
+  /** 返回地图解锁条件 */
+  public Map<Integer,Long> getClearCount() {
     return ClearCount;
   }
 
@@ -73,6 +75,11 @@ public class CheaterHuntLevelCfg extends BaseCfgBean {
   /** 返回等级 */
   public int getLevel() {
     return Level;
+  }
+
+  /** 返回地图名称多语言 */
+  public int getMapNameLocalization() {
+    return MapNameLocalization;
   }
 
   /** 返回作弊点寻找个数 */

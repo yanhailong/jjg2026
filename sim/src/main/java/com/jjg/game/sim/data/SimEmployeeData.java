@@ -23,6 +23,9 @@ public class SimEmployeeData extends AbstractData {
     private int level;
     //当前星级
     private int star;
+    //上一次计算的战力
+    private long lastCombatPower;
+
 
     public String getId() {
         return id;
@@ -73,5 +76,13 @@ public class SimEmployeeData extends AbstractData {
 
     public static String buildKey(long playerId, int employeeId) {
         return playerId + ":" + employeeId;
+    }
+
+    public long getLastCombatPower() {
+        return lastCombatPower;
+    }
+
+    public void setLastCombatPower(long lastCombatPower) {
+        this.lastCombatPower = lastCombatPower;
     }
 }

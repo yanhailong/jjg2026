@@ -16,6 +16,7 @@ import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.pb.res.ResChapterInfo;
 import com.jjg.game.sim.pb.res.ResChapterLightGird;
 import com.jjg.game.sim.pb.res.ResPassChapterLevel;
+import com.jjg.game.sim.pb.struct.ChapterPKInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -29,11 +30,13 @@ public class SimChapterService {
     private final PlayerPackService playerPackService;
     private final SimChapterDao simChapterDao;
     private final SimConfigCacheService simConfigCacheService;
+    private final SimEmployeeService simEmployeeService;
 
-    public SimChapterService(PlayerPackService playerPackService, SimChapterDao simChapterDao, SimConfigCacheService simConfigCacheService) {
+    public SimChapterService(PlayerPackService playerPackService, SimChapterDao simChapterDao, SimConfigCacheService simConfigCacheService, SimEmployeeService simEmployeeService) {
         this.playerPackService = playerPackService;
         this.simChapterDao = simChapterDao;
         this.simConfigCacheService = simConfigCacheService;
+        this.simEmployeeService = simEmployeeService;
     }
 
     /**
@@ -125,6 +128,10 @@ public class SimChapterService {
                 res.code = Code.FORBID;
                 return res;
             }
+
+            res.chapterPKInfo = new ChapterPKInfo();
+            res.chapterPKInfo.targetPower = chapterLevelCfg.getBattleValue();
+            res.chapterPKInfo.selfPower = simEmployeeService.calAllCombatPower(ctx);
         } else if (chapterLevelCfg.getLevelType() != 1) {
             res.code = Code.SAMPLE_ERROR;
             return res;
@@ -220,7 +227,6 @@ public class SimChapterService {
 
         ctx.getSimChapterData().setGirdIndex(girdIndex);
         ctx.getSimChapterData().setGirdLightCount(girdLightCount + 1);
-
         return res;
     }
 }
