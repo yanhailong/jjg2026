@@ -6,6 +6,8 @@ import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PlayerController;
 import com.jjg.game.minigame.data.CheaterHuntData;
 import com.jjg.game.minigame.data.CheaterHuntRound;
+import com.jjg.game.minigame.data.GodGamblersData;
+import com.jjg.game.minigame.data.GodGamblersRound;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.sim.constant.BuildingOutputType;
 
@@ -117,6 +119,26 @@ public class SimPlayerContext {
     private CheaterHuntData cheaterHuntData;
     //找老千本局内存状态，退出小游戏或释放会话时丢弃
     private CheaterHuntRound cheaterHuntRound;
+    //赌神搓牌每日赠送记录，首次访问时加载，随会话释放
+    private GodGamblersData godGamblersData;
+    //赌神搓牌本局内存状态，重新进入小游戏或退出会话时丢弃
+    private GodGamblersRound godGamblersRound;
+
+    public GodGamblersData getGodGamblersData() {
+        return godGamblersData;
+    }
+
+    public void setGodGamblersData(GodGamblersData godGamblersData) {
+        this.godGamblersData = godGamblersData;
+    }
+
+    public GodGamblersRound getGodGamblersRound() {
+        return godGamblersRound;
+    }
+
+    public void setGodGamblersRound(GodGamblersRound godGamblersRound) {
+        this.godGamblersRound = godGamblersRound;
+    }
 
     public CheaterHuntData getCheaterHuntData() {
         return cheaterHuntData;

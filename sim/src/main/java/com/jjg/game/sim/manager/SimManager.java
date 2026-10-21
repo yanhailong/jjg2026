@@ -18,6 +18,8 @@ import com.jjg.game.core.service.GameFunctionService;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.service.PlayerStatService;
 import com.jjg.game.minigame.dao.CheaterHuntDao;
+import com.jjg.game.minigame.dao.GodGamblersDao;
+import com.jjg.game.minigame.service.GodGamblersService;
 import com.jjg.game.minigame.service.SimMiniGameService;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.ItemCfg;
@@ -115,6 +117,8 @@ public class SimManager {
     @Autowired
     private CheaterHuntDao cheaterHuntDao;
     @Autowired
+    private GodGamblersDao godGamblersDao;
+    @Autowired
     private SimDropService simDropService;
     @Autowired
     private SimStatsService simStatsService;
@@ -160,6 +164,8 @@ public class SimManager {
     private SeasonSmallDrawService smallDrawService;
     @Autowired
     private SimMiniGameService simMiniGameService;
+    @Autowired
+    private GodGamblersService godGamblersService;
     @Autowired
     private SeasonFreeGameService seasonFreeGameService;
     @Autowired
@@ -411,6 +417,7 @@ public class SimManager {
         if (ctx != null) {
             //离开会话丢弃小游戏本局，退出保存排队期间重登也不恢复。
             ctx.setCheaterHuntRound(null);
+            ctx.setGodGamblersRound(null);
             long now = System.currentTimeMillis();
             seasonService.stopGemEarnings(ctx, now);
             ctx.getSimBaseData().accumulateOnlineTime(now);
@@ -527,6 +534,7 @@ public class SimManager {
             smallDrawService.onLogin(ctx);
             //上下文及玩家已就绪，结算小游戏当日系统赠送。
             simMiniGameService.onLogin(ctx);
+            godGamblersService.onLogin(ctx);
         }
         return ctx;
     }
@@ -670,6 +678,9 @@ public class SimManager {
                 }
                 if (ctx.getCheaterHuntData() != null) {
                     cheaterHuntDao.save(ctx.getCheaterHuntData());
+                }
+                if (ctx.getGodGamblersData() != null) {
+                    godGamblersDao.save(ctx.getGodGamblersData());
                 }
                 //落库完成后再删路由; 玩家可能在复活等待超时后已重建 ctx, 此时路由必须保留
                 if (simPlayerContextRegistry.getContext(playerId) == null) {

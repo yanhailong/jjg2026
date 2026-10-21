@@ -147,6 +147,9 @@ public class SimAutoSaveService implements SimPlayerTickListener {
         if (ctx.getCheaterHuntData() != null) {
             enqueueIfChanged(ctx.getCheaterHuntData());
         }
+        if (ctx.getGodGamblersData() != null) {
+            enqueueIfChanged(ctx.getGodGamblersData());
+        }
     }
 
     /**

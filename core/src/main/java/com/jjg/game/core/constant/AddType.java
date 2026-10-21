@@ -353,6 +353,8 @@ public enum AddType {
     SIM_CHAPTER_LIGHT_GIRD(1832),
     //找老千小游戏消耗、通关奖励及每日赠送
     SIM_CHEATER_HUNT(1833),
+    //赌神搓牌消耗、比拼奖励及每日赠送
+    SIM_GOD_GAMBLERS(1834),
 
     //创建联盟
     ALLIANCE_CREATE(2001),

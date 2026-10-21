@@ -11,6 +11,8 @@ public interface MiniGameConstant {
      * 开放一键通关所需已通关章节关卡的global配置。
      */
     int QUICK_CLEAR_CHAPTER_GLOBAL_ID = 357;
+    /** 赌神搓牌只有一条配置。 */
+    int GOD_GAMBLERS_CONFIG_ID = 1001;
 
     /**
      * 单局状态，与客户端协议中的state保持一致。

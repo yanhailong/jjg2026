@@ -15,7 +15,7 @@ public class CheaterHuntSimpleInfo {
     public int levelLangId;
     @ProtoDesc("是否解锁")
     public boolean unlock;
-    @ProtoDesc("消耗道具")
+    @ProtoDesc("每回合开局消耗道具")
     public List<ItemInfo> costItems;
     @ProtoDesc("解锁道具")
     public List<ItemInfo> unlockItems;

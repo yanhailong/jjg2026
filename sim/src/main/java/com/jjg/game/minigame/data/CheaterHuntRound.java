@@ -19,6 +19,8 @@ public class CheaterHuntRound {
     private long endTime;
     //对局状态：1进行中，2通关，3失败，4通关待发奖
     private int state;
+    //失败奖励成功发放后置为true，避免同局重复结算
+    private boolean failureRewardGranted;
 
     public long getRoundId() {
         return roundId;
@@ -74,5 +76,13 @@ public class CheaterHuntRound {
 
     public void setState(int state) {
         this.state = state;
+    }
+
+    public boolean isFailureRewardGranted() {
+        return failureRewardGranted;
+    }
+
+    public void setFailureRewardGranted(boolean failureRewardGranted) {
+        this.failureRewardGranted = failureRewardGranted;
     }
 }
