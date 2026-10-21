@@ -17,9 +17,9 @@ import com.jjg.game.minigame.pb.res.*;
 import com.jjg.game.minigame.pb.struct.CheaterHuntInfo;
 import com.jjg.game.minigame.pb.struct.CheaterHuntSimpleInfo;
 import com.jjg.game.sampledata.GameDataManager;
-import com.jjg.game.sampledata.bean.CheaterHuntLevelCfg;
-import com.jjg.game.sampledata.bean.CheaterHuntMapCfg;
 import com.jjg.game.sampledata.bean.GlobalConfigCfg;
+import com.jjg.game.sampledata.bean.MinigameCheaterHuntLevelCfg;
+import com.jjg.game.sampledata.bean.MinigameCheaterHuntMapCfg;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.service.SimAutoSaveService;
 import com.jjg.game.sim.service.SimChapterService;
@@ -69,13 +69,13 @@ public class SimMiniGameService {
         CheaterHuntData data = data(ctx);
         ResEnterCheaterHuntGame res = new ResEnterCheaterHuntGame(grantDaily(ctx, data, System.currentTimeMillis()));
         res.openOneClickPass = openOneClickPass(ctx);
-        List<CheaterHuntLevelCfg> levels = levels();
+        List<MinigameCheaterHuntLevelCfg> levels = levels();
         res.allLevels = levels.size();
-        res.passLevels = levels.indexOf(GameDataManager.getCheaterHuntLevelCfg(data.getMaxPassedLevelId())) + 1;
-        int unlockedIndex = levels.indexOf(GameDataManager.getCheaterHuntLevelCfg(data.getLevelId()));
+        res.passLevels = levels.indexOf(GameDataManager.getMinigameCheaterHuntLevelCfg(data.getMaxPassedLevelId())) + 1;
+        int unlockedIndex = levels.indexOf(GameDataManager.getMinigameCheaterHuntLevelCfg(data.getLevelId()));
         res.levelSimpleInfoList = new ArrayList<>(levels.size());
         for (int i = 0; i < levels.size(); i++) {
-            CheaterHuntLevelCfg cfg = levels.get(i);
+            MinigameCheaterHuntLevelCfg cfg = levels.get(i);
             CheaterHuntSimpleInfo info = new CheaterHuntSimpleInfo();
             info.levelId = cfg.getId();
             info.levelLangId = cfg.getMapNameLocalization();
@@ -93,12 +93,12 @@ public class SimMiniGameService {
         ResCheaterHuntGameInfo res = new ResCheaterHuntGameInfo(grantDaily(ctx, data, System.currentTimeMillis()));
         if (res.code == Code.SUCCESS) {
             if (canStart(ctx)) {
-                CheaterHuntLevelCfg cfg = level(ctx, data.getLevelId());
+                MinigameCheaterHuntLevelCfg cfg = level(ctx, data.getLevelId());
                 if (cfg == null) {
                     res.code = Code.SAMPLE_ERROR;
                 } else {
                     int mapId = RandomUtils.randomEle(cfg.getUseCase());
-                    CheaterHuntMapCfg map = map(ctx, cfg, mapId);
+                    MinigameCheaterHuntMapCfg map = map(ctx, cfg, mapId);
                     if (map == null) {
                         res.code = Code.SAMPLE_ERROR;
                     } else {
@@ -127,8 +127,8 @@ public class SimMiniGameService {
     public ResUnlockNextLevel unlockNextLevel(SimPlayerContext ctx) {
         CheaterHuntData data = data(ctx);
         ResUnlockNextLevel res = new ResUnlockNextLevel(Code.SUCCESS);
-        CheaterHuntLevelCfg current = GameDataManager.getCheaterHuntLevelCfg(data.getLevelId());
-        List<CheaterHuntLevelCfg> levels = levels();
+        MinigameCheaterHuntLevelCfg current = GameDataManager.getMinigameCheaterHuntLevelCfg(data.getLevelId());
+        List<MinigameCheaterHuntLevelCfg> levels = levels();
         int index = levels.indexOf(current);
         if (index < 0) {
             log.warn("找老千解锁进度配置不存在 playerId={},levelId={}", ctx.playerId(), data.getLevelId());
@@ -138,7 +138,7 @@ public class SimMiniGameService {
         } else if (data.getMaxPassedLevelId() != data.getLevelId()) {
             res.code = Code.NOT_UNLOCKED;
         } else {
-            CheaterHuntLevelCfg next = level(ctx, levels.get(index + 1).getId());
+            MinigameCheaterHuntLevelCfg next = level(ctx, levels.get(index + 1).getId());
             if (next == null || !validUnlockItems(next.getClearCount())) {
                 log.warn("找老千解锁条件配置错误 playerId={},levelId={}", ctx.playerId(), levels.get(index + 1).getId());
                 res.code = Code.SAMPLE_ERROR;
@@ -166,8 +166,8 @@ public class SimMiniGameService {
         CheaterHuntRound round = ctx.getCheaterHuntRound();
         res.code = checkRound(ctx, round, roundId);
         if (res.code == Code.SUCCESS) {
-            CheaterHuntLevelCfg cfg = level(ctx, round.getLevelId());
-            CheaterHuntMapCfg map = cfg == null ? null : map(ctx, cfg, round.getMapId());
+            MinigameCheaterHuntLevelCfg cfg = level(ctx, round.getLevelId());
+            MinigameCheaterHuntMapCfg map = cfg == null ? null : map(ctx, cfg, round.getMapId());
             if (map == null) {
                 res.code = Code.SAMPLE_ERROR;
             } else if (spotId < 0 || spotId >= map.getTotalSpotCount()) {
@@ -230,7 +230,7 @@ public class SimMiniGameService {
                 res.code = Code.NOT_UNLOCKED;
             }
             if (res.code == Code.SUCCESS) {
-                CheaterHuntLevelCfg cfg = level(ctx, data.getLevelId());
+                MinigameCheaterHuntLevelCfg cfg = level(ctx, data.getLevelId());
                 if (cfg == null) {
                     res.code = Code.SAMPLE_ERROR;
                 } else {
@@ -251,7 +251,7 @@ public class SimMiniGameService {
         if (res.code == Code.SUCCESS) {
             res.code = settle(ctx, data, round);
             if (res.code == Code.SUCCESS) {
-                res.rewards = ItemUtils.buildItemInfo(GameDataManager.getCheaterHuntLevelCfg(round.getLevelId()).getClearReward());
+                res.rewards = ItemUtils.buildItemInfo(GameDataManager.getMinigameCheaterHuntLevelCfg(round.getLevelId()).getClearReward());
             }
         }
         res.info = assemble(ctx, data);
@@ -299,7 +299,7 @@ public class SimMiniGameService {
         if (data.getLastDailyGrantTime() >= now || TimeHelper.inSameDay(data.getLastDailyGrantTime(), now)) {
             return Code.SUCCESS;
         }
-        CheaterHuntLevelCfg cfg = level(ctx, data.getLevelId());
+        MinigameCheaterHuntLevelCfg cfg = level(ctx, data.getLevelId());
         if (cfg == null) {
             return Code.SAMPLE_ERROR;
         }
@@ -374,7 +374,7 @@ public class SimMiniGameService {
 
     /** 达标即发奖并记录实际通关，解锁进度只能由解锁请求推进。 */
     private int settle(SimPlayerContext ctx, CheaterHuntData data, CheaterHuntRound round) {
-        CheaterHuntLevelCfg cfg = level(ctx, round.getLevelId());
+        MinigameCheaterHuntLevelCfg cfg = level(ctx, round.getLevelId());
         if (cfg == null) {
             return Code.SAMPLE_ERROR;
         }
@@ -392,8 +392,8 @@ public class SimMiniGameService {
     }
 
     /** 集中校验影响玩法的配置关系，避免非法配置形成免费通关或无解局。 */
-    private CheaterHuntLevelCfg level(SimPlayerContext ctx, int levelId) {
-        CheaterHuntLevelCfg cfg = GameDataManager.getCheaterHuntLevelCfg(levelId);
+    private MinigameCheaterHuntLevelCfg level(SimPlayerContext ctx, int levelId) {
+        MinigameCheaterHuntLevelCfg cfg = GameDataManager.getMinigameCheaterHuntLevelCfg(levelId);
         if (cfg == null || cfg.getUseCase() == null || cfg.getUseCase().isEmpty()
                 || cfg.getDrawCount() <= 0 || cfg.getTargetCount() <= 0 || cfg.getTargetCount() > cfg.getDrawCount()
                 || (cfg.getTimeLimit() != -1 && cfg.getTimeLimit() <= 0)
@@ -406,10 +406,10 @@ public class SimMiniGameService {
     }
 
     /** 配置容器不保证行序，关卡等级决定解锁顺序，同级以ID确定顺序。 */
-    private List<CheaterHuntLevelCfg> levels() {
-        return GameDataManager.getCheaterHuntLevelCfgList().stream()
-                .sorted(Comparator.comparingInt(CheaterHuntLevelCfg::getLevel)
-                        .thenComparingInt(CheaterHuntLevelCfg::getId)).toList();
+    private List<MinigameCheaterHuntLevelCfg> levels() {
+        return GameDataManager.getMinigameCheaterHuntLevelCfgList().stream()
+                .sorted(Comparator.comparingInt(MinigameCheaterHuntLevelCfg::getLevel)
+                        .thenComparingInt(MinigameCheaterHuntLevelCfg::getId)).toList();
     }
 
     /** 章节服务负责懒加载；已加载的进度直接复用，不触碰章节数据访问层。 */
@@ -425,8 +425,8 @@ public class SimMiniGameService {
     }
 
     /** 场景必须容纳配置要求的全部随机作弊点。 */
-    private CheaterHuntMapCfg map(SimPlayerContext ctx, CheaterHuntLevelCfg cfg, int mapId) {
-        CheaterHuntMapCfg map = GameDataManager.getCheaterHuntMapCfg(mapId);
+    private MinigameCheaterHuntMapCfg map(SimPlayerContext ctx, MinigameCheaterHuntLevelCfg cfg, int mapId) {
+        MinigameCheaterHuntMapCfg map = GameDataManager.getMinigameCheaterHuntMapCfg(mapId);
         if (map == null || map.getTotalSpotCount() < cfg.getDrawCount()) {
             log.warn("找老千场景配置错误 playerId={},levelId={},mapId={}", ctx.playerId(), cfg.getId(), mapId);
             return null;

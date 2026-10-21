@@ -7,17 +7,17 @@ import javax.annotation.processing.Generated;
 /**
  * 配置bean
  *
- * @excelName CheaterHuntMap.xlsx
- * @sheetName CheaterHuntMap
+ * @excelName MinigameCheaterHuntMap.xlsx
+ * @sheetName MinigameCheaterHuntMap
  * @author Auto.Generator
  */
 @Generated("com.eouna.configtool.generator.template.java.JavaTemplateGenerator")
-public class CheaterHuntMapCfg extends BaseCfgBean {
+public class MinigameCheaterHuntMapCfg extends BaseCfgBean {
 
   /** 配置表名 */
-  public static final String EXCEL_NAME = "CheaterHuntMap.xlsx";
+  public static final String EXCEL_NAME = "MinigameCheaterHuntMap.xlsx";
   /** 配置表工作薄名 */
-  public static final String SHEET_NAME = "CheaterHuntMap";
+  public static final String SHEET_NAME = "MinigameCheaterHuntMap";
 
   /** 藏取总点位 */
   protected int TotalSpotCount;

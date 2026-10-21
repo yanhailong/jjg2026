@@ -151,8 +151,6 @@ public class GameDataManager {
     containerMap.put(CasinoStatsSheetCfg.class, new CasinoStatsSheetCfgContainer());
     containerMap.put(ChapterCfg.class, new ChapterCfgContainer());
     containerMap.put(ChapterLevelCfg.class, new ChapterLevelCfgContainer());
-    containerMap.put(CheaterHuntLevelCfg.class, new CheaterHuntLevelCfgContainer());
-    containerMap.put(CheaterHuntMapCfg.class, new CheaterHuntMapCfgContainer());
     containerMap.put(ChessJackStrategyCfg.class, new ChessJackStrategyCfgContainer());
     containerMap.put(ChessRobotCfg.class, new ChessRobotCfgContainer());
     containerMap.put(ChessTexasStrategyCfg.class, new ChessTexasStrategyCfgContainer());
@@ -196,6 +194,9 @@ public class GameDataManager {
     containerMap.put(MedalListCfg.class, new MedalListCfgContainer());
     containerMap.put(MiniGameCfg.class, new MiniGameCfgContainer());
     containerMap.put(MiniGameListCfg.class, new MiniGameListCfgContainer());
+    containerMap.put(MinigameCheaterHuntLevelCfg.class, new MinigameCheaterHuntLevelCfgContainer());
+    containerMap.put(MinigameCheaterHuntMapCfg.class, new MinigameCheaterHuntMapCfgContainer());
+    containerMap.put(MinigameGodofGamblersRubbingCfg.class, new MinigameGodofGamblersRubbingCfgContainer());
     containerMap.put(MiningAchievementCfg.class, new MiningAchievementCfgContainer());
     containerMap.put(MiningBundleShopCfg.class, new MiningBundleShopCfgContainer());
     containerMap.put(MiningCellTypeCfg.class, new MiningCellTypeCfgContainer());
@@ -1103,30 +1104,6 @@ public class GameDataManager {
     return getInstance().getCfgContainer(ChapterLevelCfg.class).getCfgBeanList();
   }
 
-  public static CheaterHuntLevelCfg getCheaterHuntLevelCfg(int key) {
-    return getInstance().getCfgContainer(CheaterHuntLevelCfg.class).getCfgBeanMap().get(key);
-  }
-
-  public static Map<Integer, CheaterHuntLevelCfg> getCheaterHuntLevelCfgMap() {
-    return getInstance().getCfgContainer(CheaterHuntLevelCfg.class).getCfgBeanMap();
-  }
-
-  public static List<CheaterHuntLevelCfg> getCheaterHuntLevelCfgList() {
-    return getInstance().getCfgContainer(CheaterHuntLevelCfg.class).getCfgBeanList();
-  }
-
-  public static CheaterHuntMapCfg getCheaterHuntMapCfg(int key) {
-    return getInstance().getCfgContainer(CheaterHuntMapCfg.class).getCfgBeanMap().get(key);
-  }
-
-  public static Map<Integer, CheaterHuntMapCfg> getCheaterHuntMapCfgMap() {
-    return getInstance().getCfgContainer(CheaterHuntMapCfg.class).getCfgBeanMap();
-  }
-
-  public static List<CheaterHuntMapCfg> getCheaterHuntMapCfgList() {
-    return getInstance().getCfgContainer(CheaterHuntMapCfg.class).getCfgBeanList();
-  }
-
   public static ChessJackStrategyCfg getChessJackStrategyCfg(int key) {
     return getInstance().getCfgContainer(ChessJackStrategyCfg.class).getCfgBeanMap().get(key);
   }
@@ -1641,6 +1618,42 @@ public class GameDataManager {
 
   public static List<MiniGameListCfg> getMiniGameListCfgList() {
     return getInstance().getCfgContainer(MiniGameListCfg.class).getCfgBeanList();
+  }
+
+  public static MinigameCheaterHuntLevelCfg getMinigameCheaterHuntLevelCfg(int key) {
+    return getInstance().getCfgContainer(MinigameCheaterHuntLevelCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, MinigameCheaterHuntLevelCfg> getMinigameCheaterHuntLevelCfgMap() {
+    return getInstance().getCfgContainer(MinigameCheaterHuntLevelCfg.class).getCfgBeanMap();
+  }
+
+  public static List<MinigameCheaterHuntLevelCfg> getMinigameCheaterHuntLevelCfgList() {
+    return getInstance().getCfgContainer(MinigameCheaterHuntLevelCfg.class).getCfgBeanList();
+  }
+
+  public static MinigameCheaterHuntMapCfg getMinigameCheaterHuntMapCfg(int key) {
+    return getInstance().getCfgContainer(MinigameCheaterHuntMapCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, MinigameCheaterHuntMapCfg> getMinigameCheaterHuntMapCfgMap() {
+    return getInstance().getCfgContainer(MinigameCheaterHuntMapCfg.class).getCfgBeanMap();
+  }
+
+  public static List<MinigameCheaterHuntMapCfg> getMinigameCheaterHuntMapCfgList() {
+    return getInstance().getCfgContainer(MinigameCheaterHuntMapCfg.class).getCfgBeanList();
+  }
+
+  public static MinigameGodofGamblersRubbingCfg getMinigameGodofGamblersRubbingCfg(int key) {
+    return getInstance().getCfgContainer(MinigameGodofGamblersRubbingCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, MinigameGodofGamblersRubbingCfg> getMinigameGodofGamblersRubbingCfgMap() {
+    return getInstance().getCfgContainer(MinigameGodofGamblersRubbingCfg.class).getCfgBeanMap();
+  }
+
+  public static List<MinigameGodofGamblersRubbingCfg> getMinigameGodofGamblersRubbingCfgList() {
+    return getInstance().getCfgContainer(MinigameGodofGamblersRubbingCfg.class).getCfgBeanList();
   }
 
   public static MiningAchievementCfg getMiningAchievementCfg(int key) {

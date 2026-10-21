@@ -7,17 +7,17 @@ import javax.annotation.processing.Generated;
 /**
  * 配置bean
  *
- * @excelName CheaterHuntLevel.xlsx
- * @sheetName CheaterHuntLevel
+ * @excelName MinigameCheaterHuntLevel.xlsx
+ * @sheetName MinigameCheaterHuntLevel
  * @author Auto.Generator
  */
 @Generated("com.eouna.configtool.generator.template.java.JavaTemplateGenerator")
-public class CheaterHuntLevelCfg extends BaseCfgBean {
+public class MinigameCheaterHuntLevelCfg extends BaseCfgBean {
 
   /** 配置表名 */
-  public static final String EXCEL_NAME = "CheaterHuntLevel.xlsx";
+  public static final String EXCEL_NAME = "MinigameCheaterHuntLevel.xlsx";
   /** 配置表工作薄名 */
-  public static final String SHEET_NAME = "CheaterHuntLevel";
+  public static final String SHEET_NAME = "MinigameCheaterHuntLevel";
 
   /** 地图解锁条件 */
   protected Map<Integer,Long> ClearCount;
@@ -33,6 +33,8 @@ public class CheaterHuntLevelCfg extends BaseCfgBean {
   protected int DrawCount;
   /** 等级 */
   protected int Level;
+  /** 失败奖励 */
+  protected Map<Integer,Long> LoseReward;
   /** 地图名称多语言 */
   protected int MapNameLocalization;
   /** 作弊点寻找个数 */
@@ -75,6 +77,11 @@ public class CheaterHuntLevelCfg extends BaseCfgBean {
   /** 返回等级 */
   public int getLevel() {
     return Level;
+  }
+
+  /** 返回失败奖励 */
+  public Map<Integer,Long> getLoseReward() {
+    return LoseReward;
   }
 
   /** 返回地图名称多语言 */

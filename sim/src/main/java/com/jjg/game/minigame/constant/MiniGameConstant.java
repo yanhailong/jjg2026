@@ -3,12 +3,18 @@ package com.jjg.game.minigame.constant;
 import com.jjg.game.common.constant.MessageConst;
 
 public interface MiniGameConstant {
-    /** 找老千首次进入的关卡。 */
+    /**
+     * 找老千首次进入的关卡。
+     */
     int FIRST_CHEATER_HUNT_LEVEL_ID = 1001;
-    /** 开放一键通关所需已通关章节关卡的global配置。 */
+    /**
+     * 开放一键通关所需已通关章节关卡的global配置。
+     */
     int QUICK_CLEAR_CHAPTER_GLOBAL_ID = 357;
 
-    /** 单局状态，与客户端协议中的state保持一致。 */
+    /**
+     * 单局状态，与客户端协议中的state保持一致。
+     */
     interface RoundState {
         int NONE = 0;
         int PLAYING = 1;
@@ -43,5 +49,25 @@ public interface MiniGameConstant {
         //解锁下一关
         int REQ_UNLOCK_NEXT_LEVEL = BASE_MSG_PREFIX | 0xB;
         int RES_UNLOCK_NEXT_LEVEL = BASE_MSG_PREFIX | 0xC;
+
+        //进入赌神小游戏
+        int REQ_ENTER_GOD_GAMBLERS_GAME = BASE_MSG_PREFIX | 0xD;
+        int RES_ENTER_GOD_GAMBLERS_GAME = BASE_MSG_PREFIX | 0xE;
+
+        //开始赌神小游戏
+        int REQ_START_GOD_GAMBLERS_GAME = BASE_MSG_PREFIX | 0xF;
+        int RES_START_GOD_GAMBLERS_GAME = BASE_MSG_PREFIX | 0x10;
+
+        //获得自己的牌
+        int REQ_GOD_GAMBLERS_SELF_POKER = BASE_MSG_PREFIX | 0x11;
+        int RES_GOD_GAMBLERS_SELF_POKER = BASE_MSG_PREFIX | 0x12;
+
+        //确定比拼
+        int REQ_GOD_GAMBLERS_CONFIRM_BATTLE = BASE_MSG_PREFIX | 0x13;
+        int RES_GOD_GAMBLERS_CONFIRM_BATTLE = BASE_MSG_PREFIX | 0x14;
+
+        //一键比拼
+        int REQ_GOD_GAMBLERS_QUICK_BATTLE = BASE_MSG_PREFIX | 0x15;
+        int RES_GOD_GAMBLERS_QUICK_BATTLE = BASE_MSG_PREFIX | 0x16;
     }
 }
