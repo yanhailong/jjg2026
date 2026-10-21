@@ -5,9 +5,6 @@ import com.jjg.game.sim.data.AbstractData;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.util.HashSet;
-import java.util.Set;
-
 /** 找老千小游戏的玩家进度、每日赠送标记和对局序号。 */
 @Document
 public class CheaterHuntData extends AbstractData {
@@ -16,8 +13,8 @@ public class CheaterHuntData extends AbstractData {
     private long playerId;
     //当前已解锁关卡配置ID，首次从1001开始
     private int levelId = MiniGameConstant.FIRST_CHEATER_HUNT_LEVEL_ID;
-    //实际通关过的关卡，解锁不会记为通关
-    private Set<Integer> passedLevels = new HashSet<>();
+    //按关卡顺序已通关的最高关卡配置ID；0表示尚未通关，解锁不会推进
+    private int maxPassedLevelId;
     //上次每日道具赠送时间，毫秒时间戳；0表示尚未赠送
     private long lastDailyGrantTime;
     //玩家对局递增序号，用于区分新旧对局
@@ -39,12 +36,12 @@ public class CheaterHuntData extends AbstractData {
         this.levelId = levelId;
     }
 
-    public Set<Integer> getPassedLevels() {
-        return passedLevels;
+    public int getMaxPassedLevelId() {
+        return maxPassedLevelId;
     }
 
-    public void setPassedLevels(Set<Integer> passedLevels) {
-        this.passedLevels = passedLevels;
+    public void setMaxPassedLevelId(int maxPassedLevelId) {
+        this.maxPassedLevelId = maxPassedLevelId;
     }
 
     public long getLastDailyGrantTime() {

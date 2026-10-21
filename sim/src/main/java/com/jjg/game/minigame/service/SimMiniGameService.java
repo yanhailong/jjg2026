@@ -71,15 +71,17 @@ public class SimMiniGameService {
         res.openOneClickPass = openOneClickPass(ctx);
         List<CheaterHuntLevelCfg> levels = levels();
         res.allLevels = levels.size();
+        res.passLevels = levels.indexOf(GameDataManager.getCheaterHuntLevelCfg(data.getMaxPassedLevelId())) + 1;
+        int unlockedIndex = levels.indexOf(GameDataManager.getCheaterHuntLevelCfg(data.getLevelId()));
         res.levelSimpleInfoList = new ArrayList<>(levels.size());
-        for (CheaterHuntLevelCfg cfg : levels) {
+        for (int i = 0; i < levels.size(); i++) {
+            CheaterHuntLevelCfg cfg = levels.get(i);
             CheaterHuntSimpleInfo info = new CheaterHuntSimpleInfo();
             info.levelId = cfg.getId();
             info.levelLangId = cfg.getMapNameLocalization();
-            info.pass = data.getPassedLevels().contains(cfg.getId());
-            if (info.pass) {
-                res.passLevels++;
-            }
+            info.unlock = i <= unlockedIndex;
+            info.costItems = ItemUtils.buildItemInfo(cfg.getCostItemID());
+            info.unlockItems = ItemUtils.buildItemInfo(cfg.getClearCount());
             res.levelSimpleInfoList.add(info);
         }
         return res;
@@ -121,7 +123,7 @@ public class SimMiniGameService {
         return res;
     }
 
-    /** 仅扣除下一关的解锁道具，成功后推进解锁进度，不创建单局。 */
+    /** 当前关通关后扣除下一关的解锁道具，成功后推进解锁进度，不创建单局。 */
     public ResUnlockNextLevel unlockNextLevel(SimPlayerContext ctx) {
         CheaterHuntData data = data(ctx);
         ResUnlockNextLevel res = new ResUnlockNextLevel(Code.SUCCESS);
@@ -133,6 +135,8 @@ public class SimMiniGameService {
             res.code = Code.SAMPLE_ERROR;
         } else if (index + 1 >= levels.size() || !canStart(ctx)) {
             res.code = Code.REPEAT_OP;
+        } else if (data.getMaxPassedLevelId() != data.getLevelId()) {
+            res.code = Code.NOT_UNLOCKED;
         } else {
             CheaterHuntLevelCfg next = level(ctx, levels.get(index + 1).getId());
             if (next == null || !validUnlockItems(next.getClearCount())) {
@@ -382,7 +386,7 @@ public class SimMiniGameService {
             return reward.code;
         }
         round.setState(RoundState.CLEARED);
-        data.getPassedLevels().add(cfg.getId());
+        data.setMaxPassedLevelId(cfg.getId());
         autoSaveService.enqueueSave(data);
         return Code.SUCCESS;
     }

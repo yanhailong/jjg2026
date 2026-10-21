@@ -62,6 +62,9 @@ public class ItemUtils {
     }
 
     public static List<ItemInfo> buildItemInfo(Map<Integer, Long> itemInfo) {
+        if(itemInfo == null){
+            return Collections.emptyList();
+        }
         List<ItemInfo> itemInfos = new ArrayList<>();
         for (Map.Entry<Integer, Long> longEntry : itemInfo.entrySet()) {
             ItemInfo info = new ItemInfo();
