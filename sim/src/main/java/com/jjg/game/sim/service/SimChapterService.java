@@ -9,7 +9,6 @@ import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.ChapterCfg;
 import com.jjg.game.sampledata.bean.ChapterLevelCfg;
-import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.dao.SimChapterDao;
 import com.jjg.game.sim.data.SimChapterData;
 import com.jjg.game.sim.data.SimPlayerContext;
@@ -72,6 +71,13 @@ public class SimChapterService {
         res.chapterId = simConfigCacheService.getLevelIdByChapterId(chapterLevelId);
         res.girdIndex = ctx.getSimChapterData().getGirdIndex();
         res.girdLightCount = ctx.getSimChapterData().getGirdLightCount();
+
+        ChapterLevelCfg chapterLevelCfg = GameDataManager.getChapterLevelCfg(chapterLevelId);
+        if (chapterLevelCfg != null && chapterLevelCfg.getBattleValue() > 0) {
+            res.chapterPKInfo = new ChapterPKInfo();
+            res.chapterPKInfo.selfPower = simEmployeeService.calAllCombatPower(ctx);
+            res.chapterPKInfo.targetPower = chapterLevelCfg.getBattleValue();
+        }
         return res;
     }
 
@@ -123,15 +129,17 @@ public class SimChapterService {
                 res.code = Code.FORBID;
                 return res;
             }
-            if (playerPackService.getItemCount(ctx.playerId(), SimConstant.Item.ID_EMPLOYEE_EXP)
-                    < chapterLevelCfg.getBattleValue()) {
-                res.code = Code.FORBID;
-                return res;
-            }
+
+            long combatPower = simEmployeeService.calAllCombatPower(ctx);
 
             res.chapterPKInfo = new ChapterPKInfo();
             res.chapterPKInfo.targetPower = chapterLevelCfg.getBattleValue();
-            res.chapterPKInfo.selfPower = simEmployeeService.calAllCombatPower(ctx);
+            res.chapterPKInfo.selfPower = combatPower;
+
+            if (combatPower < chapterLevelCfg.getBattleValue()) {
+                log.warn("战力比拼失败 playerId={},levelId={},selfPower={},battlePower={}", ctx.playerId(), levelId, combatPower, chapterLevelCfg.getBattleValue());
+                return res;
+            }
         } else if (chapterLevelCfg.getLevelType() != 1) {
             res.code = Code.SAMPLE_ERROR;
             return res;

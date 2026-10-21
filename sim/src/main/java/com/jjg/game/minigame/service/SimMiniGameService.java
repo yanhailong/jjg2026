@@ -212,13 +212,15 @@ public class SimMiniGameService {
                 res.rewards = ItemUtils.buildItemInfo(cfg.getClearReward());
             }
         }
-        if (round != null && round.getRoundId() == roundId && pendingFailureReward(round)) {
-            int code = settleFailureReward(ctx, round);
-            if (code != Code.SUCCESS) {
-                res.code = code;
-            } else {
-                res.rewards = ItemUtils.buildItemInfo(
-                        GameDataManager.getMinigameCheaterHuntLevelCfg(round.getLevelId()).getLoseReward());
+        if (round != null && round.getRoundId() == roundId && round.getState() == RoundState.FAILED) {
+            //倒计时结束属于正常失败结算，已结算的结束通知也成功返回，但不重复发奖。
+            res.code = Code.SUCCESS;
+            if (pendingFailureReward(round)) {
+                res.code = settleFailureReward(ctx, round);
+                if (res.code == Code.SUCCESS) {
+                    res.rewards = ItemUtils.buildItemInfo(
+                            GameDataManager.getMinigameCheaterHuntLevelCfg(round.getLevelId()).getLoseReward());
+                }
             }
         }
         res.info = assemble(ctx, data);
@@ -351,7 +353,7 @@ public class SimMiniGameService {
         return round;
     }
 
-    /** 寻找前拒绝旧局请求、已结束局及超时局。 */
+    /** 寻找前校验局号和状态，倒计时结束后交由find结算，不再处理点位。 */
     private int checkRound(SimPlayerContext ctx, CheaterHuntRound round, long roundId) {
         if (round == null || round.getRoundId() != roundId) {
             log.warn("找老千寻找局号不匹配 playerId={},roundId={}", ctx.playerId(), roundId);
@@ -359,7 +361,6 @@ public class SimMiniGameService {
         }
         expire(ctx, round, System.currentTimeMillis());
         if (round.getState() == RoundState.FAILED) {
-            log.warn("找老千寻找已超时 playerId={},roundId={}", ctx.playerId(), roundId);
             return Code.EXPIRE;
         }
         if (round.getState() != RoundState.PLAYING && !pendingReward(round)) {
@@ -374,7 +375,7 @@ public class SimMiniGameService {
         if (round != null && round.getState() == RoundState.PLAYING
                 && round.getEndTime() != -1 && now >= round.getEndTime()) {
             round.setState(RoundState.FAILED);
-            log.info("找老千单局超时 playerId={},roundId={},endTime={}", ctx.playerId(), round.getRoundId(), round.getEndTime());
+            log.info("找老千单局倒计时结束 playerId={},roundId={},endTime={}", ctx.playerId(), round.getRoundId(), round.getEndTime());
             return true;
         }
         return round != null && round.getState() == RoundState.FAILED;
@@ -404,6 +405,8 @@ public class SimMiniGameService {
             return reward.code;
         }
         round.setFailureRewardGranted(true);
+        log.info("找老千失败结算成功 playerId={},roundId={},levelId={}",
+                ctx.playerId(), round.getRoundId(), cfg.getId());
         return Code.SUCCESS;
     }
 

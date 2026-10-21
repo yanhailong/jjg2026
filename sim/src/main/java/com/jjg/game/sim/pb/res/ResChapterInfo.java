@@ -5,6 +5,7 @@ import com.jjg.game.common.pb.AbstractResponse;
 import com.jjg.game.common.proto.ProtoDesc;
 import com.jjg.game.common.proto.ProtobufMessage;
 import com.jjg.game.sim.constant.SimConstant;
+import com.jjg.game.sim.pb.struct.ChapterPKInfo;
 
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_GAME, cmd = SimConstant.MsgBean.RES_CHAPTER_INFO, resp = true)
 @ProtoDesc("获取章节信息返回")
@@ -17,6 +18,8 @@ public class ResChapterInfo extends AbstractResponse {
     public int girdIndex;
     @ProtoDesc("该格子已经点击次数")
     public int girdLightCount;
+    @ProtoDesc("pk信息，没有pk环节的时候该值为空")
+    public ChapterPKInfo chapterPKInfo;
 
     public ResChapterInfo(int code) {
         super(code);
