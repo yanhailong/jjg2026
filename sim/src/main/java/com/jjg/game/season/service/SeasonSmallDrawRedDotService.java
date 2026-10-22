@@ -23,14 +23,17 @@ public class SeasonSmallDrawRedDotService implements IRedDotService, SimPlayerTi
     private final SeasonSmallDrawConfigService configService;
     private final SeasonLifecycleService lifecycleService;
     private final RedDotManager redDotManager;
+    private final SeasonSmallDrawClock clock;
 
     public SeasonSmallDrawRedDotService(SimPlayerContextRegistry contexts,
                                         SeasonSmallDrawConfigService configService,
-                                        SeasonLifecycleService lifecycleService, RedDotManager redDotManager) {
+                                        SeasonLifecycleService lifecycleService, RedDotManager redDotManager,
+                                        SeasonSmallDrawClock clock) {
         this.contexts = contexts;
         this.configService = configService;
         this.lifecycleService = lifecycleService;
         this.redDotManager = redDotManager;
+        this.clock = clock;
     }
 
     @Override
@@ -87,7 +90,7 @@ public class SeasonSmallDrawRedDotService implements IRedDotService, SimPlayerTi
         if (draw == null) return false;
         SeasonSmallDrawData state = season.getSmallDraw();
         boolean dailyReward = !draw.config().getDailyReward().isEmpty()
-                && (state == null || state.getDailyRewardDay() != season.getDailyKey());
+                && (state == null || state.getDailyRewardDay() != clock.dayKey(season, System.currentTimeMillis()));
         return dailyReward || state != null && state.drawChances() > 0
                 && draw.remainingRewardCount(state.getObtainedRewards()) > 0;
     }

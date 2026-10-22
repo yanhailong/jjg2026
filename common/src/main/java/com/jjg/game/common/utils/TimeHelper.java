@@ -806,6 +806,21 @@ public final class TimeHelper {
         return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMilli), DEFAULT_ZONE);
     }
 
+    /** 将日期替换为 yyyyMMdd，保留当前时分秒及毫秒，返回时间偏移；0 表示恢复系统时间。 */
+    public static long getDateOffset(String date, long now) {
+        if ("0".equals(date)) {
+            return 0;
+        }
+        if (date == null || date.length() != 8) {
+            throw new IllegalArgumentException("日期格式必须为 yyyyMMdd");
+        }
+        LocalDate target = LocalDate.parse(date, DateTimeFormatter.BASIC_ISO_DATE);
+        if (target.getYear() <= 0) {
+            throw new IllegalArgumentException("年份必须大于0");
+        }
+        return getTimestamp(target.atTime(getLocalDateTime(now).toLocalTime())) - now;
+    }
+
     /**
      * 将给定时间戳转换为当天 23:59:59.999 的时间戳
      * @param timestamp

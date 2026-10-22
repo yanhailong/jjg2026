@@ -1,5 +1,6 @@
 package com.jjg.game.season.service;
 
+import com.jjg.game.common.utils.TimeHelper;
 import com.jjg.game.common.utils.WeightRandom;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
@@ -26,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.DateTimeException;
 import java.util.List;
 import java.util.Map;
 
@@ -42,24 +44,27 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
     private final SimAutoSaveService autoSaveService;
     private final SocialSender sender;
     private final SeasonSmallDrawRedDotService redDotService;
+    private final SeasonSmallDrawClock clock;
 
     public SeasonSmallDrawService(SeasonSmallDrawConfigService configService,
                                   SeasonLifecycleService lifecycleService, PlayerPackService playerPackService,
                                   SimAutoSaveService autoSaveService, SocialSender sender,
-                                  SeasonSmallDrawRedDotService redDotService) {
+                                  SeasonSmallDrawRedDotService redDotService, SeasonSmallDrawClock clock) {
         this.configService = configService;
         this.lifecycleService = lifecycleService;
         this.playerPackService = playerPackService;
         this.autoSaveService = autoSaveService;
         this.sender = sender;
         this.redDotService = redDotService;
+        this.clock = clock;
     }
 
     public DrawDefinition current(SimPlayerContext ctx) {
-        lifecycleService.ensureCurrent(ctx, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        lifecycleService.ensureCurrent(ctx, now);
         DrawDefinition draw = configService.activeDraw(ctx.getSeasonPlayerData().getSeasonId());
         if (draw != null) {
-            updateLogin(ctx, draw);
+            updateLogin(ctx, draw, clock.dayKey(ctx.getSeasonPlayerData(), now));
         }
         return draw;
     }
@@ -77,19 +82,23 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         //生命周期已在order=100更新赛季和自然日，普通tick只比较当天标记。
         SeasonPlayerData season = ctx.getSeasonPlayerData();
         SeasonSmallDrawData state = season == null ? null : season.getSmallDraw();
-        if (season == null || state != null && state.getLastLoginDay() == season.getDailyKey()) {
+        if (season == null) {
+            return;
+        }
+        int dayKey = clock.dayKey(season, now);
+        if (state != null && state.getLastLoginDay() == dayKey) {
             return;
         }
         DrawDefinition draw = configService.activeDraw(season.getSeasonId());
         if (draw != null) {
-            updateLogin(ctx, draw);
+            updateLogin(ctx, draw, dayKey);
         }
     }
 
     @Override
     public int order() { return 101; }
 
-    private void updateLogin(SimPlayerContext ctx, DrawDefinition draw) {
+    private void updateLogin(SimPlayerContext ctx, DrawDefinition draw, int dayKey) {
         SeasonPlayerData season = ctx.getSeasonPlayerData();
         SeasonSmallDrawData state = season.getSmallDraw();
         if (state == null) {
@@ -100,10 +109,10 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         if (state.getDrawId() != draw.id()) {
             throw new IllegalStateException("同一赛季小额抽奖配置ID发生变化");
         }
-        if (state.getLastLoginDay() != season.getDailyKey()) {
+        if (state.getLastLoginDay() != dayKey) {
             int limit = Math.max(0, draw.config().getMaxCumulativeDays());
             state.setPurchaseChances(Math.min(limit, Math.addExact(state.getPurchaseChances(), 1)));
-            state.setLastLoginDay(season.getDailyKey());
+            state.setLastLoginDay(dayKey);
             autoSaveService.enqueueSave(season);
         }
     }
@@ -159,7 +168,8 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         }
         SeasonPlayerData season = ctx.getSeasonPlayerData();
         SeasonSmallDrawData state = season.getSmallDraw();
-        if (state.getDailyRewardDay() == season.getDailyKey()) {
+        int dayKey = clock.dayKey(season, System.currentTimeMillis());
+        if (state.getDailyRewardDay() == dayKey) {
             response.code = Code.REPEAT_OP;
             return response;
         }
@@ -169,12 +179,12 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         }
         CommonResult<ItemOperationResult> result = playerPackService.addItems(ctx.playerId(), draw.config().getDailyReward(),
                 AddType.SIM_SEASON_SMALL_DRAW, "season-small-draw-daily:" + season.getSeasonKey()
-                        + ':' + season.getDailyKey(), true);
+                        + ':' + dayKey, true);
         if (result == null || !result.success()) {
             response.code = result == null ? Code.EXCEPTION : result.code;
             return response;
         }
-        state.setDailyRewardDay(season.getDailyKey());
+        state.setDailyRewardDay(dayKey);
         autoSaveService.saveAndWait(season);
         redDotService.refresh(ctx);
         response.code = Code.SUCCESS;
@@ -266,6 +276,20 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         return season.getSeasonKey() + ':' + drawId;
     }
 
+    public CommonResult<String> gmTime(SimPlayerContext ctx, String[] orders) {
+        if (ctx == null || orders == null || orders.length != 2) {
+            return new CommonResult<>(Code.PARAM_ERROR);
+        }
+        try {
+            clock.setDate(orders[1]);
+        } catch (DateTimeException | IllegalArgumentException e) {
+            return new CommonResult<>(Code.PARAM_ERROR);
+        }
+        current(ctx);
+        redDotService.refresh(ctx);
+        return new CommonResult<>(Code.SUCCESS, "time=" + TimeHelper.getLocalDateTime(clock.currentTime()));
+    }
+
     private SeasonSmallDrawInfo assemble(SimPlayerContext ctx, DrawDefinition draw) {
         SeasonPlayerData season = ctx.getSeasonPlayerData();
         SeasonSmallDrawData state = season.getSmallDraw();
@@ -282,7 +306,7 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
             info.price = shop.getPrice() == null ? null : shop.getPrice().toPlainString();
             info.channelProductId = SeasonPassService.channelProductId(ctx.getPlayer(), shop);
         }
-        info.dailyRewardClaimed = state.getDailyRewardDay() == season.getDailyKey();
+        info.dailyRewardClaimed = state.getDailyRewardDay() == clock.dayKey(season, System.currentTimeMillis());
         info.dailyReward = ItemUtils.buildItemInfo(draw.config().getDailyReward());
         info.coreItems = draw.rewards().stream().filter(RewardDefinition::core).findFirst()
                 .map(reward -> reward.options().stream()

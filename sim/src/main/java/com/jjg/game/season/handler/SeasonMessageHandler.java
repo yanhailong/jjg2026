@@ -182,12 +182,16 @@ public class SeasonMessageHandler implements GmListener {
 
     @Override
     public CommonResult<String> gm(PlayerController playerController, String[] gmOrders) {
-        if (gmOrders == null || gmOrders.length == 0 || !"season".equalsIgnoreCase(gmOrders[0])) {
+        if (gmOrders == null || gmOrders.length == 0) {
+            return new CommonResult<>(Code.NOT_FOUND);
+        }
+        boolean smallDrawTime = "SmallDrawTime".equalsIgnoreCase(gmOrders[0]);
+        if (!smallDrawTime && !"season".equalsIgnoreCase(gmOrders[0])) {
             return new CommonResult<>(Code.NOT_FOUND);
         }
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx != null) {
-            return seasonService.gmTime(ctx, gmOrders);
+            return smallDrawTime ? smallDrawService.gmTime(ctx, gmOrders) : seasonService.gmTime(ctx, gmOrders);
         }
         return remoteSeasonGm(playerController, gmOrders);
     }

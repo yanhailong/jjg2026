@@ -18,6 +18,7 @@ import com.jjg.game.core.base.reddot.IRedDotService;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.*;
+import com.jjg.game.core.listener.GmListener;
 import com.jjg.game.core.listener.OrderGenerate;
 import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeInfo;
@@ -35,22 +36,47 @@ import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
+import java.time.DateTimeException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 @Component
-public class ContinuousGiftController extends BaseActivityController implements OrderGenerate, IRedDotService, IPlayerLoginSuccess {
+public class ContinuousGiftController extends BaseActivityController implements OrderGenerate, IRedDotService, IPlayerLoginSuccess, GmListener {
     private static final int FUNCTION_ID = 6001;
     private static final int PAID_PACK = 1;
     private static final int FINAL_REWARD = 2;
     private static final int RED_DOT_SUBMODULE = 2;
     private static final int UNCLAIMED_REWARD_MAIL_ID = 51;
     private final MailService mailService;
+    // 仅覆盖本实例连续礼包时间，不修改系统时间或活动配置。
+    private volatile long gmTimeOffset;
 
     public ContinuousGiftController(MailService mailService) {
         this.mailService = mailService;
+    }
+
+    private long currentTimeMillis() {
+        return System.currentTimeMillis() + gmTimeOffset;
+    }
+
+    @Override
+    public CommonResult<String> gm(PlayerController playerController, String[] gmOrders) {
+        if (gmOrders == null || gmOrders.length == 0 || !"ContinuousGiftTime".equalsIgnoreCase(gmOrders[0])) {
+            return new CommonResult<>(Code.NOT_FOUND);
+        }
+        if (gmOrders.length != 2) {
+            return new CommonResult<>(Code.PARAM_ERROR);
+        }
+        long now = System.currentTimeMillis();
+        try {
+            long offset = TimeHelper.getDateOffset(gmOrders[1], now);
+            gmTimeOffset = offset;
+            return new CommonResult<>(Code.SUCCESS, "ContinuousGiftTime=" + TimeHelper.getLocalDateTime(now + offset));
+        } catch (IllegalArgumentException | DateTimeException e) {
+            return new CommonResult<>(Code.PARAM_ERROR);
+        }
     }
 
     @Override
@@ -132,8 +158,8 @@ public class ContinuousGiftController extends BaseActivityController implements 
                 result.code = Code.REPEAT_OP;
                 return result;
             }
-            if (boughtToday(playerData, System.currentTimeMillis())) {
-                log.warn("连续礼包下单失败，今日已购买礼包 playerId:{} activityId:{} detailId:{}", player.getId(), activityData.getId(), detailId);
+            if (isDailyLimited(playerData, currentTimeMillis())) {
+                log.warn("连续礼包下单失败，未到下次购买日期 playerId:{} activityId:{} detailId:{}", player.getId(), activityData.getId(), detailId);
                 result.code = Code.DAILY_LIMIT;
                 return result;
             }
@@ -217,13 +243,14 @@ public class ContinuousGiftController extends BaseActivityController implements 
                             player.getId(), order.getId(), activityId, detailId, nextId);
                     return false;
                 }
-                if (boughtToday(playerData, System.currentTimeMillis())) {
-                    log.warn("连续礼包支付处理失败，今日已购买礼包 playerId:{} orderId:{} activityId:{} detailId:{}",
+                long now = currentTimeMillis();
+                if (isDailyLimited(playerData, now)) {
+                    log.warn("连续礼包支付处理失败，未到下次购买日期 playerId:{} orderId:{} activityId:{} detailId:{}",
                             player.getId(), order.getId(), activityId, detailId);
                     return false;
                 }
                 ContinuousGiftPlayerData purchased = new ContinuousGiftPlayerData(activityId, round);
-                purchased.setPurchaseTime(System.currentTimeMillis());
+                purchased.setPurchaseTime(now);
                 purchased.setOrderId(order.getId());
                 purchased.setClaimStatus(ActivityConstant.ClaimStatus.CAN_CLAIM);
                 playerData.put(detailId, purchased);
@@ -381,7 +408,7 @@ public class ContinuousGiftController extends BaseActivityController implements 
             }
         }
         List<ContinuousGiftDetailInfo> details = new ArrayList<>(cfgMap.size());
-        long now = System.currentTimeMillis();
+        long now = currentTimeMillis();
         for (ConsecutivePackCfg cfg : cfgMap.values()) {
             ContinuousGiftDetailInfo info = new ContinuousGiftDetailInfo();
             info.activityId = activityData.getId();
@@ -420,8 +447,9 @@ public class ContinuousGiftController extends BaseActivityController implements 
         return 0;
     }
 
-    private boolean boughtToday(Map<Integer, ContinuousGiftPlayerData> playerData, long now) {
-        return playerData.values().stream().anyMatch(data -> data.getPurchaseTime() > 0 && TimeHelper.inSameDay(data.getPurchaseTime(), now));
+    private boolean isDailyLimited(Map<Integer, ContinuousGiftPlayerData> playerData, long now) {
+        long dayStart = TimeHelper.getDateZeroMilliTime(now);
+        return playerData.values().stream().anyMatch(data -> data.getPurchaseTime() > 0 && data.getPurchaseTime() >= dayStart);
     }
 
     private boolean isClaimed(ContinuousGiftPlayerData data) {
@@ -448,7 +476,7 @@ public class ContinuousGiftController extends BaseActivityController implements 
     }
 
     private boolean isRunning(ActivityData activityData) {
-        long now = System.currentTimeMillis();
+        long now = currentTimeMillis();
         return activityData != null && activityData.getType() == ActivityType.CONTINUOUS_GIFT && activityData.canRun()
                 && now >= activityData.getTimeStart() && now < activityData.getTimeEnd();
     }

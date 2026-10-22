@@ -32,6 +32,7 @@ import com.jjg.game.season.data.SeasonFreeSpinResult;
 import com.jjg.game.season.pb.res.ResSeasonMatch;
 import com.jjg.game.season.pb.res.ResSeasonTrialProgress;
 import com.jjg.game.season.service.SeasonService;
+import com.jjg.game.season.service.SeasonSmallDrawService;
 import com.jjg.game.sim.bridge.ToSimBridge;
 import com.jjg.game.sim.data.*;
 import com.jjg.game.sim.logger.SimGuideLogger;
@@ -100,6 +101,8 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
     private SlotsStatisticsService slotsStatisticsService;
     @Autowired
     private SeasonService seasonService;
+    @Autowired
+    private SeasonSmallDrawService seasonSmallDrawService;
     @Autowired
     private SimCoopTaskService simCoopTaskService;
     @Autowired
@@ -536,6 +539,9 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
         if (ctx == null) {
             log.warn("赛季 GM 执行失败，未找到玩家 sim 数据 playerId={}", playerId);
             return new CommonResult<>(Code.NOT_FOUND);
+        }
+        if (orders != null && orders.length > 0 && "SmallDrawTime".equalsIgnoreCase(orders[0])) {
+            return seasonSmallDrawService.gmTime(ctx, orders);
         }
         return seasonService.gmTime(ctx, orders);
     }
