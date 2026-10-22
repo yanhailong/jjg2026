@@ -332,6 +332,10 @@ public interface SimConstant {
         //关卡游戏点亮格子
         int REQ_CHAPTER_LIGHT_GIRD = BASE_MSG_PREFIX | 0xAA;
         int RES_CHAPTER_LIGHT_GIRD = BASE_MSG_PREFIX | 0xAB;
+
+        //升级雇员技能
+        int REQ_UPGRADE_EMPLOYEE_SKILL = BASE_MSG_PREFIX | 0xAC;
+        int RES_UPGRADE_EMPLOYEE_SKILL = BASE_MSG_PREFIX | 0xAD;
     }
 
     interface SpecialGuest {
@@ -445,6 +449,12 @@ public interface SimConstant {
         String SLOTS = "2";
     }
 
+    interface BonusSource {
+        int COLLECTION = 1;
+        int EMPLOYEE = 2;
+        int ACHIEVEMENT = 3;
+    }
+
     interface Common {
         //普通游客产出时长达到上限80%时通知的功能
         int GUEST_OUTPUT_LIMIT_FUNCTION_ID = 5015;
@@ -461,9 +471,6 @@ public interface SimConstant {
 
         //服务能力加成系数基数 (VisitorStarCfg.Additioncoefficient, 100 表示 +0%)
         int SERVICE_CAPACITY_COEFFICIENT_BASE = 100;
-
-        //雇员加成固定值换算基数 (固定值 / 1000 = 加成百分比, 雇员文档第243行)
-        int EMPLOYEE_BONUS_DIVISOR = 1000;
 
         //广告收益倍数全局配置id (global.xlsx 135)
         int GLOBAL_AD_MULTIPLIER_ID = 135;

@@ -75,6 +75,8 @@ public class SimOperationDashboardService implements IRedDotService, SimPlayerTi
     @Autowired
     private SimBuildingService buildingService;
     @Autowired
+    private SimEmployeeAttributeService employeeAttributeService;
+    @Autowired
     private SimGuestService guestService;
     @Autowired
     private SimConfigCacheService configCache;
@@ -98,8 +100,9 @@ public class SimOperationDashboardService implements IRedDotService, SimPlayerTi
             } else {
                 long now = System.currentTimeMillis();
                 res.casinoId = casino.getCasinoId();
-                res.overview = buildOverview(ctx, casino, now, true);
-                res.buildings = buildBuildingData(ctx, casino, res.overview, now);
+                SimEmployeeAttributeService.Snapshot attributes = employeeAttributeService.snapshot(ctx);
+                res.overview = buildOverview(ctx, casino, now, true, attributes);
+                res.buildings = buildBuildingData(ctx, casino, res.overview, now, attributes);
                 res.researchBuildings = buildResearchBuildings(ctx, casino);
                 log.info("返回细分运营看板 playerId={},casinoId={},buildingCount={},researchCount={}",
                         ctx.playerId(), res.casinoId, res.buildings.size(), res.researchBuildings.size());
@@ -138,9 +141,10 @@ public class SimOperationDashboardService implements IRedDotService, SimPlayerTi
     }
 
     private OperationDashboardOverview buildOverview(SimPlayerContext ctx, SimCasinoData casino, long now,
-                                                     boolean writeSatisfactionLog) {
+                                                     boolean writeSatisfactionLog,
+                                                     SimEmployeeAttributeService.Snapshot attributes) {
         OperationDashboardOverview overview = new OperationDashboardOverview();
-        Map<BuildingOutputType, Long> outputs = buildingService.computePerMinuteOutput(ctx, casino);
+        Map<BuildingOutputType, Long> outputs = buildingService.computePerMinuteOutput(ctx, casino, attributes);
         overview.goldOutputPerMinute = outputs.getOrDefault(BuildingOutputType.GOLD, 0L) * 60;
         overview.expOutputPerMinute = outputs.getOrDefault(BuildingOutputType.CASINO_LEVEL_EXP, 0L) * 60;
         overview.totalCapacity = computeCurrentCapacity(casino);
@@ -148,13 +152,13 @@ public class SimOperationDashboardService implements IRedDotService, SimPlayerTi
         int currentCapacity = casino.countGenerateInWindow(now, SimConstant.Common.CAPACITY_WINDOW_MS);
         overview.currentCapacity = Math.min(overview.totalCapacity, currentCapacity);
         overview.capacityOverloaded = isCapacityOverloaded(currentCapacity, overview.totalCapacity);
-        overview.serviceCapacity = buildingService.computeDeptValue(ctx, casino, BuildingOutputType.SERVICE);
-        overview.awareness = buildingService.computeDeptValue(ctx, casino, BuildingOutputType.AWARENESS);
-        long exposure = buildingService.computeDeptValue(ctx, casino, BuildingOutputType.EXPOSURE);
+        overview.serviceCapacity = buildingService.computeDeptValue(ctx, casino, BuildingOutputType.SERVICE, attributes);
+        overview.awareness = buildingService.computeDeptValue(ctx, casino, BuildingOutputType.AWARENESS, attributes);
+        long exposure = buildingService.computeDeptValue(ctx, casino, BuildingOutputType.EXPOSURE, attributes);
 
         CasinoStatsSheetCfg casinoCfg = configCache.getCasinoStatsSheetCfg(
                 casino.getCasinoId(), casino.getCasinoLevel());
-        overview.customerAcquisitionPerMinute = customerAcquisitionPerMinute(casinoCfg, casino, now);
+        overview.customerAcquisitionPerMinute = customerAcquisitionPerMinute(ctx, casinoCfg, casino, now);
         overview.operationRate = operationRate(exposure, casinoCfg);
         overview.totalProsperity = buildingService.computeProsperity(casino);
         overview.standardInteractionCount = buildingService.computeStandardInteractionCount(casino);
@@ -174,7 +178,8 @@ public class SimOperationDashboardService implements IRedDotService, SimPlayerTi
     }
 
     private List<OperationBuildingData> buildBuildingData(SimPlayerContext ctx, SimCasinoData casino,
-                                                          OperationDashboardOverview overview, long now) {
+                                                          OperationDashboardOverview overview, long now,
+                                                          SimEmployeeAttributeService.Snapshot attributes) {
         Map<Integer, Integer> expectedLevels = expectedBuildingLevels(casino);
         int receptionBuildingId = configCache.getCasinoManageBuildId(
                 casino.getCasinoId(), ServerBuildingType.WELCOME);
@@ -217,7 +222,7 @@ public class SimOperationDashboardService implements IRedDotService, SimPlayerTi
                 data.capacityOverloaded = isCapacityOverloaded(currentCapacity, data.capacity);
             }
 
-            Map<BuildingOutputType, Long> values = buildingService.computeDashboardBuildingValues(ctx, building);
+            Map<BuildingOutputType, Long> values = buildingService.computeDashboardBuildingValues(ctx, building, attributes, null);
             // 配置及建筑结算返回的是每分钟产出；数据看板前端统一按“/h”展示。
             data.goldOutputPerHour = values.getOrDefault(BuildingOutputType.GOLD, 0L) * 60;
             data.expOutputPerHour = values.getOrDefault(BuildingOutputType.CASINO_LEVEL_EXP, 0L) * 60;
@@ -382,8 +387,8 @@ public class SimOperationDashboardService implements IRedDotService, SimPlayerTi
         return total;
     }
 
-    public long customerAcquisitionPerMinute(CasinoStatsSheetCfg cfg, SimCasinoData casino, long now) {
-        long intervalMs = guestService.computeVisitIntervalMs(cfg, casino, now, true);
+    public long customerAcquisitionPerMinute(SimPlayerContext ctx, CasinoStatsSheetCfg cfg, SimCasinoData casino, long now) {
+        long intervalMs = guestService.computeVisitIntervalMs(ctx, cfg, casino, now, true);
         if (intervalMs <= 0) {
             return 0;
         }

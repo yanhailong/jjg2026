@@ -4,6 +4,9 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * 雇员数据
  *
@@ -23,6 +26,8 @@ public class SimEmployeeData extends AbstractData {
     private int level;
     //当前星级
     private int star;
+    //技能组 -> 当前等级；各雇员独立升级
+    private Map<Integer, Integer> skillLevels = new HashMap<>();
 
 
     public String getId() {
@@ -63,6 +68,14 @@ public class SimEmployeeData extends AbstractData {
 
     public void setStar(int star) {
         this.star = star;
+    }
+
+    public Map<Integer, Integer> getSkillLevels() {
+        return skillLevels;
+    }
+
+    public void setSkillLevels(Map<Integer, Integer> skillLevels) {
+        this.skillLevels = skillLevels;
     }
 
     /**

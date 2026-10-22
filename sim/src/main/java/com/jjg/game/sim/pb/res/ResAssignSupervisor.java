@@ -4,10 +4,8 @@ import com.jjg.game.common.constant.MessageConst;
 import com.jjg.game.common.pb.AbstractResponse;
 import com.jjg.game.common.proto.ProtoDesc;
 import com.jjg.game.common.proto.ProtobufMessage;
-import com.jjg.game.core.pb.KVInfo;
 import com.jjg.game.sim.constant.SimConstant;
-
-import java.util.List;
+import com.jjg.game.sim.pb.struct.EmployDetailInfo;
 
 /**
  * @author 11
@@ -18,10 +16,10 @@ import java.util.List;
 public class ResAssignSupervisor extends AbstractResponse {
     @ProtoDesc("雇员id")
     public int employeeId;
-    @ProtoDesc("主管百分比加成  key参考BuildingAreaTable表的typeValue值")
-    public List<KVInfo> manageEmployeeBonus;
-    @ProtoDesc("主管固定加成  key参考BuildingAreaTable表的typeValue值")
-    public List<KVInfo> manageEmployeeFixBonus;
+    @ProtoDesc("当前场景的雇员详情")
+    public EmployDetailInfo employee;
+    @ProtoDesc("当前场景雇员总战力")
+    public long totalCombatPower;
 
     public ResAssignSupervisor(int code) {
         super(code);

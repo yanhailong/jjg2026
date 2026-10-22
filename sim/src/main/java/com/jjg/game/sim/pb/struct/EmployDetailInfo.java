@@ -2,7 +2,7 @@ package com.jjg.game.sim.pb.struct;
 
 import com.jjg.game.common.proto.ProtoDesc;
 import com.jjg.game.common.proto.ProtobufMessage;
-import com.jjg.game.core.pb.KVInfo;
+import com.jjg.game.core.pb.KVLongInfo;
 
 import java.util.List;
 
@@ -21,10 +21,10 @@ public class EmployDetailInfo {
     public int star;
     @ProtoDesc("是否为主管")
     public boolean manager;
-    @ProtoDesc("主管百分比加成  key参考BuildingAreaTable表的typeValue值")
-    public List<KVInfo> manageEmployeeBonus;
-    @ProtoDesc("主管固定加成  key参考BuildingAreaTable表的typeValue值")
-    public List<KVInfo> manageEmployeeFixBonus;
-    @ProtoDesc("普通加成(雇员等级加成)  key参考BuildingAreaTable表的typeValue值")
-    public List<KVInfo> employeeBonus;
+    @ProtoDesc("战斗力")
+    public long combatPower;
+    @ProtoDesc("最终属性，key为BuildingOutputType")
+    public List<KVLongInfo> attributes;
+    @ProtoDesc("技能当前等级及配置")
+    public List<EmployeeSkillInfo> skills;
 }

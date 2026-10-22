@@ -485,6 +485,12 @@ public class SimPlayerContext {
         }
     }
 
+    public void printEmployee() {
+        for (Map.Entry<Integer, SimEmployeeData> en : employeeMap.entrySet()) {
+            System.out.println(JSONObject.toJSONString(en.getValue()));
+        }
+    }
+
     public void printBuilding() {
         SimCasinoData casino = getCurrentCasino();
         if (casino == null) {

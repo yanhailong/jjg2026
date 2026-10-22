@@ -25,6 +25,7 @@ import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.BuildingAreaTableCfg;
 import com.jjg.game.sampledata.bean.BuildingUpgradeTableCfg;
 import com.jjg.game.sampledata.bean.CasinoStatsSheetCfg;
+import com.jjg.game.sampledata.bean.EmployeeProfileCfg;
 import com.jjg.game.sim.constant.BuildingOutputType;
 import com.jjg.game.sim.constant.BuildingType;
 import com.jjg.game.sim.constant.SimConstant;
@@ -66,7 +67,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
     @Autowired
     private SimConfigCacheService configCache;
     @Autowired
-    private SimEmployeeService employeeService;
+    private SimEmployeeAttributeService employeeAttributeService;
     @Autowired
     private PlayerPackService playerPackService;
     @Autowired
@@ -186,6 +187,17 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                 res.canSetManager = employeeProfile > 0 && ctx.getEmployeeMap().keySet().stream().map(GameDataManager::getEmployeeProfileCfg).filter(Objects::nonNull).anyMatch(cfg -> cfg.getProfessionID() == employeeProfile);
             }
             log.info("返回建筑信息 playerId={},res={}", ctx.playerId(), JSON.toJSONString(res));
+
+            //这里为测试代码
+            log.info("建筑id={},受影响的雇员类型 ={}", buildingData.getId(), areaCfg.getEmployeeProfile());
+            log.info("已有雇员对应的技能：");
+            List<EmployeeProfileCfg> tmpList = configCache.getEmployeeProfileCfgByProfile(areaCfg.getEmployeeProfile());
+            for (EmployeeProfileCfg cfg : tmpList) {
+                SimEmployeeData employee = ctx.getEmployee(cfg.getId());
+                if (employee != null) {
+                    log.info("雇员信息={}", JSON.toJSONString(employee));
+                }
+            }
         } catch (Exception e) {
             log.error("", e);
         }
@@ -408,7 +420,9 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         return currentCfg != null && checkBuildingUpgrade(ctx, data, currentCfg).getFirst() == BuildingUpgradeCheck.CAN_UPGRADE && playerPackService.checkHasItems(ctx.getPlayer(), currentCfg.getUpgradeCost());
     }
 
-    /** 红点只统计当前资源足以完成整次升级的建筑，不把仅能投入一步进度的建筑算作可升级。 */
+    /**
+     * 红点只统计当前资源足以完成整次升级的建筑，不把仅能投入一步进度的建筑算作可升级。
+     */
     public Map<Integer, Long> redDotUpgradeCost(SimPlayerContext ctx, int buildingId) {
         SimCasinoData casino = ctx.getCurrentCasino();
         BuildingData data = casino == null ? null : casino.findBuilding(buildingId);
@@ -508,7 +522,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
 
             CommonResult<ItemOperationResult> commonResult = playerPackService.removeItems(ctx.getPlayer(), currentCfg.getUpgradeCost(), AddType.SIM_BUILDING_UPGRADE, null);
             if (!commonResult.success()) {
-                log.warn("升级建筑失败, 资源不足 playerId={},buildingId={},cost={},code={}", ctx.playerId(), buildingId, currentCfg.getUpgradeCost(),commonResult.code);
+                log.warn("升级建筑失败, 资源不足 playerId={},buildingId={},cost={},code={}", ctx.playerId(), buildingId, currentCfg.getUpgradeCost(), commonResult.code);
                 res.code = commonResult.code;
                 ctx.send(res);
                 return;
@@ -648,7 +662,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                 long cfgMs = remainMs * configCache.getBuildUpgradeCDProp() / 10000;
 
                 long reduceMs = configCache.getBuildUpgradeCDClearMs();
-                if(cfgMs > configCache.getBuildUpgradeCDClearMs()){
+                if (cfgMs > configCache.getBuildUpgradeCDClearMs()) {
                     reduceMs = cfgMs;
                 }
 
@@ -789,17 +803,17 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
      * @return itemId -> 每分钟数量 (金币/能量混合)
      */
     public Map<BuildingOutputType, Long> computePerMinuteOutput(SimPlayerContext ctx, SimCasinoData casino) {
+        return computePerMinuteOutput(ctx, casino, employeeAttributeService.snapshot(ctx));
+    }
+
+    public Map<BuildingOutputType, Long> computePerMinuteOutput(SimPlayerContext ctx, SimCasinoData casino,
+                                                                SimEmployeeAttributeService.Snapshot attributes) {
         if (casino.getBuildingData() == null || casino.getBuildingData().isEmpty()) {
             return Collections.emptyMap();
         }
-
-        //获取雇员加成
-        Map<BuildingOutputType, Integer> bonusesMap = new HashMap<>();
-        employeeService.computeEmployeeLevelBonus(ctx, bonusesMap);
-
-        Map<BuildingOutputType, Long> total = new HashMap<>();
+        Map<BuildingOutputType, Long> total = new EnumMap<>(BuildingOutputType.class);
         for (BuildingData building : casino.getBuildingData().values()) {
-            Map<BuildingOutputType, Long> actual = buildingActualPerMinute(ctx, building, bonusesMap);
+            Map<BuildingOutputType, Long> actual = buildingActualPerMinute(ctx, building, attributes);
             actual.forEach((buildingOutputType, count) -> total.merge(buildingOutputType, count, Long::sum));
         }
         return total;
@@ -808,9 +822,10 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
     /**
      * 计算单个建筑每分钟实际产出 (含普通雇员 + 主管 + 技能加成); 非每分钟产出类型返回空。
      *
-     * @param bonusesMap 已汇总的普通雇员加成 (按类型)
+     * @param attributes 本次计算共用的雇员最终属性和生效技能
      */
-    private Map<BuildingOutputType, Long> buildingActualPerMinute(SimPlayerContext ctx, BuildingData building, Map<BuildingOutputType, Integer> bonusesMap) {
+    private Map<BuildingOutputType, Long> buildingActualPerMinute(SimPlayerContext ctx, BuildingData building,
+                                                                  SimEmployeeAttributeService.Snapshot attributes) {
         BuildingAreaTableCfg areaCfg = GameDataManager.getBuildingAreaTableCfg(building.getId());
         if (areaCfg == null) {
             return Collections.emptyMap();
@@ -821,13 +836,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
             return Collections.emptyMap();
         }
 
-        //获取建筑的基础产出，不包含加成
-        Map<BuildingOutputType, Long> base = getBaseOutput(building.getId(), building.getLevel());
-        if (base.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        long skillBonus = skillOutputBonus(ctx, areaCfg.getUnlockGameId());
-        return applyBuildingBonus(ctx, base, areaCfg.getEmployeeProfile(), bonusesMap, skillBonus, null);
+        return computeDashboardBuildingValues(ctx, building, attributes, null);
     }
 
     /**
@@ -835,13 +844,17 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
      * 游戏区和休息区返回每分钟产出（含雇员、主管、技能加成），管理区返回当前部门属性。
      */
     public Map<BuildingOutputType, Long> computeDashboardBuildingValues(SimPlayerContext ctx, BuildingData building) {
-        return computeDashboardBuildingValues(ctx, building, null);
+        if (ctx == null || building == null) {
+            return Collections.emptyMap();
+        }
+        return computeDashboardBuildingValues(ctx, building, employeeAttributeService.snapshot(ctx), null);
     }
 
     /**
      * 计算总值时按需收集各属性的来源加成，结算和普通看板不创建明细对象。
      */
     public Map<BuildingOutputType, Long> computeDashboardBuildingValues(SimPlayerContext ctx, BuildingData building,
+                                                                        SimEmployeeAttributeService.Snapshot attributes,
                                                                         List<BonusInfo> bonusInfos) {
         if (ctx == null || building == null) {
             return Collections.emptyMap();
@@ -854,76 +867,32 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         if (base.isEmpty()) {
             return Collections.emptyMap();
         }
-        Map<BuildingOutputType, Integer> bonusesMap = new HashMap<>();
-        employeeService.computeEmployeeLevelBonus(ctx, bonusesMap);
-        BuildingType buildingType = BuildingType.fromCode(areaCfg.getType());
-        long skillBonus = buildingType == BuildingType.GAME || buildingType == BuildingType.REST
-                ? skillOutputBonus(ctx, areaCfg.getUnlockGameId()) : 0;
-        return applyBuildingBonus(ctx, base, areaCfg.getEmployeeProfile(), bonusesMap, skillBonus, bonusInfos);
-    }
-
-    private long skillOutputBonus(SimPlayerContext ctx, int gameType) {
-        long bonus = skillOutputBonus(ctx.getSkillData(0));
-        if (gameType > 0) {
-            bonus += skillOutputBonus(ctx.getSkillData(gameType));
-        }
-        return bonus;
-    }
-
-    private long skillOutputBonus(SimSkillsData skillsData) {
-        Map<Integer, SkillDetailData> skillsMap = skillsData == null ? null : skillsData.getSkillsMap();
-        if (skillsMap == null || skillsMap.isEmpty()) {
-            return 0;
-        }
-        long bonus = 0;
-        for (SkillDetailData detail : skillsMap.values()) {
-            if (detail != null) {
-                bonus += detail.getAddOutPut();
-            }
-        }
-        return bonus;
+        return applyBuildingBonus(base, areaCfg, attributes, bonusInfos);
     }
 
     /**
-     * 为单个建筑的基础产出叠加 (普通雇员 + 主管) 加成; 按产出类型分别计算:
-     * 实际产出 = 基础 + 基础 * 百分比 / 1000 + 固定值。
-     * 百分比 = 雇员等级加成 + 主管技能 Modifier；固定值 = 主管技能 Buff + 成就徽章 BuffId。
+     * 固定收益相加后，统一应用万分比；明细仅在建筑详情请求时创建。
      */
-    private Map<BuildingOutputType, Long> applyBuildingBonus(SimPlayerContext ctx, Map<BuildingOutputType, Long> base, int employeeProfile, Map<BuildingOutputType, Integer> bonusesMap) {
-        return applyBuildingBonus(ctx, base, employeeProfile, bonusesMap, 0, null);
-    }
-
-    private Map<BuildingOutputType, Long> applyBuildingBonus(SimPlayerContext ctx, Map<BuildingOutputType, Long> base,
-                                                             int employeeProfile, Map<BuildingOutputType, Integer> bonusesMap,
-                                                             long skillBonus, List<BonusInfo> bonusInfos) {
-        if (base == null || base.isEmpty()) {
-            return base;
-        }
-        //主管加成 (百分比 + 固定值)
-        SimEmployeeService.ManageBonus manage = employeeService.manageEmployeeBonus(ctx, employeeProfile);
-        Map<BuildingOutputType, Long> result = new HashMap<>(base.size());
+    private Map<BuildingOutputType, Long> applyBuildingBonus(Map<BuildingOutputType, Long> base,
+                                                             BuildingAreaTableCfg areaCfg,
+                                                             SimEmployeeAttributeService.Snapshot attributes,
+                                                             List<BonusInfo> bonusInfos) {
+        long employeeOutput = attributes.professionAttribute(areaCfg.getEmployeeProfile()) / GameConstant.TEN_THOUSAND;
+        Map<BuildingOutputType, Long> result = new EnumMap<>(BuildingOutputType.class);
         for (Map.Entry<BuildingOutputType, Long> en : base.entrySet()) {
-            BuildingOutputType group = en.getKey().bonusGroup();
+            BuildingOutputType type = en.getKey();
             long baseVal = en.getValue();
-            int employeePercent = bonusesMap.getOrDefault(group, 0);
-            int percent = employeePercent + manage.modifier().getOrDefault(group, 0);
-            long employeeAndManager = baseVal * percent / SimConstant.Common.EMPLOYEE_BONUS_DIVISOR
-                    + manage.buff().getOrDefault(group, 0);
-            int medal = medalService.getFixedBonus(ctx, en.getKey());
-            long skill = en.getKey() == BuildingOutputType.CASINO_LEVEL_EXP
-                    ? 0 : baseVal * skillBonus / GameConstant.TEN_THOUSAND;
-            result.put(en.getKey(), baseVal + employeeAndManager + medal + skill);
+            SimAttributeBonus bonus = new SimAttributeBonus();
+            bonus.addFixed(employeeOutput);
+            attributes.addBuildingBonus(areaCfg.getId(), type, bonus);
+            long actual = bonus.apply(baseVal);
+            result.put(type, actual);
             if (bonusInfos != null) {
-                long employee = baseVal * employeePercent / SimConstant.Common.EMPLOYEE_BONUS_DIVISOR;
-                //保留比例合并取整的结算口径，取整差额归入主管项，保证明细之和等于总加成。
-                long manager = employeeAndManager - employee;
                 BonusInfo info = new BonusInfo();
-                info.typeValue = en.getKey().getCode();
-                info.bonus = List.of(
-                        new KVLongInfo(Code.BUILD_BONUS_EMPLOYEE, employee),
-                        new KVLongInfo(Code.BUILD_BONUS_MANAGER, manager),
-                        new KVLongInfo(Code.BUILD_BONUS_MEDAL, medal),
-                        new KVLongInfo(Code.BUILD_BONUS_SKILL, skill));
+                info.typeValue = type.getCode();
+                info.totalValue = actual;
+                info.fixedValueAddList = List.of(new KVLongInfo(SimConstant.BonusSource.EMPLOYEE, bonus.fixed()));
+                info.propValueAddList = List.of(new KVLongInfo(SimConstant.BonusSource.EMPLOYEE, bonus.percent()));
                 bonusInfos.add(info);
             }
         }
@@ -943,8 +912,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         if (casino.getBuildingData() == null || casino.getBuildingData().isEmpty()) {
             return result;
         }
-        Map<BuildingOutputType, Integer> bonusesMap = new HashMap<>();
-        employeeService.computeEmployeeLevelBonus(ctx, bonusesMap);
+        SimEmployeeAttributeService.Snapshot attributes = employeeAttributeService.snapshot(ctx);
 
         for (BuildingData building : casino.getBuildingData().values()) {
             BuildingAreaTableCfg areaCfg = GameDataManager.getBuildingAreaTableCfg(building.getId());
@@ -955,11 +923,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
             if (buildingType != BuildingType.REST && buildingType != BuildingType.GAME) {
                 continue;
             }
-            Map<BuildingOutputType, Long> base = getBaseOutput(building.getId(), building.getLevel());
-            if (base.isEmpty()) {
-                continue;
-            }
-            Map<BuildingOutputType, Long> actual = applyBuildingBonus(ctx, base, areaCfg.getEmployeeProfile(), bonusesMap);
+            Map<BuildingOutputType, Long> actual = buildingActualPerMinute(ctx, building, attributes);
             if (buildingType == BuildingType.REST) {
                 //能量房间: 休息区 POWER 产量
                 result.merge(SimStatKey.Operation.ENERGY_ROOM, actual.getOrDefault(BuildingOutputType.POWER, 0L), Long::sum);
@@ -1068,18 +1032,16 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
      * @return 部门属性值; 未解锁对应建筑返回 0
      */
     public long computeDeptValue(SimPlayerContext ctx, SimCasinoData casino, BuildingOutputType outputType) {
+        return computeDeptValue(ctx, casino, outputType, employeeAttributeService.snapshot(ctx));
+    }
+
+    public long computeDeptValue(SimPlayerContext ctx, SimCasinoData casino, BuildingOutputType outputType,
+                                 SimEmployeeAttributeService.Snapshot attributes) {
         BuildingData dept = findDeptBuilding(casino, outputType);
         if (dept == null) {
             return 0;
         }
-        Map<BuildingOutputType, Long> base = getBaseOutput(dept.getId(), dept.getLevel());
-        if (base.isEmpty()) {
-            return 0;
-        }
-        BuildingAreaTableCfg areaCfg = GameDataManager.getBuildingAreaTableCfg(dept.getId());
-        Map<BuildingOutputType, Integer> bonusesMap = new HashMap<>();
-        employeeService.computeEmployeeLevelBonus(ctx, bonusesMap);
-        Map<BuildingOutputType, Long> actual = applyBuildingBonus(ctx, base, areaCfg.getEmployeeProfile(), bonusesMap);
+        Map<BuildingOutputType, Long> actual = computeDashboardBuildingValues(ctx, dept, attributes, null);
         return actual.getOrDefault(outputType, 0L);
     }
 
@@ -1483,7 +1445,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         if (cfg == null) {
             return Collections.emptyMap();
         }
-        Map<BuildingOutputType, Long> map = new HashMap<>(typeValues.size());
+        Map<BuildingOutputType, Long> map = new EnumMap<>(BuildingOutputType.class);
         for (Integer typeValue : typeValues) {
             BuildingOutputType outputType = BuildingOutputType.fromCode(typeValue);
             if (outputType == null) {

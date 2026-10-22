@@ -545,6 +545,16 @@ public class SimMessageHandler implements GmListener {
     }
 
     /**
+     * 升级雇员技能
+     */
+    @Command(SimConstant.MsgBean.REQ_UPGRADE_EMPLOYEE_SKILL)
+    public void reqUpgradeEmployeeSkill(PlayerController playerController, ReqUpgradeEmployeeSkill req) {
+        execute(playerController, ctx -> {
+            employeeService.onUpgradeEmployeeSkill(ctx, req.employeeId, req.groupId);
+        }, ReqUpgradeEmployeeSkill.class);
+    }
+
+    /**
      * 升星雇员
      */
     @Command(SimConstant.MsgBean.REQ_STAR_UP_EMPLOYEE)
@@ -1256,6 +1266,9 @@ public class SimMessageHandler implements GmListener {
             } else if ("printGuest".equalsIgnoreCase(gmOrders[0])) {
                 SimPlayerContext context = this.simPlayerContextRegistry.getContext(playerController.playerId());
                 context.printGuest();
+            } else if ("printEmployee".equalsIgnoreCase(gmOrders[0])) {
+                SimPlayerContext context = this.simPlayerContextRegistry.getContext(playerController.playerId());
+                context.printEmployee();
             } else if ("printBuilding".equalsIgnoreCase(gmOrders[0])) {
                 SimPlayerContext context = this.simPlayerContextRegistry.getContext(playerController.playerId());
                 context.printBuilding();

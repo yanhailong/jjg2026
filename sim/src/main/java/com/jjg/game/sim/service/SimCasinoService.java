@@ -57,8 +57,6 @@ public class SimCasinoService implements SimTaskStateReporter {
     @Autowired
     private SimConfigCacheService configCacheService;
     @Autowired
-    private SimEmployeeService employeeService;
-    @Autowired
     private SimAutoSaveService autoSaveService;
     @Autowired
     private RedisTemplate redisTemplate;
@@ -587,41 +585,7 @@ public class SimCasinoService implements SimTaskStateReporter {
      */
     public long awareness(SimPlayerContext ctx) {
         SimCasinoData casinoData = ctx.getCurrentCasino();
-        if (casinoData == null) {
-            return 0;
-        }
-
-        if (casinoData.getBuildingData() == null || casinoData.getBuildingData().isEmpty()) {
-            return 0;
-        }
-
-        BuildingData buildingData = null;
-        int operateBuildId = configCacheService.getCasinoManageBuildId(ctx.getCurrentCasino().getCasinoId(), ServerBuildingType.OPERATIONS);
-        if (operateBuildId > 0) {
-            //获取运营部的建筑
-            buildingData = casinoData.getBuildingData().get(operateBuildId);
-            if (buildingData == null) {
-                return 0;
-            }
-        }
-
-        //获取配置
-        BuildingUpgradeTableCfg cfg = configCacheService.getBuildingUpgradeCfg(buildingData.getId(), buildingData.getLevel());
-        if (cfg == null || cfg.getUpgradeOutput() < 1) {
-            return 0;
-        }
-
-        //获取雇员加成
-        Map<BuildingOutputType, Integer> bonusesMap = new HashMap<>();
-        employeeService.computeEmployeeLevelBonus(ctx, bonusesMap);
-        //运营部产出知名度: 加成 = 管理区集合体(MANAGE_ARRT, 雇员/主管) + 知名度专项(AWARENESS, 勋章)
-        int bouns = bonusesMap.getOrDefault(BuildingOutputType.MANAGE_ARRT, 0)
-                + bonusesMap.getOrDefault(BuildingOutputType.AWARENESS, 0);
-        if (bouns <= 0) {
-            return cfg.getUpgradeOutput();
-        }
-        long extra = cfg.getUpgradeOutput() * bouns / SimConstant.Common.EMPLOYEE_BONUS_DIVISOR;
-        return cfg.getUpgradeOutput() + extra;
+        return casinoData == null ? 0 : simBuildingService.computeDeptValue(ctx, casinoData, BuildingOutputType.AWARENESS);
     }
 
     /**

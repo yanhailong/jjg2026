@@ -11,6 +11,8 @@ import com.jjg.game.sim.data.*;
 import com.jjg.game.sim.pb.struct.*;
 import com.jjg.game.sim.service.SimBuildingService;
 import com.jjg.game.sim.service.SimConfigCacheService;
+import com.jjg.game.sim.service.SimEmployeeAttributeService;
+import com.jjg.game.sim.service.SimEmployeeService;
 import com.jjg.game.sim.service.SimOperationDashboardService;
 
 import java.util.ArrayList;
@@ -53,6 +55,14 @@ public final class SimPbConverter {
 
     public static BuildingInfo toBuildingInfo(SimPlayerContext ctx, SimConfigCacheService simConfigCacheService,
                                               BuildingData buildingData, BuildingUpgradeTableCfg currentLevelCfg, int unlockGameId, long now) {
+        return toBuildingInfo(ctx, simConfigCacheService, buildingData, currentLevelCfg, unlockGameId, now,
+                CommonUtil.getContext().getBean(SimEmployeeAttributeService.class).snapshot(ctx));
+    }
+
+    private static BuildingInfo toBuildingInfo(SimPlayerContext ctx, SimConfigCacheService simConfigCacheService,
+                                               BuildingData buildingData, BuildingUpgradeTableCfg currentLevelCfg,
+                                               int unlockGameId, long now,
+                                               SimEmployeeAttributeService.Snapshot attributes) {
         BuildingInfo info = new BuildingInfo();
         info.id = buildingData.getId();
         info.level = buildingData.getLevel();
@@ -80,7 +90,7 @@ public final class SimPbConverter {
                         ctx.getCurrentCasino().getCasinoId(), ctx.getCurrentCasino().getCasinoLevel());
                 //运营看板每分钟获客量
                 info.interactCount = Math.toIntExact(CommonUtil.getContext()
-                        .getBean(SimOperationDashboardService.class).customerAcquisitionPerMinute(casinoCfg, ctx.getCurrentCasino(), System.currentTimeMillis()));
+                        .getBean(SimOperationDashboardService.class).customerAcquisitionPerMinute(ctx, casinoCfg, ctx.getCurrentCasino(), System.currentTimeMillis()));
             }
         } else {
             int marketBuildId = simConfigCacheService.getCasinoManageBuildId(ctx.getCurrentCasino().getCasinoId(), ServerBuildingType.MARKETING);
@@ -102,7 +112,7 @@ public final class SimPbConverter {
 
         info.bonusInfos = new ArrayList<>();
         CommonUtil.getContext().getBean(SimBuildingService.class)
-                .computeDashboardBuildingValues(ctx, buildingData, info.bonusInfos);
+                .computeDashboardBuildingValues(ctx, buildingData, attributes, info.bonusInfos);
 
         BuildingAreaTableCfg buildingAreaTableCfg = GameDataManager.getBuildingAreaTableCfg(buildingData.getId());
 
@@ -116,7 +126,8 @@ public final class SimPbConverter {
 
         if (buildingAreaTableCfg.getType() == BuildingType.GAME.code() || buildingAreaTableCfg.getType() == BuildingType.REST.code()) {
             for (BonusInfo bonusInfo : info.bonusInfos) {
-                for (KVLongInfo bonus : bonusInfo.bonus) {
+                bonusInfo.totalValue *= 60L;
+                for (KVLongInfo bonus : bonusInfo.fixedValueAddList) {
                     bonus.value *= 60L;
                 }
             }
@@ -134,6 +145,7 @@ public final class SimPbConverter {
         info.id = data.getEmployeeId();
         info.level = data.getLevel();
         info.star = data.getStar();
+        info.skills = CommonUtil.getContext().getBean(SimEmployeeService.class).skillInfos(data);
         return info;
     }
 
@@ -173,12 +185,13 @@ public final class SimPbConverter {
         }
         List<BuildingInfo> list = new ArrayList<>(ctx.getCurrentCasino().getBuildingData().size());
         long now = System.currentTimeMillis();
-
-
+        SimEmployeeAttributeService.Snapshot attributes = CommonUtil.getContext()
+                .getBean(SimEmployeeAttributeService.class).snapshot(ctx);
         for (BuildingData b : ctx.getCurrentCasino().getBuildingData().values()) {
             BuildingAreaTableCfg buildingAreaTableCfg = GameDataManager.getBuildingAreaTableCfg(b.getId());
             BuildingUpgradeTableCfg buildingUpgradeCfg = simConfigCacheService.getBuildingUpgradeCfg(b.getId(), b.getLevel());
-            list.add(SimPbConverter.toBuildingInfo(ctx, simConfigCacheService, b, buildingUpgradeCfg, buildingAreaTableCfg.getUnlockGameId(), now));
+            list.add(toBuildingInfo(ctx, simConfigCacheService, b, buildingUpgradeCfg,
+                    buildingAreaTableCfg.getUnlockGameId(), now, attributes));
         }
         return list;
     }

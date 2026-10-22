@@ -28,6 +28,7 @@ import com.jjg.game.core.service.SpecialGuestDailyCountService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
+import com.jjg.game.sim.constant.BuildingOutputType;
 import com.jjg.game.sim.constant.ServerBuildingType;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.dao.SimCasinoDao;
@@ -135,7 +136,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             return;
         }
         //计算实际生成间隔(ms)
-        long intervalMs = computeVisitIntervalMs(casinoCfg, casino, now, false);
+        long intervalMs = computeVisitIntervalMs(ctx, casinoCfg, casino, now, false);
         if (casino.getLastGenerateTime() != 0 && now - casino.getLastGenerateTime() < intervalMs) {
             return;
         }
@@ -322,6 +323,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         if (res.guests == null) {
             res.guests = new ArrayList<>();
         }
+        long receptionCapacity = receptionCapacity(ctx);
         boolean guestUnlocked = false;
         for (int i = 0; i < count; i++) {
             GuestData guest = casino.findGuestData(guestId);
@@ -337,8 +339,8 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             //本次交互次数 (有奖励 + 无奖励)
             VisitorStarCfg starCfg = rewardService.getStarCfg(guestId, guest.getStar());
             int prosperity = buildingService.computeProsperity(casino);
-            int rewardedCount = computeInteractionCount(ctx, visitorQuestCfg.getServiceCapacity(), prosperity, starCfg);
-            int unrewardedCount = computeInteractionCount(ctx, visitorQuestCfg.getBaseServiceCapacity(), prosperity, starCfg);
+            int rewardedCount = computeInteractionCount(receptionCapacity, visitorQuestCfg.getServiceCapacity(), prosperity, starCfg);
+            int unrewardedCount = computeInteractionCount(receptionCapacity, visitorQuestCfg.getBaseServiceCapacity(), prosperity, starCfg);
             if (rewardedCount + unrewardedCount <= 0) {
                 log.info("生成购买游客但交互次数为 0, 跳过 playerId={},guestId={}", ctx.playerId(), guestId);
                 continue;
@@ -475,7 +477,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         NotifyGenerateGuest notify = new NotifyGenerateGuest(Code.SUCCESS);
         notify.guests = new ArrayList<>();
 
-        WeightRandom<GuestData> guestDataWeightRandom = weightRandomGuest(ctx.getCurrentCasino());
+        WeightRandom<GuestData> guestDataWeightRandom = weightRandomGuest(ctx);
 
         int cacheSize = 0;
 
@@ -512,8 +514,9 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         }
         List<GuestInfo> guests = new ArrayList<>();
         SimCasinoData casino = ctx.getCurrentCasino();
-        WeightRandom<GuestData> random = weightRandomGuest(casino);
+        WeightRandom<GuestData> random = weightRandomGuest(ctx);
         int prosperity = buildingService.computeProsperity(casino);
+        long receptionCapacity = receptionCapacity(ctx);
         for (int i = 0; i < count; i++) {
             GuestData guest = random.next();
             if (guest == null) {
@@ -524,7 +527,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                 continue;
             }
             VisitorStarCfg starCfg = rewardService.getStarCfg(guest.getId(), guest.getStar());
-            int rewardedCount = computeInteractionCount(ctx, visitorQuestCfg.getServiceCapacity(), prosperity, starCfg);
+            int rewardedCount = computeInteractionCount(receptionCapacity, visitorQuestCfg.getServiceCapacity(), prosperity, starCfg);
             List<DestinationInfo> destinations = planDestinations(guest, visitorQuestCfg, casino, rewardedCount, false,
                     canGenerateOrdinaryGuestRewards(ctx, System.currentTimeMillis()));
             if (destinations.isEmpty()) {
@@ -575,8 +578,9 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         //本次交互次数 (有奖励 + 无奖励)
         VisitorStarCfg starCfg = rewardService.getStarCfg(guest.getId(), guest.getStar());
         int prosperity = buildingService.computeProsperity(ctx.getCurrentCasino());
-        int rewardedCount = computeInteractionCount(ctx, visitorQuestCfg.getServiceCapacity(), prosperity, starCfg);
-        int unrewardedCount = computeInteractionCount(ctx, visitorQuestCfg.getBaseServiceCapacity(), prosperity, starCfg);
+        long receptionCapacity = receptionCapacity(ctx);
+        int rewardedCount = computeInteractionCount(receptionCapacity, visitorQuestCfg.getServiceCapacity(), prosperity, starCfg);
+        int unrewardedCount = computeInteractionCount(receptionCapacity, visitorQuestCfg.getBaseServiceCapacity(), prosperity, starCfg);
         if (rewardedCount + unrewardedCount <= 0) {
             ctx.getCurrentCasino().setLastGenerateTime(now);
 //            log.info("生成游客但交互次数为 0, 跳过 playerId={},guestId={}", ctx.playerId(), visitorQuestCfg.getId());
@@ -673,7 +677,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
      *
      * @param show 表示是否为展示数据，如果为展示数据，就不用考虑限制
      */
-    public long computeVisitIntervalMs(CasinoStatsSheetCfg casinoCfg, SimCasinoData casino, long now, boolean show) {
+    public long computeVisitIntervalMs(SimPlayerContext ctx, CasinoStatsSheetCfg casinoCfg, SimCasinoData casino, long now, boolean show) {
         long base = (long) casinoCfg.getBaseVisitInterval() * 1000L;
         int recent = casino.countGenerateInWindow(now, SimConstant.Common.CAPACITY_WINDOW_MS);
 
@@ -686,8 +690,8 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         if (building == null) {
             return computeVisitIntervalMsResult(casino, recent, base, show);
         }
-        BuildingUpgradeTableCfg buildingUpgradeCfg = configCache.getBuildingUpgradeCfg(operateBuildId, building.getLevel());
-        if (buildingUpgradeCfg == null) {
+        Map<BuildingOutputType, Long> buildingValues = buildingService.computeDashboardBuildingValues(ctx, building);
+        if (buildingValues.isEmpty()) {
             return computeVisitIntervalMsResult(casino, recent, base, show);
         }
 
@@ -698,7 +702,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         }
 
         double tmpExposureTimes = Math.round(
-                (double) buildingUpgradeCfg.getUpgradeOutput()
+                (double) buildingValues.getOrDefault(BuildingOutputType.EXPOSURE, 0L)
                         / casinoStatsSheetCfg.getExposureRequirements() * 10000
         ) / 10000.0;
         double param2 = Math.max(0, 1 - tmpExposureTimes);
@@ -720,7 +724,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
      * 1) 服务能力先按 VisitorStarCfg.Additioncoefficient (百分比) 加成
      * 2) floor(serviceCapacity / Prosperity) + 小数部分概率触发 +1
      */
-    private int computeInteractionCount(SimPlayerContext ctx, int serviceCapacity, int prosperity, VisitorStarCfg starCfg) {
+    private int computeInteractionCount(long receptionCapacity, int serviceCapacity, int prosperity, VisitorStarCfg starCfg) {
         if (serviceCapacity <= 0 || prosperity <= 0) {
             return 0;
         }
@@ -730,18 +734,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         }
         double effective = (double) serviceCapacity * coefficient / SimConstant.Common.SERVICE_CAPACITY_COEFFICIENT_BASE;
 
-        //加上接待区的服务能力
-        int welcomeBuildId = configCache.getCasinoManageBuildId(ctx.getCurrentCasino().getCasinoId(), ServerBuildingType.WELCOME);
-        if (welcomeBuildId > 0) {
-            BuildingData buildingData = ctx.getCurrentCasino().findBuilding(welcomeBuildId);
-            if (buildingData != null) {
-                BuildingUpgradeTableCfg buildingUpgradeTableCfg = configCache.getBuildingUpgradeCfg(buildingData.getId(), buildingData.getLevel());
-                if (buildingUpgradeTableCfg != null) {
-                    effective += buildingUpgradeTableCfg.getUpgradeOutput();
-                }
-            }
-        }
-
+        effective += receptionCapacity;
 
         double ratio = effective / (double) prosperity;
         int floor = (int) Math.floor(ratio);
@@ -752,23 +745,37 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         return floor;
     }
 
+    private long receptionCapacity(SimPlayerContext ctx) {
+        int welcomeBuildId = configCache.getCasinoManageBuildId(ctx.getCurrentCasino().getCasinoId(), ServerBuildingType.WELCOME);
+        if (welcomeBuildId > 0) {
+            BuildingData buildingData = ctx.getCurrentCasino().findBuilding(welcomeBuildId);
+            if (buildingData != null) {
+                return buildingService.computeDashboardBuildingValues(ctx, buildingData)
+                        .getOrDefault(BuildingOutputType.SERVICE, 0L);
+            }
+        }
+        return 0;
+    }
+
     /**
      * 按已解锁游客的刷新权重加权随机
      *
-     * @param casino
+     * @param ctx
      * @return
      */
-    private WeightRandom<GuestData> weightRandomGuest(SimCasinoData casino) {
+    private WeightRandom<GuestData> weightRandomGuest(SimPlayerContext ctx) {
         WeightRandom<GuestData> random = WeightRandom.create();
+        SimCasinoData casino = ctx.getCurrentCasino();
         if (casino.getGuestMap() == null || casino.getGuestMap().isEmpty()) {
             return random;
         }
+        BigDecimal awarenessRatio = guestAwarenessRatio(ctx, casino);
         for (GuestData g : casino.getGuestMap().values()) {
             VisitorQuestCfg cfg = GameDataManager.getVisitorQuestCfg(g.getId());
             if (cfg == null) {
                 continue;
             }
-            int weight = effectiveRefreshWeight(casino, cfg);
+            int weight = effectiveRefreshWeight(awarenessRatio, cfg);
             if (weight > 0) {
                 random.add(g, weight);
             }
@@ -779,36 +786,32 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
     /**
      * 计算游客的有效刷新权重 (考虑知名度修正)
      */
-    public int effectiveRefreshWeight(SimCasinoData casino, VisitorQuestCfg cfg) {
+    private int effectiveRefreshWeight(BigDecimal awarenessRatio, VisitorQuestCfg cfg) {
         int base = cfg.getBaseWeight();
-        if (cfg.getAwareness() <= 0) {
+        if (cfg.getAwareness() <= 0 || awarenessRatio.signum() <= 0) {
             return base;
         }
+        return awarenessRatio.multiply(BigDecimal.valueOf(cfg.getAwareness())).intValue() + base;
+    }
 
-        //获取运营部的等级
-        BuildingData buildingData = null;
+    private BigDecimal guestAwarenessRatio(SimPlayerContext ctx, SimCasinoData casino) {
         int operateBuildId = configCache.getCasinoManageBuildId(casino.getCasinoId(), ServerBuildingType.OPERATIONS);
-        if (operateBuildId > 0) {
-            //获取运营部的建筑
-            buildingData = casino.getBuildingData().get(operateBuildId);
-            if (buildingData == null) {
-                return base;
-            }
+        BuildingData buildingData = casino.findBuilding(operateBuildId);
+        if (buildingData == null) {
+            return BigDecimal.ZERO;
         }
-
-        BuildingUpgradeTableCfg buildingUpgradeCfg = configCache.getBuildingUpgradeCfg(buildingData.getId(), buildingData.getLevel());
-        if (buildingUpgradeCfg == null || buildingUpgradeCfg.getUpgradeOutput() < 1) {
-            return base;
+        //保留原刷新权重取值口径：OPERATIONS 对应曝光建筑，此处使用该建筑的实际曝光值。
+        long awareness = buildingService.computeDashboardBuildingValues(ctx, buildingData)
+                .getOrDefault(BuildingOutputType.EXPOSURE, 0L);
+        if (awareness < 1) {
+            return BigDecimal.ZERO;
         }
 
         GlobalConfigCfg globalConfigCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.GUEST_AWARENESS_MAX);
         if (globalConfigCfg == null || globalConfigCfg.getIntValue() < 1) {
-            return base;
+            return BigDecimal.ZERO;
         }
-
-        BigDecimal value1 = BigDecimal.valueOf(buildingUpgradeCfg.getUpgradeOutput()).divide(BigDecimal.valueOf(globalConfigCfg.getIntValue()), 4, RoundingMode.HALF_EVEN);
-        BigDecimal value2 = value1.multiply(BigDecimal.valueOf(cfg.getAwareness()));
-        return value2.intValue() + base;
+        return BigDecimal.valueOf(awareness).divide(BigDecimal.valueOf(globalConfigCfg.getIntValue()), 4, RoundingMode.HALF_EVEN);
     }
 
     /**

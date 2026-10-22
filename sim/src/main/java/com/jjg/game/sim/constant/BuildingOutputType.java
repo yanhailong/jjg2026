@@ -100,6 +100,27 @@ public enum BuildingOutputType {
             case 13 -> {
                 return WATCH_ADS_ADD_GOLD;
             }
+            case 14 -> {
+                return BATTLE;
+            }
+            case 15 -> {
+                return BET;
+            }
+            case 16 -> {
+                return ENTERTAINMENT;
+            }
+            case 111 -> {
+                return MANAGE_ARRT_PROP;
+            }
+            case 114 -> {
+                return BATTLE_PROP;
+            }
+            case 115 -> {
+                return BET_PROP;
+            }
+            case 116 -> {
+                return ENTERTAINMENT_PROP;
+            }
             default -> {
                 return null;
             }
@@ -114,6 +135,17 @@ public enum BuildingOutputType {
         return switch (this) {
             case SERVICE, AWARENESS, EXPOSURE -> MANAGE_ARRT;
             default -> this;
+        };
+    }
+
+    /** 雇员固定属性及其万分比类型归并到同一属性，建筑产出类型返回 null。 */
+    public BuildingOutputType employeeAttribute() {
+        return switch (this) {
+            case MANAGE_ARRT, MANAGE_ARRT_PROP -> MANAGE_ARRT;
+            case BATTLE, BATTLE_PROP -> BATTLE;
+            case BET, BET_PROP -> BET;
+            case ENTERTAINMENT, ENTERTAINMENT_PROP -> ENTERTAINMENT;
+            default -> null;
         };
     }
 }

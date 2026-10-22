@@ -7,11 +7,10 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
-import com.jjg.game.core.pb.KVInfo;
+import com.jjg.game.core.pb.KVLongInfo;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
-import com.jjg.game.sim.constant.BuildingOutputType;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.dao.SimEmployeeDao;
 import com.jjg.game.sim.data.SimEmployeeData;
@@ -19,6 +18,7 @@ import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.listener.SimTaskStateReporter;
 import com.jjg.game.sim.pb.res.*;
 import com.jjg.game.sim.pb.struct.EmployDetailInfo;
+import com.jjg.game.sim.pb.struct.EmployeeSkillInfo;
 import com.jjg.game.sim.pb.struct.RecruitItemInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +45,8 @@ public class SimEmployeeService implements SimTaskStateReporter {
 
     @Autowired
     private SimConfigCacheService configCache;
+    @Autowired
+    private SimEmployeeAttributeService attributeService;
     @Autowired
     private SimEmployeeDao simEmployeeDao;
     @Autowired
@@ -148,14 +150,8 @@ public class SimEmployeeService implements SimTaskStateReporter {
                     re.itemId = profileCfg.getDuplicatetoShard().get(0);
                     re.count = profileCfg.getDuplicatetoShard().get(2);
 
-                    SimEmployeeData data = ctx.getEmployee(profileCfg.getId());
-                    if (data == null) {
-                        data = new SimEmployeeData();
-                        data.setPlayerId(ctx.playerId());
-                        data.setEmployeeId(profileCfg.getId());
-                        data.setLevel(INITIAL_LEVEL);
-                        data.setStar(INITIAL_STAR);
-                        ctx.putEmployee(data);
+                    if (ctx.getEmployee(profileCfg.getId()) == null) {
+                        unlockEmployee(ctx, profileCfg);
 
                         addEmployee.merge(profileCfg.getId(), 1, Integer::sum);
                     } else { //已拥有,转化成碎片
@@ -254,6 +250,63 @@ public class SimEmployeeService implements SimTaskStateReporter {
             log.info("升级雇员成功 playerId={},employeeId={},newLevel={},changeEndItemNum={}", ctx.playerId(), employeeId, data.getLevel(), changeEndItemNum);
         } catch (Exception e) {
             log.error("", e);
+            res.code = Code.EXCEPTION;
+        }
+        ctx.send(res);
+    }
+
+    /**
+     * 每个雇员独立升级技能，仅当前等级配置参与效果计算。
+     */
+    public void onUpgradeEmployeeSkill(SimPlayerContext ctx, int employeeId, int groupId) {
+        ResUpgradeEmployeeSkill res = new ResUpgradeEmployeeSkill(Code.SUCCESS);
+        res.employeeId = employeeId;
+        res.groupId = groupId;
+        try {
+            SimEmployeeData data = ctx.getEmployee(employeeId);
+            if (data == null) {
+                res.code = Code.NOT_FOUND;
+                ctx.send(res);
+                return;
+            }
+            Integer level = data.getSkillLevels().get(groupId);
+            EmployeeSkillConfigCfg current = level == null ? null : configCache.getEmployeeSkillCfg(groupId, level);
+            if (current == null) {
+                res.code = Code.PARAM_ERROR;
+                ctx.send(res);
+                return;
+            }
+            Map<Integer, Integer> upCost = current.getUpCost();
+            if (upCost == null || upCost.isEmpty()) {
+                res.code = Code.LEVEL_MAX;
+                ctx.send(res);
+                return;
+            }
+            EmployeeSkillConfigCfg next = configCache.getEmployeeSkillCfg(groupId, level + 1);
+            if (next == null) {
+                log.warn("升级雇员技能失败, 下一等级配置不存在 playerId={},employeeId={},groupId={},level={}",
+                        ctx.playerId(), employeeId, groupId, level);
+                res.code = Code.PARAM_ERROR;
+                ctx.send(res);
+                return;
+            }
+            Map<Integer, Long> cost = new HashMap<>(upCost.size());
+            upCost.forEach((itemId, count) -> cost.put(itemId, count.longValue()));
+            CommonResult<ItemOperationResult> removed = playerPackService.removeItems(ctx.getPlayer(), cost,
+                    AddType.SIM_EMPLOYEE_SKILL_UPGRADE, null);
+            if (!removed.success()) {
+                res.code = removed.code;
+                ctx.send(res);
+                return;
+            }
+            data.getSkillLevels().put(groupId, next.getSkillLevel());
+            SimEmployeeAttributeService.Snapshot snapshot = attributeService.snapshot(ctx);
+            res.employee = toEmployeeDetail(ctx, data, snapshot);
+            res.totalCombatPower = snapshot.totalCombatPower();
+            log.info("升级雇员技能成功 playerId={},employeeId={},groupId={},level={}",
+                    ctx.playerId(), employeeId, groupId, next.getSkillLevel());
+        } catch (Exception e) {
+            log.error("升级雇员技能异常 playerId={},employeeId={},groupId={}", ctx.playerId(), employeeId, groupId, e);
             res.code = Code.EXCEPTION;
         }
         ctx.send(res);
@@ -368,10 +421,9 @@ public class SimEmployeeService implements SimTaskStateReporter {
             }
             ctx.getCurrentCasino().addManagerEmploy(cfg.getProfessionID(), employeeId);
 
-            //主管加成: 按该职业可任职建筑的产出类型过滤后返回
-            ManageBonus manageBonus = managerBonusFiltered(ctx, cfg.getProfessionID());
-            res.manageEmployeeBonus = toKVList(manageBonus.modifier());
-            res.manageEmployeeFixBonus = toKVList(manageBonus.buff());
+            SimEmployeeAttributeService.Snapshot snapshot = attributeService.snapshot(ctx);
+            res.employee = toEmployeeDetail(ctx, data, snapshot);
+            res.totalCombatPower = snapshot.totalCombatPower();
 
             log.info("任命主管 playerId={},casinoId={},professionId={},employeeId={}", ctx.playerId(), ctx.getCurrentCasino().getCasinoId(), cfg.getProfessionID(), employeeId);
         } catch (Exception e) {
@@ -390,21 +442,10 @@ public class SimEmployeeService implements SimTaskStateReporter {
         ResAllEmployee res = new ResAllEmployee(Code.SUCCESS);
         try {
             if (ctx.getEmployeeMap() != null && !ctx.getEmployeeMap().isEmpty()) {
+                SimEmployeeAttributeService.Snapshot snapshot = attributeService.snapshot(ctx);
                 res.employees = new ArrayList<>();
-                for (Map.Entry<Integer, SimEmployeeData> en : ctx.getEmployeeMap().entrySet()) {
-                    SimEmployeeData value = en.getValue();
-                    EmployDetailInfo detailInfo = new EmployDetailInfo();
-                    detailInfo.id = value.getEmployeeId();
-                    detailInfo.level = value.getLevel();
-                    detailInfo.star = value.getStar();
-                    detailInfo.manager = ctx.getCurrentCasino().employIsManager(value.getEmployeeId());
-                    //主管加成: 原样返回雇员技能配置, 不做过滤 (11不拆, 客户端自行分类汇总)
-                    ManageBonus bonus = employeeSkillBonus(value.getEmployeeId());
-                    detailInfo.manageEmployeeBonus = toKVList(bonus.modifier());
-                    detailInfo.manageEmployeeFixBonus = toKVList(bonus.buff());
-                    //普通加成: 该雇员等级加成, 同样原样返回不拆11
-                    detailInfo.employeeBonus = toKVList(employeeNormalBonus(value));
-                    res.employees.add(detailInfo);
+                for (SimEmployeeData data : ctx.getEmployeeMap().values()) {
+                    res.employees.add(toEmployeeDetail(ctx, data, snapshot));
                 }
             }
         } catch (Exception e) {
@@ -429,183 +470,6 @@ public class SimEmployeeService implements SimTaskStateReporter {
     }
 
     /**
-     * 汇总所有已解锁雇员的等级百分比加成到 bonusesMap；单位千分比。
-     *
-     * @param ctx        玩家上下文
-     * @param bonusesMap 加成汇总输出
-     */
-    public void computeEmployeeLevelBonus(SimPlayerContext ctx, Map<BuildingOutputType, Integer> bonusesMap) {
-        //所有已解锁同职业雇员的等级加成
-        for (SimEmployeeData emp : ctx.getEmployeeMap().values()) {
-            EmployeeLevelCfg levelCfg = getLevelCfg(emp.getEmployeeId(), emp.getLevel());
-            if (levelCfg == null) {
-                continue;
-            }
-            sumBouns(bonusesMap, levelCfg.getAttributeValue());
-        }
-    }
-
-    /**
-     * 单个雇员的普通加成 (等级加成; 单位千分比), 不含勋章, key 保留 MANAGE_ARRT(11) 不拆。
-     * 与 {@link #computeEmployeeLevelBonus} 的雇员聚合口径同源, 供雇员列表逐雇员返回。
-     */
-    private Map<BuildingOutputType, Integer> employeeNormalBonus(SimEmployeeData emp) {
-        EmployeeLevelCfg levelCfg = getLevelCfg(emp.getEmployeeId(), emp.getLevel());
-        if (levelCfg == null) {
-            return Collections.emptyMap();
-        }
-        Map<BuildingOutputType, Integer> map = new HashMap<>();
-        sumBouns(map, levelCfg.getAttributeValue());
-        return map;
-    }
-
-    /**
-     * 仅仅获取主管的加成: 当前任职于该职业建筑的主管雇员技能加成 (Modifier 百分比 + Buff 固定值)。
-     *
-     * @param ctx             玩家上下文
-     * @param employeeProfile 建筑关联的职业ID
-     * @return 主管加成 (百分比 + 固定值)
-     */
-    public ManageBonus manageEmployeeBonus(SimPlayerContext ctx, int employeeProfile) {
-        if (employeeProfile < 1) {
-            return ManageBonus.empty();
-        }
-
-        int managerId = ctx.getCurrentCasino().manageEmploy(employeeProfile);
-        if (managerId < 1) {
-            return ManageBonus.empty();
-        }
-        //主管未解锁则无加成
-        if (ctx.getEmployee(managerId) == null) {
-            return ManageBonus.empty();
-        }
-        return employeeSkillBonus(managerId);
-    }
-
-    /**
-     * 雇员技能配置的原始加成: EmployeeProfile.SkillIdList 对应 EmployeeSkillConfig 的
-     * Modifier(百分比) + Buff(固定值), 按 {@link BuildingOutputType} 归类, 不做任何过滤。
-     */
-    private ManageBonus employeeSkillBonus(int employeeId) {
-        EmployeeProfileCfg profileCfg = GameDataManager.getEmployeeProfileCfg(employeeId);
-        if (profileCfg == null || profileCfg.getSkillIdList() == null || profileCfg.getSkillIdList().isEmpty()) {
-            return ManageBonus.empty();
-        }
-        Map<BuildingOutputType, Integer> modifier = new HashMap<>();
-        Map<BuildingOutputType, Integer> buff = new HashMap<>();
-        for (Integer skillId : profileCfg.getSkillIdList()) {
-            EmployeeSkillConfigCfg skillCfg = GameDataManager.getEmployeeSkillConfigCfg(skillId);
-            if (skillCfg == null) {
-                continue;
-            }
-            sumBouns(modifier, skillCfg.getModifier());
-            sumBouns(buff, skillCfg.getBuff());
-        }
-        return new ManageBonus(modifier, buff);
-    }
-
-    /**
-     * 当前任职于该职业建筑的主管加成, 已按该职业可任职建筑的产出类型过滤。
-     * 供任命主管返回与建筑信息返回共用, 保证两者同名字段取值一致。
-     */
-    public ManageBonus managerBonusFiltered(SimPlayerContext ctx, int employeeProfile) {
-        return filterByProfessionOutput(manageEmployeeBonus(ctx, employeeProfile), employeeProfile);
-    }
-
-    /**
-     * 主管加成按建筑产出类型过滤: 某职业只能担任 EmployeeProfile 匹配的建筑主管,
-     * 仅保留这些建筑产出类型 (typeValue 的 {@link BuildingOutputType#bonusGroup()}) 对应的加成。
-     */
-    private ManageBonus filterByProfessionOutput(ManageBonus bonus, int professionId) {
-        if (bonus.isEmpty()) {
-            return bonus;
-        }
-        Set<BuildingOutputType> allowed = EnumSet.noneOf(BuildingOutputType.class);
-        for (BuildingAreaTableCfg areaCfg : GameDataManager.getBuildingAreaTableCfgList()) {
-            List<Integer> typeValues = areaCfg.getTypeValue();
-            if (areaCfg.getEmployeeProfile() != professionId || typeValues == null) {
-                continue;
-            }
-            for (Integer typeValue : typeValues) {
-                BuildingOutputType type = BuildingOutputType.fromCode(typeValue);
-                if (type != null) {
-                    allowed.add(type.bonusGroup());
-                }
-            }
-        }
-        return new ManageBonus(retainAllowed(bonus.modifier(), allowed), retainAllowed(bonus.buff(), allowed));
-    }
-
-    private Map<BuildingOutputType, Integer> retainAllowed(Map<BuildingOutputType, Integer> src, Set<BuildingOutputType> allowed) {
-        if (src.isEmpty() || allowed.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        Map<BuildingOutputType, Integer> result = new HashMap<>(src.size());
-        for (Map.Entry<BuildingOutputType, Integer> en : src.entrySet()) {
-            BuildingOutputType key = en.getKey();
-            if (allowed.contains(key)) {
-                if (key == BuildingOutputType.MANAGE_ARRT) {
-                    result.put(BuildingOutputType.SERVICE, en.getValue());
-                    result.put(BuildingOutputType.AWARENESS, en.getValue());
-                    result.put(BuildingOutputType.EXPOSURE, en.getValue());
-                } else {
-                    result.put(key, en.getValue());
-                }
-            }
-        }
-        return result;
-    }
-
-    /**
-     * 加成 Map 转 KVInfo 列表 (key=产出类型 code, value=加成值); 空则返回 null。
-     */
-    public List<KVInfo> toKVList(Map<BuildingOutputType, Integer> bonus) {
-        if (bonus.isEmpty()) {
-            return null;
-        }
-        List<KVInfo> list = new ArrayList<>(bonus.size());
-        for (Map.Entry<BuildingOutputType, Integer> en : bonus.entrySet()) {
-            list.add(new KVInfo(en.getKey().getCode(), en.getValue()));
-        }
-        return list;
-    }
-
-    /**
-     * 主管加成: 百分比(千分比) + 固定值, 均按 {@link BuildingOutputType} 归类。
-     */
-    public record ManageBonus(Map<BuildingOutputType, Integer> modifier, Map<BuildingOutputType, Integer> buff) {
-        private static final ManageBonus EMPTY = new ManageBonus(Collections.emptyMap(), Collections.emptyMap());
-
-        public static ManageBonus empty() {
-            return EMPTY;
-        }
-
-        public boolean isEmpty() {
-            return modifier.isEmpty() && buff.isEmpty();
-        }
-    }
-
-    /**
-     * 将所有的加成总结
-     *
-     * @param bonusesMap
-     * @param attrMap
-     */
-    private void sumBouns(Map<BuildingOutputType, Integer> bonusesMap, Map<Integer, Integer> attrMap) {
-        if (attrMap == null || attrMap.isEmpty()) {
-            return;
-        }
-
-        for (Map.Entry<Integer, Integer> en : attrMap.entrySet()) {
-            BuildingOutputType buildingOutputType = BuildingOutputType.fromCode(en.getKey());
-            if (buildingOutputType == null) {
-                continue;
-            }
-            bonusesMap.merge(buildingOutputType, en.getValue(), Integer::sum);
-        }
-    }
-
-    /**
      * 添加雇员道具：首次解锁，其余数量按招募配置转为碎片。
      */
     public boolean addEmployeeItem(SimPlayerContext ctx, int itemId, long count, AddType addType) {
@@ -625,12 +489,7 @@ public class SimEmployeeService implements SimTaskStateReporter {
             }
         }
         if (unlocked) {
-            SimEmployeeData data = new SimEmployeeData();
-            data.setPlayerId(ctx.playerId());
-            data.setEmployeeId(cfg.getId());
-            data.setLevel(INITIAL_LEVEL);
-            data.setStar(INITIAL_STAR);
-            ctx.putEmployee(data);
+            unlockEmployee(ctx, cfg);
             employeeRedDotService.recordNewContent(ctx, SimEmployeeRedDotService.NEW_EMPLOYEE, cfg.getId());
             employeeRedDotService.updateRedDots(ctx.playerId(), SimConstant.Employee.RED_DOT_EMPLOYEE_GROWTH);
             reportEmployeeCounts(ctx);
@@ -641,6 +500,55 @@ public class SimEmployeeService implements SimTaskStateReporter {
     // ---------------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------------
+
+    private void unlockEmployee(SimPlayerContext ctx, EmployeeProfileCfg profile) {
+        SimEmployeeData data = new SimEmployeeData();
+        data.setPlayerId(ctx.playerId());
+        data.setEmployeeId(profile.getId());
+        data.setLevel(INITIAL_LEVEL);
+        data.setStar(INITIAL_STAR);
+        if (profile.getSkillIdList() != null) {
+            for (int skillId : profile.getSkillIdList()) {
+                EmployeeSkillConfigCfg skill = GameDataManager.getEmployeeSkillConfigCfg(skillId);
+                if (skill != null) {
+                    data.getSkillLevels().put(skill.getGroupId(), skill.getSkillLevel());
+                }
+            }
+        }
+        ctx.putEmployee(data);
+    }
+
+    public List<EmployeeSkillInfo> skillInfos(SimEmployeeData data) {
+        List<EmployeeSkillInfo> infos = new ArrayList<>(data.getSkillLevels().size());
+        data.getSkillLevels().forEach((groupId, level) -> {
+            EmployeeSkillConfigCfg cfg = configCache.getEmployeeSkillCfg(groupId, level);
+            if (cfg != null) {
+                EmployeeSkillInfo info = new EmployeeSkillInfo();
+                info.groupId = groupId;
+                info.level = level;
+                info.configId = cfg.getId();
+                infos.add(info);
+            }
+        });
+        infos.sort(Comparator.comparingInt(info -> info.groupId));
+        return infos;
+    }
+
+    public EmployDetailInfo toEmployeeDetail(SimPlayerContext ctx, SimEmployeeData data,
+                                           SimEmployeeAttributeService.Snapshot snapshot) {
+        EmployDetailInfo info = new EmployDetailInfo();
+        info.id = data.getEmployeeId();
+        info.level = data.getLevel();
+        info.star = data.getStar();
+        info.manager = ctx.getCurrentCasino().employIsManager(data.getEmployeeId());
+        info.combatPower = snapshot.combatPower(data.getEmployeeId());
+        info.attributes = new ArrayList<>();
+        snapshot.attributes(data.getEmployeeId()).forEach((type, value) ->
+                info.attributes.add(new KVLongInfo(type.getCode(), value)));
+        info.attributes.sort(Comparator.comparingInt(attribute -> attribute.key));
+        info.skills = skillInfos(data);
+        return info;
+    }
 
     private EmployeeLevelCfg getLevelCfg(int employeeId, int level) {
         Map<Integer, Map<Integer, EmployeeLevelCfg>> levelMap = configCache.getEmployeeLevelCfgMap();
@@ -697,40 +605,12 @@ public class SimEmployeeService implements SimTaskStateReporter {
     }
 
     /**
-     * 计算雇员战力
-     *
-     * @param simEmployeeData
-     * @return
-     */
-    public long calCombatPower(SimEmployeeData simEmployeeData) {
-        EmployeeLevelCfg cfg = configCache.getEmployeeLevelCfgByIdAndLevel(simEmployeeData.getEmployeeId(), simEmployeeData.getLevel());
-        if (cfg == null || cfg.getAttributeValue() == null || cfg.getAttributeValue().isEmpty()) {
-            return 0;
-        }
-
-        long combatPower = 0;
-        for (Map.Entry<Integer, Integer> en : cfg.getAttributeValue().entrySet()) {
-            combatPower += en.getValue();
-        }
-        return combatPower;
-    }
-
-    /**
      * 计算所有雇员的战力之和
      *
      * @param ctx
      * @return
      */
     public long calAllCombatPower(SimPlayerContext ctx) {
-        if (ctx.getEmployeeMap() == null || ctx.getEmployeeMap().isEmpty()) {
-            return 0;
-        }
-
-        long combatPower = 0;
-        for (Map.Entry<Integer, SimEmployeeData> en : ctx.getEmployeeMap().entrySet()) {
-            combatPower += calCombatPower(en.getValue());
-        }
-
-        return combatPower;
+        return attributeService.snapshot(ctx).totalCombatPower();
     }
 }

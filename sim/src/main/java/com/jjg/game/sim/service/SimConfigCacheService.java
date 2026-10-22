@@ -87,8 +87,12 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private Map<Integer, Map<Integer, EmployeeLevelCfg>> employeeLevelCfgMap;
     //EmployeeStar配置 employeeId -> star -> cfg
     private Map<Integer, Map<Integer, EmployeeStarCfg>> employeeStarCfgMap;
+    //EmployeeSkillConfig配置 groupId -> level -> cfg，热更新整体替换
+    private volatile Map<Integer, Map<Integer, EmployeeSkillConfigCfg>> employeeSkillCfgMap = Map.of();
     //EmployeeProfile配置 道具id(角色道具) -> cfg
     private Map<Integer, EmployeeProfileCfg> employeeProfileItemCfgMap;
+    //EmployeeProfile配置 ProfessionID -> cfg
+    private Map<Integer, List<EmployeeProfileCfg>> employeeProfileProfessionCfgMap;
     //employeePool 的drop item的权重
     private Map<Integer, WeightRandom<List<Integer>>> employeePoolRandomMap;
 
@@ -103,6 +107,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private Map<Integer, BuildingAreaTableCfg> gameBuildingAreaTableCfg;
     //RegionID -> casinoLevel -> List.BuildingAreaTableCfg  ，每个场景等级解锁的建筑
     private Map<Integer, Map<Integer, List<BuildingAreaTableCfg>>> casinoLevelBuildingAreaTableCfgs;
+    //RegionID -> EmployeeProfile -> List.BuildingAreaTableCfg
+    private Map<Integer, Map<Integer, List<BuildingAreaTableCfg>>> casinoProfileBuildingAreaTableCfgs;
     //RegionID -> ServerBuildingType -> buildingId  ，每个场景的特殊建筑id
     private Map<Integer, Map<ServerBuildingType, Integer>> casinoManageBuildIdMap;
 
@@ -192,6 +198,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
         loadEmployeeLevelConfig();
         loadEmployeeStarConfig();
+        loadEmployeeSkillConfig();
         loadEmployeeProfileConfig();
         loadEmployeePoolConfig();
 
@@ -413,18 +420,30 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         this.employeeStarCfgMap = tmp;
     }
 
+    private void loadEmployeeSkillConfig() {
+        Map<Integer, Map<Integer, EmployeeSkillConfigCfg>> tmp = new HashMap<>();
+        for (EmployeeSkillConfigCfg cfg : GameDataManager.getEmployeeSkillConfigCfgList()) {
+            tmp.computeIfAbsent(cfg.getGroupId(), k -> new HashMap<>()).put(cfg.getSkillLevel(), cfg);
+        }
+        this.employeeSkillCfgMap = tmp;
+    }
+
     /**
      * 加载 EmployeeProfile 配置 (按角色道具id索引, 用于卡池招募)
      */
     private void loadEmployeeProfileConfig() {
         Map<Integer, EmployeeProfileCfg> tmp = new HashMap<>();
+        Map<Integer, List<EmployeeProfileCfg>> tmpEmployeeProfileProfessionCfgMap = new HashMap<>();
         for (EmployeeProfileCfg cfg : GameDataManager.getEmployeeProfileCfgList()) {
             List<Integer> shard = cfg.getDuplicatetoShard();
             if (shard != null && shard.size() >= 3) {
                 tmp.put(shard.getFirst(), cfg);
             }
+
+            tmpEmployeeProfileProfessionCfgMap.computeIfAbsent(cfg.getProfessionID(), k -> new ArrayList<>()).add(cfg);
         }
         this.employeeProfileItemCfgMap = tmp;
+        this.employeeProfileProfessionCfgMap = tmpEmployeeProfileProfessionCfgMap;
     }
 
     /**
@@ -511,6 +530,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         Map<Integer, BuildingAreaTableCfg> tmpGameBuildingAreaTableCfg = new HashMap<>();
         Map<Integer, Map<Integer, List<BuildingAreaTableCfg>>> tmpCasinoLevelBuildingAreaTableCfgs = new HashMap<>();
         Map<Integer, Map<ServerBuildingType, Integer>> tmpCasinoManageBuildIdMap = new HashMap<>();
+        Map<Integer, Map<Integer, List<BuildingAreaTableCfg>>> tmpCasinoProfileBuildingAreaTableCfgs = new HashMap<>();
+
 
         for (BuildingAreaTableCfg cfg : GameDataManager.getBuildingAreaTableCfgList()) {
             if (cfg.getUnlockGameId() > 0) {
@@ -520,6 +541,12 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
             if (cfg.getCasinoLevel() > 1) {
                 Map<Integer, List<BuildingAreaTableCfg>> levelMap = tmpCasinoLevelBuildingAreaTableCfgs.computeIfAbsent(cfg.getRegionID(), k -> new HashMap<>());
                 List<BuildingAreaTableCfg> tmpList = levelMap.computeIfAbsent(cfg.getCasinoLevel(), k -> new ArrayList<>());
+                tmpList.add(cfg);
+            }
+
+            if (cfg.getEmployeeProfile() > 0) {
+                Map<Integer, List<BuildingAreaTableCfg>> profileMap = tmpCasinoProfileBuildingAreaTableCfgs.computeIfAbsent(cfg.getRegionID(), k -> new HashMap<>());
+                List<BuildingAreaTableCfg> tmpList = profileMap.computeIfAbsent(cfg.getEmployeeProfile(), k -> new ArrayList<>());
                 tmpList.add(cfg);
             }
 
@@ -540,6 +567,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         this.gameBuildingAreaTableCfg = tmpGameBuildingAreaTableCfg;
         this.casinoLevelBuildingAreaTableCfgs = tmpCasinoLevelBuildingAreaTableCfgs;
         this.casinoManageBuildIdMap = tmpCasinoManageBuildIdMap;
+        this.casinoProfileBuildingAreaTableCfgs = tmpCasinoProfileBuildingAreaTableCfgs;
     }
 
     /**
@@ -918,6 +946,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
         addInitSampleFileObserveWithCallBack(EmployeeLevelCfg.EXCEL_NAME, this::loadEmployeeLevelConfig);
         addInitSampleFileObserveWithCallBack(EmployeeStarCfg.EXCEL_NAME, this::loadEmployeeStarConfig);
+        addInitSampleFileObserveWithCallBack(EmployeeSkillConfigCfg.EXCEL_NAME, this::loadEmployeeSkillConfig);
         addInitSampleFileObserveWithCallBack(EmployeeProfileCfg.EXCEL_NAME, this::loadEmployeeProfileConfig);
         addInitSampleFileObserveWithCallBack(EmployeePoolCfg.EXCEL_NAME, this::loadEmployeePoolConfig);
 
@@ -970,12 +999,12 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     }
 
     public EmployeeLevelCfg getEmployeeLevelCfgByIdAndLevel(int employeeId, int level) {
-        if(this.employeeLevelCfgMap == null || this.employeeLevelCfgMap.isEmpty()){
+        if (this.employeeLevelCfgMap == null || this.employeeLevelCfgMap.isEmpty()) {
             return null;
         }
 
         Map<Integer, EmployeeLevelCfg> tmpMap = this.employeeLevelCfgMap.get(employeeId);
-        if(tmpMap == null || tmpMap.isEmpty()){
+        if (tmpMap == null || tmpMap.isEmpty()) {
             return null;
         }
 
@@ -984,6 +1013,11 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
     public Map<Integer, Map<Integer, EmployeeStarCfg>> getEmployeeStarCfgMap() {
         return employeeStarCfgMap;
+    }
+
+    public EmployeeSkillConfigCfg getEmployeeSkillCfg(int groupId, int level) {
+        Map<Integer, EmployeeSkillConfigCfg> levels = employeeSkillCfgMap.get(groupId);
+        return levels == null ? null : levels.get(level);
     }
 
     /**
@@ -1471,5 +1505,31 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         }
 
         return this.allChapterLevels.get(nextIndexId);
+    }
+
+    /**
+     * 根据雇员职业获取对应的建筑
+     *
+     * @param regionId
+     * @param employeeProfile
+     * @return
+     */
+    public List<BuildingAreaTableCfg> getBuildingAreaTableCfgByProfile(int regionId, int employeeProfile) {
+        if (this.casinoProfileBuildingAreaTableCfgs == null || this.casinoProfileBuildingAreaTableCfgs.isEmpty()) {
+            return null;
+        }
+
+        Map<Integer, List<BuildingAreaTableCfg>> tmpMap = this.casinoProfileBuildingAreaTableCfgs.get(regionId);
+        if (tmpMap == null || tmpMap.isEmpty()) {
+            return null;
+        }
+        return tmpMap.get(employeeProfile);
+    }
+
+    public List<EmployeeProfileCfg> getEmployeeProfileCfgByProfile(int employeeProfile){
+        if(this.employeeProfileProfessionCfgMap == null || this.employeeProfileProfessionCfgMap.isEmpty()){
+            return null;
+        }
+        return this.employeeProfileProfessionCfgMap.get(employeeProfile);
     }
 }

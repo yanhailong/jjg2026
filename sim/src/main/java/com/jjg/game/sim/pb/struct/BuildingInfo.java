@@ -31,7 +31,7 @@ public class BuildingInfo {
     public int interactCount;
     @ProtoDesc("游客品质出现概率")
     public List<KVInfo> guestQualityList;
-    @ProtoDesc("建筑加成")
+    @ProtoDesc("按产出类型区分的总值、固定值及比例加成来源")
     public List<BonusInfo> bonusInfos;
     @ProtoDesc("建筑基础属性  对应 BuildingUpgradeTable.xlsx 的upgradeOutput")
     public long upgradeOutput;
