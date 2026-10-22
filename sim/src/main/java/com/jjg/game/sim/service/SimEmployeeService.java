@@ -712,8 +712,6 @@ public class SimEmployeeService implements SimTaskStateReporter {
         for (Map.Entry<Integer, Integer> en : cfg.getAttributeValue().entrySet()) {
             combatPower += en.getValue();
         }
-
-        simEmployeeData.setLastCombatPower(combatPower);
         return combatPower;
     }
 

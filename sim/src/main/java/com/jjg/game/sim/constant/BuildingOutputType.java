@@ -27,12 +27,26 @@ public enum BuildingOutputType {
     TOP_RANK(9),
     //装饰
     DECORATION(10),
-    //管理属性(它是一个集合体，包括了SERVICE，AWARENESS，EXPOSURE)
+    //管理属性(它是一个集合体，包括了SERVICE，AWARENESS，EXPOSURE)，酒水服务类型雇员属性
     MANAGE_ARRT(11),
     //场景等级经验
     CASINO_LEVEL_EXP(12),
     //看广告增加金币收益
     WATCH_ADS_ADD_GOLD(13),
+    //对战博弈类型雇员属性
+    BATTLE(14),
+    //下注策略类型雇员属性
+    BET(15),
+    //电子娱乐类型雇员属性
+    ENTERTAINMENT(16),
+    //对战博弈类型雇员属性万分比加成
+    BATTLE_PROP(114),
+    //下注策略类型雇员属性万分比加成
+    BET_PROP(115),
+    //电子娱乐类型雇员属性万分比加成
+    ENTERTAINMENT_PROP(116),
+    //酒水服务类型雇员属性万分比加成
+    MANAGE_ARRT_PROP(111),
     ;
 
     private final int code;
