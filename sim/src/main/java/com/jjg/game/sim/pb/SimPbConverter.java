@@ -5,6 +5,7 @@ import com.jjg.game.core.pb.KVInfo;
 import com.jjg.game.core.pb.KVLongInfo;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
+import com.jjg.game.sim.constant.BuildingOutputType;
 import com.jjg.game.sim.constant.BuildingType;
 import com.jjg.game.sim.constant.ServerBuildingType;
 import com.jjg.game.sim.data.*;
@@ -66,19 +67,12 @@ public final class SimPbConverter {
         BuildingInfo info = new BuildingInfo();
         info.id = buildingData.getId();
         info.level = buildingData.getLevel();
-        info.cdEndTime = buildingData.getCdEndTime();
-        info.progress = buildingData.getProgress();
-        info.watchAdCount = buildingData.getAdClearCount();
-        info.cdZero = (buildingData.getCdEndTime() > 0 && buildingData.getCdEndTime() <= now);
+        info.cdEndTime = 0;
+        info.progress = 0;
+        info.watchAdCount = 0;
+        info.cdZero = false;
 
         info.skillConditionPass = true;
-        if (unlockGameId > 0) {
-            //检查技能等级
-            SimSkillsData skillData = ctx.getSkillData(unlockGameId);
-            if (skillData == null || skillData.allLevel() < currentLevelCfg.getSkillLevel()) {
-                info.skillConditionPass = false;
-            }
-        }
 
         //交互次数
         info.interactCount = buildingData.getReceptCount();
@@ -111,16 +105,26 @@ public final class SimPbConverter {
         }
 
         info.bonusInfos = new ArrayList<>();
-        CommonUtil.getContext().getBean(SimBuildingService.class)
-                .computeDashboardBuildingValues(ctx, buildingData, attributes, info.bonusInfos);
+        SimBuildingService buildingService = CommonUtil.getContext().getBean(SimBuildingService.class);
+        buildingService.computeDashboardBuildingValues(ctx, buildingData, attributes, info.bonusInfos);
+
+        info.areaSkinInfos = new ArrayList<>();
+        for (BuildingUpgradeAreaCfg area : simConfigCacheService.getBuildingUpgradeAreaCfgs(buildingData.getId())) {
+            BuildingAreaSkinInfo skins = new BuildingAreaSkinInfo();
+            skins.areaId = area.getAreaId();
+            skins.unlocked = buildingData.getUnlockedAreaIds().contains(area.getId());
+            skins.unlockedSkinIds = area.getSkinId() == null ? List.of()
+                    : area.getSkinId().stream().filter(buildingData.getUnlockedSkinIds()::contains).toList();
+            int using = buildingData.getUsingSkinIds().getOrDefault(area.getId(), 0);
+            skins.usingSkinId = skins.unlockedSkinIds.contains(using) ? using : 0;
+            info.areaSkinInfos.add(skins);
+        }
 
         BuildingAreaTableCfg buildingAreaTableCfg = GameDataManager.getBuildingAreaTableCfg(buildingData.getId());
 
-
-        if(currentLevelCfg != null) {
-            info.upgradeOutput = currentLevelCfg.getUpgradeOutput();
-            info.upgradeExp = currentLevelCfg.getUpgradeExp();
-        }
+        info.upgradeOutput = buildingService.getBaseOutput(buildingData.getId(), buildingData.getLevel())
+                .getOrDefault(BuildingOutputType.GOLD, 0L);
+        info.upgradeExp = 0;
 
         info.buileTypeValue = buildingAreaTableCfg.getTypeValue();
 
@@ -132,10 +136,7 @@ public final class SimPbConverter {
                 }
             }
 
-            if(currentLevelCfg != null) {
-                info.upgradeOutput = currentLevelCfg.getUpgradeOutput() * 60;
-                info.upgradeExp = currentLevelCfg.getUpgradeExp() * 60;
-            }
+            info.upgradeOutput *= 60L;
         }
         return info;
     }

@@ -3,8 +3,10 @@ package com.jjg.game.sim.data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /** 每玩家每期一条记录；历史记录供跨期支付到账和未领奖励结算使用。 */
 @Document
@@ -22,6 +24,8 @@ public class ActivePassData extends AbstractData {
     private Map<Integer, Integer> claimedRewards = new LinkedHashMap<>();
     private Map<Integer, ActivePassTask> dailyTasks = new LinkedHashMap<>();
     private Map<Integer, ActivePassTask> periodTasks = new LinkedHashMap<>();
+    //本期已领奖的周期任务 id，保留已替换成下一阶段的任务记录
+    private Set<Integer> rewardedPeriodTaskIds = new HashSet<>();
 
     public static String key(long playerId, int passId) { return playerId + ":" + passId; }
     @Override public void buildKey() { id = key(playerId, passId); }
@@ -49,4 +53,6 @@ public class ActivePassData extends AbstractData {
     public void setDailyTasks(Map<Integer, ActivePassTask> value) { dailyTasks = value; }
     public Map<Integer, ActivePassTask> getPeriodTasks() { return periodTasks; }
     public void setPeriodTasks(Map<Integer, ActivePassTask> value) { periodTasks = value; }
+    public Set<Integer> getRewardedPeriodTaskIds() { return rewardedPeriodTaskIds; }
+    public void setRewardedPeriodTaskIds(Set<Integer> value) { rewardedPeriodTaskIds = value; }
 }

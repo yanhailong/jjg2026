@@ -170,6 +170,7 @@ public class SimCoopTaskService {
         data.setClaimedCount(0);
         //全清: 任一状态都不跨天保留。
         data.getTasks().clear();
+        data.getRewardedTaskIds().clear();
         long receiptExpireBefore = System.currentTimeMillis() - SETTLEMENT_RECEIPT_RETENTION_MS;
         data.getSettlementReceipts().values().removeIf(receipt -> receipt.getFinishTime() < receiptExpireBefore);
         data.setPoolTaskIds(drawTasks(configService.getDailyPoolCount(), data.getTasks().keySet()));
@@ -355,6 +356,9 @@ public class SimCoopTaskService {
             log.warn("多人任务领奖失败,数据缺失 playerId={},taskId={}", ctx.playerId(), taskId);
             return res;
         }
+        if (!ensureDaily(data)) {
+            return res;
+        }
         SimCoopTaskEntry entry = data.getTasks().get(taskId);
         if (entry == null || entry.getStatus() != CoopTaskConst.TaskStatus.REWARDABLE) {
             log.warn("多人任务领奖失败,状态不符 playerId={},taskId={},status={}",
@@ -375,6 +379,7 @@ public class SimCoopTaskService {
                 return res;
             }
         }
+        data.getRewardedTaskIds().add(taskId);
         //领取后任务直接移除列表 (含今日池位)
         data.getTasks().remove(taskId);
         data.getPoolTaskIds().remove(Integer.valueOf(taskId));
@@ -384,6 +389,12 @@ public class SimCoopTaskService {
         res.code = Code.SUCCESS;
         log.info("多人任务领奖成功 playerId={},taskId={}", ctx.playerId(), taskId);
         return res;
+    }
+
+    public boolean hasRewardedTask(SimPlayerContext ctx, int taskId) {
+        SimCoopTaskData data = ctx.getSimCoopTaskData();
+        return data != null && ensureDaily(data) && data.getDayKey() == todayKey()
+                && data.getRewardedTaskIds().contains(taskId);
     }
 
     // =====================================================================

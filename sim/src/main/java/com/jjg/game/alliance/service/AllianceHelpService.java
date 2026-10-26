@@ -50,9 +50,6 @@ import java.util.concurrent.TimeUnit;
  * 关键设计:
  * <ul>
  *   <li>求助订单内嵌联盟文档, "每单每人一次"由 helpers 存在性条件更新保证, 多节点并发安全;</li>
- *   <li>建筑加速不跨节点写对方内存: 帮助产生的抵扣秒数累计在 Redis
- *       ({@code alliance:help:speedup:{pid}:{buildingId}}), 由被帮助者所在节点在
- *       建筑查询/完成时调用 {@link #consumeSpeedupSeconds} 消费抵扣, 同时实时 NOTIFY 求助者刷新;</li>
  *   <li>任务求助帮助即完成任务 (上限 1 次, 见 AllianceTaskService.onTaskHelped);</li>
  *   <li>订单超时惰性清理, 不会无界膨胀;</li>
  *   <li>建筑加速数值取 global 表 225(每日被帮助上限)/226(每日给出帮助上限)/
@@ -518,68 +515,12 @@ public class AllianceHelpService {
                 dailyShareLimit);
     }
 
-    public boolean hasValidBuildingHelpOrder(long playerId, int buildingId, long now) {
-        long allianceId = cacheService.getAllianceId(playerId);
-        if (allianceId <= 0) {
-            return false;
-        }
-        AllianceData alliance = allianceDao.findById(allianceId).orElse(null);
-        if (alliance == null) {
-            return false;
-        }
-        return alliance.getHelpOrders().values().stream().anyMatch(order ->
-                order.getType() == AllianceConst.HelpType.BUILD_SPEEDUP
-                        && order.getOwnerId() == playerId && order.getTargetId() == buildingId
-                        && !expired(order, now) && !order.full());
-    }
-
-    public void removeBuildingHelpOrders(long playerId, int buildingId) {
-        long allianceId = cacheService.getAllianceId(playerId);
-        if (allianceId <= 0) {
-            return;
-        }
-        AllianceData alliance = allianceDao.findById(allianceId).orElse(null);
-        if (alliance == null) {
-            return;
-        }
-        List<Long> orderIds = alliance.getHelpOrders().values().stream()
-                .filter(order -> order.getType() == AllianceConst.HelpType.BUILD_SPEEDUP
-                        && order.getOwnerId() == playerId && order.getTargetId() == buildingId)
-                .map(AllianceHelpOrder::getOrderId)
-                .toList();
-        if (!orderIds.isEmpty()) {
-            allianceDao.removeHelpOrders(allianceId, orderIds);
-            cacheService.publishInvalidate(allianceId);
-        }
-    }
-
-    // =====================================================================
-    // 建筑加速消费 (供 sim 建筑系统接入)
-    // =====================================================================
-
-    /**
-     * 消费玩家某建筑累计的加速抵扣秒数 (原子取出并清零)。
-     * <p>
-     * 接入点: SimBuildingService 计算建筑升级剩余时间/完成校验处调用, 把返回秒数从剩余时间中扣除。
-     *
-     * @return 累计可抵扣秒数 (无则 0)
-     */
-    public long consumeSpeedupSeconds(long playerId, long buildingId) {
-        try {
-            String val = stringRedisTemplate.opsForValue().getAndDelete(speedupKey(playerId, buildingId));
-            return val == null ? 0 : Long.parseLong(val);
-        } catch (Exception e) {
-            log.warn("消费建筑加速抵扣失败 playerId={},buildingId={}", playerId, buildingId, e);
-            return 0;
-        }
-    }
-
     private void publishSpeedupPending(long playerId, long buildingId) {
         try {
             stringRedisTemplate.convertAndSend(AllianceConst.RedisKey.SPEEDUP_PENDING_CHANNEL,
                     playerId + ":" + buildingId);
         } catch (Exception e) {
-            // Redis 中的累计秒数仍会由定时检查或下次进入场景消费，发布失败不能回滚已成功的帮助。
+            //发布失败不能回滚已成功的帮助。
             log.warn("发布建筑加速待消费通知失败 playerId={},buildingId={}", playerId, buildingId, e);
         }
     }

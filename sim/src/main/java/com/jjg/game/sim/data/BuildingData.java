@@ -1,5 +1,10 @@
 package com.jjg.game.sim.data;
 
+import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
 /**
  * 建筑数据
  *
@@ -9,16 +14,22 @@ package com.jjg.game.sim.data;
 public class BuildingData {
     //建筑id (对应 BuildingAreaTableCfg.id)
     private int id;
-    //当前等级 (对应 BuildingUpgradeTableCfg.level)
+    //当前建筑等级，按等级段匹配 BuildingUpgradeTableCfg
     private int level;
-    //升级 CD 结束时间 (ms); 0 表示无 CD
+    //旧 CD 字段保留；即时升级不再设置 CD
     private long cdEndTime;
-    //已发起的清 CD 广告次数; 用于限流
+    //旧清 CD 广告次数字段
     private int adClearCount;
-    //进度条 BuildingUpgradeTable.CostPerLevel 的下标，默认为0
+    //旧升级进度字段；即时升级不再累加进度
     private int progress;
     //接待次数
     private int receptCount;
+    //已解锁的 BuildingUpgradeArea 配置 id
+    private Set<Integer> unlockedAreaIds = new HashSet<>();
+    //已解锁皮肤；全部参与所属区域的 Buff 计算
+    private Set<Integer> unlockedSkinIds = new HashSet<>();
+    //BuildingUpgradeArea 配置 id -> 当前使用的皮肤 id
+    private Map<Integer, Integer> usingSkinIds = new HashMap<>();
 
     public int getId() {
         return id;
@@ -68,33 +79,35 @@ public class BuildingData {
         this.receptCount = receptCount;
     }
 
+    public Set<Integer> getUnlockedAreaIds() {
+        return unlockedAreaIds;
+    }
+
+    public void setUnlockedAreaIds(Set<Integer> unlockedAreaIds) {
+        this.unlockedAreaIds = unlockedAreaIds;
+    }
+
+    public Set<Integer> getUnlockedSkinIds() {
+        return unlockedSkinIds;
+    }
+
+    public void setUnlockedSkinIds(Set<Integer> unlockedSkinIds) {
+        this.unlockedSkinIds = unlockedSkinIds;
+    }
+
+    public Map<Integer, Integer> getUsingSkinIds() {
+        return usingSkinIds;
+    }
+
+    public void setUsingSkinIds(Map<Integer, Integer> usingSkinIds) {
+        this.usingSkinIds = usingSkinIds;
+    }
+
     /**
      * 是否处于升级 CD 中 (尚未到时)
      */
     public boolean isUpgrading(long now) {
         return cdEndTime > now;
-    }
-
-    /**
-     * CD 是否已到时 (可以执行完成升级)
-     */
-    public boolean isUpgradeReady(long now) {
-        return cdEndTime > 0 && cdEndTime <= now;
-    }
-
-    /**
-     * 扣减升级 CD，最多扣到当前时间，避免把完成时间推进到过去。
-     *
-     * @return 实际扣减秒数
-     */
-    public long applySpeedupSeconds(long seconds, long now) {
-        if (seconds <= 0 || !isUpgrading(now)) {
-            return 0;
-        }
-        long remainMs = cdEndTime - now;
-        long reduceMs = Math.min(seconds * 1000L, remainMs);
-        cdEndTime -= reduceMs;
-        return reduceMs / 1000L;
     }
 
     public void incrementReceptCount(){

@@ -142,6 +142,8 @@ public class GameDataManager {
     containerMap.put(BuildingFloorCfg.class, new BuildingFloorCfgContainer());
     containerMap.put(BuildingFunctionCfg.class, new BuildingFunctionCfgContainer());
     containerMap.put(BuildingGainCfg.class, new BuildingGainCfgContainer());
+    containerMap.put(BuildingSkinCfg.class, new BuildingSkinCfgContainer());
+    containerMap.put(BuildingUpgradeAreaCfg.class, new BuildingUpgradeAreaCfgContainer());
     containerMap.put(BuildingUpgradeTableCfg.class, new BuildingUpgradeTableCfgContainer());
     containerMap.put(BuildingWaitPosCfg.class, new BuildingWaitPosCfgContainer());
     containerMap.put(BundleGiftPackCfg.class, new BundleGiftPackCfgContainer());
@@ -196,7 +198,9 @@ public class GameDataManager {
     containerMap.put(MiniGameListCfg.class, new MiniGameListCfgContainer());
     containerMap.put(MinigameCheaterHuntLevelCfg.class, new MinigameCheaterHuntLevelCfgContainer());
     containerMap.put(MinigameCheaterHuntMapCfg.class, new MinigameCheaterHuntMapCfgContainer());
+    containerMap.put(MinigameFishCfg.class, new MinigameFishCfgContainer());
     containerMap.put(MinigameGodofGamblersRubbingCfg.class, new MinigameGodofGamblersRubbingCfgContainer());
+    containerMap.put(MinigameHappyHappyFishCfg.class, new MinigameHappyHappyFishCfgContainer());
     containerMap.put(MiningAchievementCfg.class, new MiningAchievementCfgContainer());
     containerMap.put(MiningBundleShopCfg.class, new MiningBundleShopCfgContainer());
     containerMap.put(MiningCellTypeCfg.class, new MiningCellTypeCfgContainer());
@@ -996,6 +1000,30 @@ public class GameDataManager {
     return getInstance().getCfgContainer(BuildingGainCfg.class).getCfgBeanList();
   }
 
+  public static BuildingSkinCfg getBuildingSkinCfg(int key) {
+    return getInstance().getCfgContainer(BuildingSkinCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, BuildingSkinCfg> getBuildingSkinCfgMap() {
+    return getInstance().getCfgContainer(BuildingSkinCfg.class).getCfgBeanMap();
+  }
+
+  public static List<BuildingSkinCfg> getBuildingSkinCfgList() {
+    return getInstance().getCfgContainer(BuildingSkinCfg.class).getCfgBeanList();
+  }
+
+  public static BuildingUpgradeAreaCfg getBuildingUpgradeAreaCfg(int key) {
+    return getInstance().getCfgContainer(BuildingUpgradeAreaCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, BuildingUpgradeAreaCfg> getBuildingUpgradeAreaCfgMap() {
+    return getInstance().getCfgContainer(BuildingUpgradeAreaCfg.class).getCfgBeanMap();
+  }
+
+  public static List<BuildingUpgradeAreaCfg> getBuildingUpgradeAreaCfgList() {
+    return getInstance().getCfgContainer(BuildingUpgradeAreaCfg.class).getCfgBeanList();
+  }
+
   public static BuildingUpgradeTableCfg getBuildingUpgradeTableCfg(int key) {
     return getInstance().getCfgContainer(BuildingUpgradeTableCfg.class).getCfgBeanMap().get(key);
   }
@@ -1644,6 +1672,18 @@ public class GameDataManager {
     return getInstance().getCfgContainer(MinigameCheaterHuntMapCfg.class).getCfgBeanList();
   }
 
+  public static MinigameFishCfg getMinigameFishCfg(int key) {
+    return getInstance().getCfgContainer(MinigameFishCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, MinigameFishCfg> getMinigameFishCfgMap() {
+    return getInstance().getCfgContainer(MinigameFishCfg.class).getCfgBeanMap();
+  }
+
+  public static List<MinigameFishCfg> getMinigameFishCfgList() {
+    return getInstance().getCfgContainer(MinigameFishCfg.class).getCfgBeanList();
+  }
+
   public static MinigameGodofGamblersRubbingCfg getMinigameGodofGamblersRubbingCfg(int key) {
     return getInstance().getCfgContainer(MinigameGodofGamblersRubbingCfg.class).getCfgBeanMap().get(key);
   }
@@ -1654,6 +1694,18 @@ public class GameDataManager {
 
   public static List<MinigameGodofGamblersRubbingCfg> getMinigameGodofGamblersRubbingCfgList() {
     return getInstance().getCfgContainer(MinigameGodofGamblersRubbingCfg.class).getCfgBeanList();
+  }
+
+  public static MinigameHappyHappyFishCfg getMinigameHappyHappyFishCfg(int key) {
+    return getInstance().getCfgContainer(MinigameHappyHappyFishCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, MinigameHappyHappyFishCfg> getMinigameHappyHappyFishCfgMap() {
+    return getInstance().getCfgContainer(MinigameHappyHappyFishCfg.class).getCfgBeanMap();
+  }
+
+  public static List<MinigameHappyHappyFishCfg> getMinigameHappyHappyFishCfgList() {
+    return getInstance().getCfgContainer(MinigameHappyHappyFishCfg.class).getCfgBeanList();
   }
 
   public static MiningAchievementCfg getMiningAchievementCfg(int key) {

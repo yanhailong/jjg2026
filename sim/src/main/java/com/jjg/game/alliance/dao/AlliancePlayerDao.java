@@ -250,9 +250,28 @@ public class AlliancePlayerDao extends MongoBaseDao<AlliancePlayerData, Long> {
     }
 
     public void incrementTaskFinish(long playerId, int day) {
-        resetDailyCounter(playerId, day, "taskDay", "taskFinishCount");
+        ensurePlayerDocument(playerId);
+        Query resetQuery = new Query(new Criteria().andOperator(
+                Criteria.where("_id").is(playerId),
+                new Criteria().orOperator(
+                        Criteria.where("taskDay").exists(false),
+                        Criteria.where("taskDay").lt(day))));
+        mongoTemplate.updateFirst(resetQuery,
+                new Update().set("taskDay", day).set("taskFinishCount", 0)
+                        .set("rewardedTaskIds", Collections.emptySet()), AlliancePlayerData.class);
         mongoTemplate.updateFirst(new Query(Criteria.where("_id").is(playerId).and("taskDay").is(day)),
                 new Update().inc("taskFinishCount", 1), AlliancePlayerData.class);
+    }
+
+    public void markTaskRewarded(long playerId, int day, int taskId) {
+        Query query = new Query(Criteria.where("_id").is(playerId).and("taskDay").is(day));
+        mongoTemplate.updateFirst(query, new Update().addToSet("rewardedTaskIds", taskId), AlliancePlayerData.class);
+    }
+
+    public boolean hasRewardedTask(long playerId, int day, int taskId) {
+        Query query = new Query(Criteria.where("_id").is(playerId).and("taskDay").is(day)
+                .and("rewardedTaskIds").is(taskId));
+        return mongoTemplate.exists(query, AlliancePlayerData.class);
     }
 
     public int tryConsumeRefresh(long playerId, int day, int limit) {

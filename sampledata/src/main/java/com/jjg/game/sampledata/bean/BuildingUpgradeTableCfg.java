@@ -21,64 +21,65 @@ public class BuildingUpgradeTableCfg extends BaseCfgBean {
 
   /** 建筑ID */
   protected int BuildingID;
-  /** 每级消耗 */
-  protected List<List<Long>> CostPerLevel;
-  /** 交互次数 */
-  protected int InteractCount;
-  /** 最大交互数量 */
+  /** 升级消耗材料(最多1个) */
+  protected Map<Integer,Long> CostPerLevel;
+  /** 曝光度产出(起始值,增量值) */
+  protected List<Long> Exposure;
+  /** 交互次数（起始值,增量值） */
+  protected List<Integer> InteractCount;
+  /** 电子显示屏中的数量 */
   protected int MaxInteractionCount;
-  /** 最大等待数量 */
+  /** 建筑区域等待点位 */
   protected List<Integer> MaxWaiting;
   /** 经营等级 */
   protected int NeedLevel;
-  /** 基础繁荣度 */
-  protected int Prosperity;
-  /** 技能等级限制 */
-  protected int SkillLevel;
-  /** 解锁装饰 */
+  /** 相对-升级物品默认中心的偏移量x、y */
+  protected List<Integer> Offset;
+  /** 知名度产出(起始值,增量值) */
+  protected List<Long> Popularity;
+  /** 基础繁荣度(起始值,增量值) */
+  protected List<Integer> Prosperity;
+  /** 服务能力产出(起始值,增量值) */
+  protected List<Long> Service;
+  /** 解锁\升级装饰 */
   protected List<Integer> UnlockDecorationId;
-  /** 解锁设备 */
+  /** 解锁\升级设备 */
   protected List<Integer> UnlockEquipment;
   /** 交互点ID */
   protected List<Integer> UnlockInteractionId;
-  /** 建筑升级CD时间（min） */
-  protected int UpgradeCD;
-  /** 升级消耗道具 */
-  protected Map<Integer,Long> UpgradeCost;
-  /** 每分钟经验产出 */
-  protected long UpgradeExp;
-  /** 建筑产出 */
-  protected long UpgradeOutput;
-  /** 升级奖励 */
+  /** 金币产出(起始值,增量值) */
+  protected List<Long> UpgradeOutput;
+  /** 等级段升级奖励(最多2个) */
   protected Map<Integer,Long> UpgradeReward;
-  /** 建筑等级解锁下注金额 */
-  protected Map<Integer,Integer> bet;
-  /** 等级 */
+  /** 建筑等级段(起始值 >=) */
   protected int level;
-  /** 多语言 */
-  protected int text;
 
   /** 返回建筑ID */
   public int getBuildingID() {
     return BuildingID;
   }
 
-  /** 返回每级消耗 */
-  public List<List<Long>> getCostPerLevel() {
+  /** 返回升级消耗材料(最多1个) */
+  public Map<Integer,Long> getCostPerLevel() {
     return CostPerLevel;
   }
 
-  /** 返回交互次数 */
-  public int getInteractCount() {
+  /** 返回曝光度产出(起始值,增量值) */
+  public List<Long> getExposure() {
+    return Exposure;
+  }
+
+  /** 返回交互次数（起始值,增量值） */
+  public List<Integer> getInteractCount() {
     return InteractCount;
   }
 
-  /** 返回最大交互数量 */
+  /** 返回电子显示屏中的数量 */
   public int getMaxInteractionCount() {
     return MaxInteractionCount;
   }
 
-  /** 返回最大等待数量 */
+  /** 返回建筑区域等待点位 */
   public List<Integer> getMaxWaiting() {
     return MaxWaiting;
   }
@@ -88,22 +89,32 @@ public class BuildingUpgradeTableCfg extends BaseCfgBean {
     return NeedLevel;
   }
 
-  /** 返回基础繁荣度 */
-  public int getProsperity() {
+  /** 返回相对-升级物品默认中心的偏移量x、y */
+  public List<Integer> getOffset() {
+    return Offset;
+  }
+
+  /** 返回知名度产出(起始值,增量值) */
+  public List<Long> getPopularity() {
+    return Popularity;
+  }
+
+  /** 返回基础繁荣度(起始值,增量值) */
+  public List<Integer> getProsperity() {
     return Prosperity;
   }
 
-  /** 返回技能等级限制 */
-  public int getSkillLevel() {
-    return SkillLevel;
+  /** 返回服务能力产出(起始值,增量值) */
+  public List<Long> getService() {
+    return Service;
   }
 
-  /** 返回解锁装饰 */
+  /** 返回解锁\升级装饰 */
   public List<Integer> getUnlockDecorationId() {
     return UnlockDecorationId;
   }
 
-  /** 返回解锁设备 */
+  /** 返回解锁\升级设备 */
   public List<Integer> getUnlockEquipment() {
     return UnlockEquipment;
   }
@@ -113,44 +124,19 @@ public class BuildingUpgradeTableCfg extends BaseCfgBean {
     return UnlockInteractionId;
   }
 
-  /** 返回建筑升级CD时间（min） */
-  public int getUpgradeCD() {
-    return UpgradeCD;
-  }
-
-  /** 返回升级消耗道具 */
-  public Map<Integer,Long> getUpgradeCost() {
-    return UpgradeCost;
-  }
-
-  /** 返回每分钟经验产出 */
-  public long getUpgradeExp() {
-    return UpgradeExp;
-  }
-
-  /** 返回建筑产出 */
-  public long getUpgradeOutput() {
+  /** 返回金币产出(起始值,增量值) */
+  public List<Long> getUpgradeOutput() {
     return UpgradeOutput;
   }
 
-  /** 返回升级奖励 */
+  /** 返回等级段升级奖励(最多2个) */
   public Map<Integer,Long> getUpgradeReward() {
     return UpgradeReward;
   }
 
-  /** 返回建筑等级解锁下注金额 */
-  public Map<Integer,Integer> getBet() {
-    return bet;
-  }
-
-  /** 返回等级 */
+  /** 返回建筑等级段(起始值 >=) */
   public int getLevel() {
     return level;
-  }
-
-  /** 返回多语言 */
-  public int getText() {
-    return text;
   }
 
   @Override

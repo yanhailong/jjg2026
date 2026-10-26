@@ -798,6 +798,7 @@ public class SimTaskService implements IRedDotService {
         if (noReward) {
             node.setStatus(TaskConstant.TaskStatus.STATUS_REWARDED);
             node.setRewardTime(now);
+            data.getRewardedTaskIds().add(cfg.getId());
             taskLogger.receiveTaskAward(player.getId(), node.getConfigId(), null,
                     cfg.getIntegralNum(), TaskConstant.TaskStatus.STATUS_REWARDED);
             changed.add(assemble(ctx, player, node, cfg));
@@ -821,6 +822,21 @@ public class SimTaskService implements IRedDotService {
                     cfg.getIntegralNum(), TaskConstant.TaskStatus.STATUS_COMPLETED);
             changed.add(assemble(ctx, player, node, cfg));
         }
+    }
+
+    /** 查询主线或成就任务是否实际领取过奖励，不把 GM 跳过的前置节点视为已领奖。 */
+    public boolean hasRewardedTask(SimPlayerContext ctx, int taskId) {
+        TaskCfg cfg = GameDataManager.getTaskCfg(taskId);
+        SimTaskData data = ctx == null ? null : ctx.getSimTaskData();
+        if (data == null || !isSimTaskCfg(cfg)) {
+            return false;
+        }
+        if (data.getRewardedTaskIds().contains(taskId)) {
+            return true;
+        }
+        TaskDetail current = findActiveNode(data, cfg);
+        return current != null && current.getConfigId() == taskId
+                && current.getStatus() == TaskConstant.TaskStatus.STATUS_REWARDED;
     }
 
     /**
@@ -868,6 +884,7 @@ public class SimTaskService implements IRedDotService {
         node.setStatus(TaskConstant.TaskStatus.STATUS_REWARDED);
         long rewardTime = System.currentTimeMillis();
         node.setRewardTime(rewardTime);
+        data.getRewardedTaskIds().add(taskId);
         //后台任务日志: 奖励领取 (含领取内容)
         taskLogger.receiveTaskAward(playerId, taskId, rewardItems, cfg.getIntegralNum(),
                 TaskConstant.TaskStatus.STATUS_REWARDED);

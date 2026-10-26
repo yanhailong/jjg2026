@@ -10,7 +10,9 @@ import com.jjg.game.common.utils.TimeHelper;
 import com.jjg.game.core.base.reddot.IRedDotService;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.TaskConstant;
+import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Item;
+import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.listener.ConfigExcelChangeListener;
 import com.jjg.game.core.logger.TaskLogger;
 import com.jjg.game.core.manager.RedDotManager;
@@ -432,6 +434,21 @@ public class TaskManager implements ConfigExcelChangeListener, IRedDotService, O
         }
     }
 
+    /** 查询当前日积分任务是否已经领取奖励。 */
+    public boolean hasRewardedTask(long playerId, int taskId) {
+        TaskCfg cfg = GameDataManager.getTaskCfg(taskId);
+        if (cfg == null || cfg.getTaskType() != TaskConstant.TaskType.POINTS_AWARD) {
+            return false;
+        }
+        TaskData data = playerTaskMap.get(playerId);
+        if (data == null) {
+            data = taskService.getPlayerTask(playerId);
+        }
+        TaskDetail detail = data == null ? null : data.getTaskDetail(taskId);
+        return detail != null && detail.getStatus() == TaskConstant.TaskStatus.STATUS_REWARDED
+                && TimeHelper.inSameDay(detail.getCreateTime(), System.currentTimeMillis());
+    }
+
     /**
      * 领取任务奖励
      *
@@ -461,19 +478,23 @@ public class TaskManager implements ConfigExcelChangeListener, IRedDotService, O
                 log.warn("玩家[{}]领取[{}]任务奖励失败!任务状态[{}]", playerId, taskId, taskDetail == null ? "null" : taskDetail.getStatus());
                 return false;
             }
-            //修改任务状态
-            taskDetail.setRewardTime(System.currentTimeMillis());
-            taskDetail.setStatus(TaskConstant.TaskStatus.STATUS_REWARDED);
+            List<Item> itemList = new ArrayList<>();
+            if (!taskCfg.getGetItem().isEmpty()) {
+                itemList = ItemUtils.buildItems(taskCfg.getGetItem());
+                CommonResult<ItemOperationResult> added = playerPackService.addItems(playerId, itemList, AddType.TASKAWARD);
+                if (added == null || !added.success()) {
+                    log.error("领取任务奖励失败，背包发奖失败 playerId={},taskId={},result={}", playerId, taskId, added);
+                    return false;
+                }
+            }
             int integralNum = taskCfg.getIntegralNum();
             //如果有积分奖励通知大厅
             if (integralNum > TaskConstant.TimeConstants.MIN_INTEGRAL_REWARD) {
                 taskService.addPlayerPoints(playerId, integralNum, true);
             }
-            List<Item> itemList = new ArrayList<>();
-            if (!taskCfg.getGetItem().isEmpty()) {
-                itemList = ItemUtils.buildItems(taskCfg.getGetItem());
-                playerPackService.addItems(playerId, itemList, AddType.TASKAWARD);
-            }
+            //发奖和积分入账成功后再记录已领奖。
+            taskDetail.setRewardTime(System.currentTimeMillis());
+            taskDetail.setStatus(TaskConstant.TaskStatus.STATUS_REWARDED);
             //记录日志
             taskLogger.receiveTaskAward(playerId, taskId, itemList, integralNum, TaskConstant.TaskStatus.STATUS_REWARDED);
             log.info("玩家[{}]成功领取任务[{}]奖励", playerId, taskId);

@@ -21,7 +21,7 @@ public class BuildingAreaTableCfg extends BaseCfgBean {
 
   /** 建筑名称ID */
   protected int BuildingNameId;
-  /** 解锁条件1 */
+  /** 娱乐城等级解锁条件1 */
   protected int CasinoLevel;
   /** 受影响的雇员类型 */
   protected int EmployeeProfile;
@@ -39,7 +39,7 @@ public class BuildingAreaTableCfg extends BaseCfgBean {
   protected Map<Integer,Long> UnlockCost;
   /** 解锁游戏ID */
   protected int UnlockGameId;
-  /** 解锁条件2 */
+  /** 建筑前置解锁条件2 */
   protected Map<Integer,Integer> UnlockMethod;
   /** 解锁方式 */
   protected boolean UnlockType;
@@ -49,13 +49,15 @@ public class BuildingAreaTableCfg extends BaseCfgBean {
   protected int type;
   /** 建筑属性分类 */
   protected List<Integer> typeValue;
+  /** 解锁一键升10级功能 */
+  protected int unlockUp10Level;
 
   /** 返回建筑名称ID */
   public int getBuildingNameId() {
     return BuildingNameId;
   }
 
-  /** 返回解锁条件1 */
+  /** 返回娱乐城等级解锁条件1 */
   public int getCasinoLevel() {
     return CasinoLevel;
   }
@@ -100,7 +102,7 @@ public class BuildingAreaTableCfg extends BaseCfgBean {
     return UnlockGameId;
   }
 
-  /** 返回解锁条件2 */
+  /** 返回建筑前置解锁条件2 */
   public Map<Integer,Integer> getUnlockMethod() {
     return UnlockMethod;
   }
@@ -123,6 +125,11 @@ public class BuildingAreaTableCfg extends BaseCfgBean {
   /** 返回建筑属性分类 */
   public List<Integer> getTypeValue() {
     return typeValue;
+  }
+
+  /** 返回解锁一键升10级功能 */
+  public int getUnlockUp10Level() {
+    return unlockUp10Level;
   }
 
   @Override

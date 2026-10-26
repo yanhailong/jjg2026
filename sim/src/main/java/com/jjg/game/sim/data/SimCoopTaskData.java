@@ -5,8 +5,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 玩家多人协作任务数据 (每日任务池 + 已领取任务)。
@@ -36,6 +38,9 @@ public class SimCoopTaskData extends AbstractData {
 
     //已领取任务 taskId -> entry (领奖/失败清理后移除)
     private Map<Integer, SimCoopTaskEntry> tasks = new HashMap<>();
+
+    //当前 dayKey 内已成功领取奖励的 TaskCfg.id
+    private Set<Integer> rewardedTaskIds = new HashSet<>();
 
     //已处理结算 roomId -> 回执；独立于领奖后会删除的任务条目
     private Map<Long, CoopSettlementReceipt> settlementReceipts = new HashMap<>();
@@ -92,6 +97,14 @@ public class SimCoopTaskData extends AbstractData {
 
     public void setTasks(Map<Integer, SimCoopTaskEntry> tasks) {
         this.tasks = tasks == null ? new HashMap<>() : tasks;
+    }
+
+    public Set<Integer> getRewardedTaskIds() {
+        return rewardedTaskIds;
+    }
+
+    public void setRewardedTaskIds(Set<Integer> rewardedTaskIds) {
+        this.rewardedTaskIds = rewardedTaskIds;
     }
 
     public Map<Long, CoopSettlementReceipt> getSettlementReceipts() {

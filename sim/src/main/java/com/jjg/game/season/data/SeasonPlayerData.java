@@ -10,8 +10,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 玩家赛季聚合数据。赛季内高频状态集中在一个文档中，避免一次操作写多个集合。
@@ -50,6 +52,8 @@ public class SeasonPlayerData extends AbstractData {
     private Map<Integer, Integer> shopPurchases = new HashMap<>();
     private Map<Integer, Integer> dailyShopPurchases = new HashMap<>();
     private Map<Integer, Integer> trialStars = new HashMap<>();
+    //本赛季已成功发奖的试炼任务 id，跨日保留、切季清空
+    private Set<Integer> rewardedTrialTaskIds = new HashSet<>();
     //跟随赛季的通行证进度、付费轨解锁和奖励领取状态
     private Map<String, Long> passProgress = new HashMap<>();
     private Map<Integer, Integer> passPurchasedTracks = new HashMap<>();
@@ -103,6 +107,7 @@ public class SeasonPlayerData extends AbstractData {
         getShopPurchases().clear();
         getDailyShopPurchases().clear();
         getTrialStars().clear();
+        getRewardedTrialTaskIds().clear();
         getPassProgress().clear();
         getPassPurchasedTracks().clear();
         getPassClaimedTracks().clear();
@@ -250,6 +255,8 @@ public class SeasonPlayerData extends AbstractData {
         return trialStars;
     }
     public void setTrialStars(Map<Integer, Integer> trialStars) { this.trialStars = trialStars == null ? new HashMap<>() : trialStars; }
+    public Set<Integer> getRewardedTrialTaskIds() { return rewardedTrialTaskIds; }
+    public void setRewardedTrialTaskIds(Set<Integer> rewardedTrialTaskIds) { this.rewardedTrialTaskIds = rewardedTrialTaskIds; }
     public Map<String, Long> getPassProgress() {
         if (passProgress == null) passProgress = new HashMap<>();
         return passProgress;

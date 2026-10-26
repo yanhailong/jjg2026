@@ -5,8 +5,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 玩家侧联盟数据 (每玩家一文档, 跟随玩家、不随换盟/解散重置)。
@@ -45,6 +47,8 @@ public class AlliancePlayerData {
     //任务完成次数
     private int taskDay;
     private int taskFinishCount;
+    //当前 taskDay 内已成功发放奖励的 TaskCfg.id
+    private Set<Integer> rewardedTaskIds = new HashSet<>();
     //任务刷新次数
     private int refreshDay;
     private int refreshCount;
@@ -160,6 +164,14 @@ public class AlliancePlayerData {
 
     public void setTaskFinishCount(int taskFinishCount) {
         this.taskFinishCount = taskFinishCount;
+    }
+
+    public Set<Integer> getRewardedTaskIds() {
+        return rewardedTaskIds;
+    }
+
+    public void setRewardedTaskIds(Set<Integer> rewardedTaskIds) {
+        this.rewardedTaskIds = rewardedTaskIds;
     }
 
     public int getRefreshDay() {

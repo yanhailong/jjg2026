@@ -18,6 +18,7 @@ import com.jjg.game.core.base.condition.numeric.ConditionUpdate;
 import com.jjg.game.core.base.condition.numeric.PreparedCondition;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
+import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.PlayerController;
 import com.jjg.game.core.pb.NotifyOpenFunction;
 import com.jjg.game.core.service.CorePlayerService;
@@ -587,7 +588,9 @@ public class AllianceTaskService {
         //经营信息: 完成任务数 +1 (在线走内存; 不在本节点则直写库, 与发奖离线兜底同口径)
         incrementFinishedTaskCount(playerId);
 
-        grantTaskRewards(playerId, taken.getAllianceId(), cfg);
+        if (grantTaskRewards(playerId, taken.getAllianceId(), cfg)) {
+            alliancePlayerDao.markTaskRewarded(playerId, today, cfg.getId());
+        }
 
         NotifyAllianceTask notify = new NotifyAllianceTask(Code.SUCCESS);
         notify.result = TASK_RESULT_FINISH;
@@ -620,10 +623,14 @@ public class AllianceTaskService {
         }
     }
 
-    private void grantTaskRewards(long playerId, long allianceId, TaskCfg cfg) {
+    public boolean hasRewardedTask(long playerId, int taskId) {
+        return alliancePlayerDao.hasRewardedTask(playerId, TimeHelper.getDayNumerical(), taskId);
+    }
+
+    private boolean grantTaskRewards(long playerId, long allianceId, TaskCfg cfg) {
         Map<Integer, Long> rewards = cfg.getGetItem();
         if (rewards == null || rewards.isEmpty()) {
-            return;
+            return true;
         }
         long reputation = 0;
         long contribution = 0;
@@ -648,8 +655,13 @@ public class AllianceTaskService {
         }
         if (!packRewards.isEmpty()) {
             //统一走 sim 道具入口: 在线入内存资源/背包, 离线则进背包待上线迁移 (能量等 sim 特殊资源)
-            playerPackService.addItems(playerId, packRewards, AddType.ALLIANCE_TASK_REWARD, "", true);
+            CommonResult<?> result = playerPackService.addItems(playerId, packRewards, AddType.ALLIANCE_TASK_REWARD, "", true);
+            if (result == null || !result.success()) {
+                log.error("联盟任务发奖失败 playerId={},taskId={},result={}", playerId, cfg.getId(), result);
+                return false;
+            }
         }
+        return true;
     }
 
     /**

@@ -227,6 +227,25 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         return response(ctx, REQ_ACTIVE_PASS_INFO, Code.SUCCESS, data);
     }
 
+    public boolean hasRewardedTask(SimPlayerContext ctx, int taskId) {
+        if (ctx == null || ctx.getSimBaseData() == null) {
+            return false;
+        }
+        ActivePassData data = ensureCurrent(ctx, System.currentTimeMillis());
+        var def = config.index().task(taskId);
+        if (data == null || def == null) {
+            return false;
+        }
+        if (def.config().getTaskType() == TaskConstant.TaskType.ACTIVE_PASS_PERIOD) {
+            return data.getRewardedPeriodTaskIds().contains(taskId);
+        }
+        if (def.config().getTaskType() != TaskConstant.TaskType.ACTIVE_PASS_DAILY) {
+            return false;
+        }
+        ActivePassTask task = data.getDailyTasks().get(def.config().getGroup());
+        return task != null && task.getTaskId() == taskId && task.isClaimed();
+    }
+
     public ResActivePass claimTask(SimPlayerContext ctx, int passId, int taskId, int day) {
         ActivePassData data = ensureCurrent(ctx, System.currentTimeMillis());
         if (!matches(data, passId)) {
@@ -256,6 +275,7 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         data.setPoints(Math.addExact(data.getPoints(), def.config().getIntegralNum()));
         task.setClaimed(true);
         if (def.config().getTaskType() == TaskConstant.TaskType.ACTIVE_PASS_PERIOD) {
+            data.getRewardedPeriodTaskIds().add(taskId);
             var next = config.index().next(def.config().getGroup(), taskId);
             if (next != null) {
                 ActivePassTask newTask = newTask(next.config().getId());
@@ -388,6 +408,7 @@ public class ActivePassService implements SimConditionEventListener, SimPlayerTi
         data.setSettled(true);
         data.getDailyTasks().clear();
         data.getPeriodTasks().clear();
+        data.getRewardedPeriodTaskIds().clear();
         saves.enqueueSave(data);
     }
 

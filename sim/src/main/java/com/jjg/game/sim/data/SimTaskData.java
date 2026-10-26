@@ -5,9 +5,11 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 玩家 sim 任务数据 (主线 + 成就)。
@@ -32,6 +34,9 @@ public class SimTaskData extends AbstractData {
      * 成就任务: group -> 当前节点，末节点领取后保留，表示该组已全部完成。
      */
     private Map<Integer, TaskDetail> achievementTasks = new HashMap<>();
+
+    /** 主线、成就任务实际领取过奖励的配置 id，不由 GM 跳转推断。 */
+    private Set<Integer> rewardedTaskIds = new HashSet<>();
 
     /**
      * 场景与个人简介共用的成就徽章ID(MedalBuff.MedalType)，顺序即展示顺序。
@@ -64,6 +69,14 @@ public class SimTaskData extends AbstractData {
 
     public void setAchievementTasks(Map<Integer, TaskDetail> achievementTasks) {
         this.achievementTasks = achievementTasks == null ? new HashMap<>() : achievementTasks;
+    }
+
+    public Set<Integer> getRewardedTaskIds() {
+        return rewardedTaskIds;
+    }
+
+    public void setRewardedTaskIds(Set<Integer> rewardedTaskIds) {
+        this.rewardedTaskIds = rewardedTaskIds == null ? new HashSet<>() : rewardedTaskIds;
     }
 
     public List<Integer> getDisplayedMedalIds() {

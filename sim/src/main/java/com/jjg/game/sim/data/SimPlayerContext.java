@@ -78,8 +78,6 @@ public class SimPlayerContext {
     private long lastRandomVisitTime;
     //当前正在拜访的房主id (内存态; 0 表示在自己场景, 留言板据此判断查谁的)
     private long visitTargetId;
-    //上次联盟加速抵扣检查时间 (ms, 内存态; tick 内按玩家节流 Redis 访问)
-    private long lastSpeedupCheckTime;
     //赛季宝石在线收益计时游标 (ms, 内存态; 重登从 0 开始以排除离线时段)
     private long lastGemEarningTime;
     //雇员卡池红点已检查的有效卡池版本 (内存态; 仅在开放卡池变化时重算)
@@ -449,14 +447,6 @@ public class SimPlayerContext {
 
     public void setVisitTargetId(long visitTargetId) {
         this.visitTargetId = visitTargetId;
-    }
-
-    public long getLastSpeedupCheckTime() {
-        return lastSpeedupCheckTime;
-    }
-
-    public void setLastSpeedupCheckTime(long lastSpeedupCheckTime) {
-        this.lastSpeedupCheckTime = lastSpeedupCheckTime;
     }
 
     public long getLastGemEarningTime() {

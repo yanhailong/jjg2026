@@ -162,8 +162,7 @@ public class SimCasinoService implements SimTaskStateReporter {
             simGuestService.updateSpecialGuestRedDots(ctx.playerId());
             employeeRedDotService.updateRedDots(ctx.playerId(),
                     SimConstant.Employee.RED_DOT_GUEST_STAR_UP);
-            //先消费联盟助力抵扣(可能使CD提前到时), 再判定完成, 最后下发建筑列表
-            simBuildingService.applyPendingSpeedup(ctx, target, System.currentTimeMillis());
+            simBuildingService.initializeBuildingAreas(target);
 
             SimCasinoData casino = ctx.getCurrentCasino();
             res.currentCasinoId = casino.getCasinoId();
@@ -288,8 +287,7 @@ public class SimCasinoService implements SimTaskStateReporter {
         simBuildingService.updateCacheGuestSize(currentCasino);
 
         ctx.setCurrentCasino(currentCasino);
-        //检查是否有建筑完成升级
-        simBuildingService.completeAllBuildingUpgrade(ctx, currentCasino);
+        simBuildingService.initializeBuildingAreas(currentCasino);
         return currentCasino;
     }
 

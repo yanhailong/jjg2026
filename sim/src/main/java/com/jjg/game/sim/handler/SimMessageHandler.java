@@ -66,6 +66,8 @@ public class SimMessageHandler implements GmListener {
     @Autowired
     private SimBuildingService buildingService;
     @Autowired
+    private SimBuildingSkinService buildingSkinService;
+    @Autowired
     private SimOnlineRewardService onlineRewardService;
     @Autowired
     private SimEmployeeService employeeService;
@@ -482,13 +484,25 @@ public class SimMessageHandler implements GmListener {
     }
 
     /**
-     * 升级建筑 (启动 CD)
+     * 升级建筑
      */
     @Command(SimConstant.MsgBean.REQ_UPGRADE_BUILDING)
     public void reqUpgradeBuilding(PlayerController playerController, ReqUpgradeBuilding req) {
         execute(playerController, ctx -> {
-            buildingService.onUpgradeBuilding(ctx, req.id);
+            buildingService.onUpgradeBuilding(ctx, req.id, req.up10Level);
         }, ReqUpgradeBuilding.class);
+    }
+
+    @Command(SimConstant.MsgBean.REQ_UNLOCK_BUILDING_SKIN)
+    public void reqUnlockBuildingSkin(PlayerController playerController, ReqUnlockBuildingSkin req) {
+        execute(playerController, ctx -> ctx.send(buildingSkinService.unlock(
+                ctx, req.buildingId, req.areaId, req.skinId)), ReqUnlockBuildingSkin.class);
+    }
+
+    @Command(SimConstant.MsgBean.REQ_USE_BUILDING_SKIN)
+    public void reqUseBuildingSkin(PlayerController playerController, ReqUseBuildingSkin req) {
+        execute(playerController, ctx -> ctx.send(buildingSkinService.use(
+                ctx, req.buildingId, req.areaId, req.skinId)), ReqUseBuildingSkin.class);
     }
 
     /**

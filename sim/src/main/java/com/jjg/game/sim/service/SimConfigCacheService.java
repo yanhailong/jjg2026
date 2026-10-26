@@ -97,11 +97,13 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private Map<Integer, WeightRandom<List<Integer>>> employeePoolRandomMap;
 
     //建筑等级配置 buildingId -> level -> cfg
-    private Map<Integer, Map<Integer, BuildingUpgradeTableCfg>> buildingUpgradeCfgMap;
+    private volatile Map<Integer, NavigableMap<Integer, BuildingUpgradeTableCfg>> buildingUpgradeCfgMap;
     //RegionID -> level -> List.BuildLevelMaxInfo
-    private Map<Integer, Map<Integer, List<BuildLevelMaxInfo>>> buildingLevelMaxInfoMap;
+    private volatile Map<Integer, Map<Integer, List<BuildLevelMaxInfo>>> buildingLevelMaxInfoMap;
     //建筑等级解锁设备的信息
-    private Map<Integer, BuildingUnlockEquipmentData> buildingUnlockEquipmentDataMap;
+    private volatile Map<Integer, BuildingUnlockEquipmentData> buildingUnlockEquipmentDataMap;
+    //建筑区域配置 buildingId -> cfgs
+    private volatile Map<Integer, List<BuildingUpgradeAreaCfg>> buildingUpgradeAreaCfgMap = Map.of();
 
     //gameType -> BuildingAreaTableCfg
     private Map<Integer, BuildingAreaTableCfg> gameBuildingAreaTableCfg;
@@ -161,10 +163,6 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     //迷你商店 needItemId -> id ->cfg
     private Map<Integer, Map<Integer, ShopMiniCfg>> tmpShopMiniCfgMap = null;
 
-    //建筑升级清除cd配置
-    private int buildUpgradeCDProp = 0;
-    private int buildUpgradeCDClearMs = 0;
-
     //免广告礼包：购买后附赠奖励
     private Map<Integer, Long> noAdsRewardsMap = Map.of();
     //免广告礼包：折扣后的价格,ShopRechargeList.id
@@ -195,6 +193,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
         loadBuildingUpgradeConfig();
         loadBuildingAreaTableConfig();
+        loadBuildingUpgradeAreaConfig();
 
         loadEmployeeLevelConfig();
         loadEmployeeStarConfig();
@@ -465,44 +464,40 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
      * 加载建筑等级配置
      */
     public void loadBuildingUpgradeConfig() {
-        Map<Integer, Map<Integer, BuildingUpgradeTableCfg>> tmp = new HashMap<>();
+        Map<Integer, NavigableMap<Integer, BuildingUpgradeTableCfg>> tmp = new HashMap<>();
         Map<Integer, Map<Integer, List<BuildLevelMaxInfo>>> tmpBuildingLevelMaxInfoMap = new HashMap<>();
         Map<Integer, BuildingUnlockEquipmentData> tmpBuildingUnlockEquipmentDataMap = new HashMap<>();
         for (BuildingUpgradeTableCfg cfg : GameDataManager.getBuildingUpgradeTableCfgList()) {
-            tmp.computeIfAbsent(cfg.getBuildingID(), k -> new HashMap<>()).put(cfg.getLevel(), cfg);
-
-            BuildingUnlockEquipmentData buildingUnlockEquipmentData = tmpBuildingUnlockEquipmentDataMap.computeIfAbsent(cfg.getBuildingID(), k -> {
-                BuildingUnlockEquipmentData data = new BuildingUnlockEquipmentData();
-                data.setBuildId(cfg.getBuildingID());
-                return data;
-            });
-
-            if (cfg.getUnlockEquipment() != null && !cfg.getUnlockEquipment().isEmpty()) {
-                if (buildingUnlockEquipmentData.getMaxLevel() < cfg.getLevel()) {
-                    buildingUnlockEquipmentData.setMaxLevel(cfg.getLevel());
-                }
-
-                List<Integer> tmpList = buildingUnlockEquipmentData.getLevelUnlockEquipment(cfg.getLevel() - 1);
-                List<Integer> allList = new ArrayList<>();
-                if (tmpList != null) {
-                    allList.addAll(tmpList);
-                }
-                allList.addAll(new HashSet<>(cfg.getUnlockEquipment()));
-                buildingUnlockEquipmentData.setLevelUnlockEquipment(cfg.getLevel(), allList);
-            }
-
+            tmp.computeIfAbsent(cfg.getBuildingID(), k -> new TreeMap<>()).put(cfg.getLevel(), cfg);
         }
 
-        for (Map.Entry<Integer, Map<Integer, BuildingUpgradeTableCfg>> en : tmp.entrySet()) {
+        for (Map.Entry<Integer, NavigableMap<Integer, BuildingUpgradeTableCfg>> en : tmp.entrySet()) {
             int buildingId = en.getKey();
+            NavigableMap<Integer, BuildingUpgradeTableCfg> levels = en.getValue();
+            BuildingUnlockEquipmentData equipmentData = new BuildingUnlockEquipmentData();
+            equipmentData.setBuildId(buildingId);
+            Set<Integer> equipmentIds = new LinkedHashSet<>();
+            for (BuildingUpgradeTableCfg cfg : levels.values()) {
+                if (cfg.getUnlockEquipment() != null && !cfg.getUnlockEquipment().isEmpty()) {
+                    equipmentIds.addAll(cfg.getUnlockEquipment());
+                    equipmentData.setMaxLevel(cfg.getLevel());
+                    equipmentData.setLevelUnlockEquipment(cfg.getLevel(), List.copyOf(equipmentIds));
+                }
+            }
+            tmpBuildingUnlockEquipmentDataMap.put(buildingId, equipmentData);
+
             BuildingAreaTableCfg areaCfg = GameDataManager.getBuildingAreaTableCfg(buildingId);
             if (areaCfg == null) {
                 continue;
             }
 
             Map<Integer, Integer> needLevelMaxMap = new TreeMap<>();
-            for (BuildingUpgradeTableCfg cfg : en.getValue().values()) {
-                needLevelMaxMap.merge(cfg.getNeedLevel(), cfg.getLevel(), Math::max);
+            for (BuildingUpgradeTableCfg cfg : levels.values()) {
+                Integer nextLevel = levels.higherKey(cfg.getLevel());
+                int rangeEnd = Math.min(areaCfg.getMaxLevel(), nextLevel == null ? areaCfg.getMaxLevel() : nextLevel);
+                if (rangeEnd >= cfg.getLevel()) {
+                    needLevelMaxMap.merge(cfg.getNeedLevel(), rangeEnd, Math::max);
+                }
             }
 
             int oldMax = 1;
@@ -524,6 +519,16 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         this.buildingUpgradeCfgMap = tmp;
         this.buildingLevelMaxInfoMap = tmpBuildingLevelMaxInfoMap;
         this.buildingUnlockEquipmentDataMap = tmpBuildingUnlockEquipmentDataMap;
+    }
+
+    private void loadBuildingUpgradeAreaConfig() {
+        Map<Integer, List<BuildingUpgradeAreaCfg>> tmp = new HashMap<>();
+        for (BuildingUpgradeAreaCfg cfg : GameDataManager.getBuildingUpgradeAreaCfgList()) {
+            tmp.computeIfAbsent(cfg.getBuildingId(), k -> new ArrayList<>()).add(cfg);
+        }
+        tmp.replaceAll((buildingId, configs) -> configs.stream()
+                .sorted(Comparator.comparingInt(BuildingUpgradeAreaCfg::getId)).toList());
+        this.buildingUpgradeAreaCfgMap = tmp;
     }
 
     private void loadBuildingAreaTableConfig() {
@@ -669,13 +674,6 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
                 tmpGenGuestGuideSet.add(Integer.parseInt(s1));
             }
             this.genGuestGuideSet = tmpGenGuestGuideSet;
-        }
-
-        GlobalConfigCfg buildUpgradeCDCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Global.ID_WATCH_AD_CLEAR_TIME);
-        if (buildUpgradeCDCfg != null) {
-            String[] s = buildUpgradeCDCfg.getValue().split("_");
-            this.buildUpgradeCDProp = Integer.parseInt(s[0]);
-            this.buildUpgradeCDClearMs = Integer.parseInt(s[1]) * 60000;
         }
 
         //免广告
@@ -952,6 +950,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
         addInitSampleFileObserveWithCallBack(BuildingAreaTableCfg.EXCEL_NAME, this::loadBuildingAreaTableConfig);
         addInitSampleFileObserveWithCallBack(BuildingUpgradeTableCfg.EXCEL_NAME, this::loadBuildingUpgradeConfig);
+        addInitSampleFileObserveWithCallBack(BuildingUpgradeAreaCfg.EXCEL_NAME, this::loadBuildingUpgradeAreaConfig);
 
 
         addInitSampleFileObserveWithCallBack(GlobalConfigCfg.EXCEL_NAME, this::loadGlobalConfig);
@@ -971,6 +970,16 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         addInitSampleFileObserveWithCallBack(ShopMiniCfg.EXCEL_NAME, this::loadShopMiniConfig);
 
         addInitSampleFileObserveWithCallBack(ChapterCfg.EXCEL_NAME, this::loadChapterConfig);
+    }
+
+    @Override
+    public void changeSampleCallbackCollector() {
+        addChangeSampleFileObserveWithCallBack(BuildingAreaTableCfg.EXCEL_NAME, () -> {
+            loadBuildingAreaTableConfig();
+            loadBuildingUpgradeConfig();
+        });
+        addChangeSampleFileObserveWithCallBack(BuildingUpgradeTableCfg.EXCEL_NAME, this::loadBuildingUpgradeConfig);
+        addChangeSampleFileObserveWithCallBack(BuildingUpgradeAreaCfg.EXCEL_NAME, this::loadBuildingUpgradeAreaConfig);
     }
 
     // ---------------------------------------------------------------------
@@ -1027,28 +1036,44 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         if (buildingUpgradeCfgMap == null) {
             return null;
         }
-        Map<Integer, BuildingUpgradeTableCfg> map = buildingUpgradeCfgMap.get(buildingId);
-        return map == null ? null : map.get(level);
+        NavigableMap<Integer, BuildingUpgradeTableCfg> map = buildingUpgradeCfgMap.get(buildingId);
+        Map.Entry<Integer, BuildingUpgradeTableCfg> entry = map == null ? null : map.floorEntry(level);
+        return entry == null ? null : entry.getValue();
+    }
+
+    public Map<Integer, Long> getBuildingUpgradeReward(int buildingId, int level) {
+        if (buildingUpgradeCfgMap == null) {
+            return Collections.emptyMap();
+        }
+        NavigableMap<Integer, BuildingUpgradeTableCfg> levels = buildingUpgradeCfgMap.get(buildingId);
+        Integer startLevel = levels == null ? null : levels.floorKey(level);
+        if (startLevel != null) {
+            for (BuildingUpgradeTableCfg cfg : levels.tailMap(startLevel, true).values()) {
+                if (cfg.getUpgradeReward() != null && !cfg.getUpgradeReward().isEmpty()) {
+                    return cfg.getUpgradeReward();
+                }
+            }
+        }
+        return Collections.emptyMap();
+    }
+
+    public List<BuildingUpgradeAreaCfg> getBuildingUpgradeAreaCfgs(int buildingId) {
+        return buildingUpgradeAreaCfgMap.getOrDefault(buildingId, Collections.emptyList());
+    }
+
+    public static long getBuildingLevelValue(List<? extends Number> values, int level, int startLevel) {
+        if (values == null || values.isEmpty()) {
+            return 0;
+        }
+        return values.getFirst().longValue() + ((long) level - startLevel) * values.get(1).longValue();
     }
 
     /**
      * 获取建筑的最大等级
      */
     public int getBuildingMaxLevel(int buildingId) {
-        if (buildingUpgradeCfgMap == null) {
-            return 0;
-        }
-        Map<Integer, BuildingUpgradeTableCfg> map = buildingUpgradeCfgMap.get(buildingId);
-        if (map == null || map.isEmpty()) {
-            return 0;
-        }
-        int max = 0;
-        for (Integer l : map.keySet()) {
-            if (l > max) {
-                max = l;
-            }
-        }
-        return max;
+        BuildingAreaTableCfg areaCfg = GameDataManager.getBuildingAreaTableCfg(buildingId);
+        return areaCfg == null ? 0 : areaCfg.getMaxLevel();
     }
 
     /**
@@ -1429,14 +1454,6 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         }
         Integer id = tmpMap.get(serverBuildingType);
         return id == null ? 0 : id;
-    }
-
-    public int getBuildUpgradeCDProp() {
-        return buildUpgradeCDProp;
-    }
-
-    public int getBuildUpgradeCDClearMs() {
-        return buildUpgradeCDClearMs;
     }
 
     /**

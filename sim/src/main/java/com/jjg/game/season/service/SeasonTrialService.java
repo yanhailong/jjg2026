@@ -81,6 +81,11 @@ public class SeasonTrialService {
         return trialConfigService.trial(trialId);
     }
 
+    public boolean hasRewardedTask(SimPlayerContext ctx, int taskId) {
+        SeasonPlayerData data = ctx == null ? null : ctx.getSeasonPlayerData();
+        return data != null && data.getRewardedTrialTaskIds().contains(taskId);
+    }
+
     // =====================================================================
     // 列表
     // =====================================================================
@@ -336,10 +341,14 @@ public class SeasonTrialService {
             taskLogger.completeTask(ctx.playerId(), cfg.getId());
             completedFunctionIds.add(cfg.getFunctionId());
             List<Item> logItems = null;
+            boolean rewarded = true;
             if (cfg.getGetItem() != null && !cfg.getGetItem().isEmpty()) {
-                grant(ctx, cfg.getGetItem(), cfg.getId());
+                rewarded = grant(ctx, cfg.getGetItem(), cfg.getId());
                 cfg.getGetItem().forEach((id, count) -> total.merge(id, count, Long::sum));
                 logItems = toItemList(cfg.getGetItem());
+            }
+            if (rewarded) {
+                ctx.getSeasonPlayerData().getRewardedTrialTaskIds().add(cfg.getId());
             }
             taskLogger.receiveTaskAward(ctx.playerId(), cfg.getId(), logItems,
                     cfg.getIntegralNum(), TaskConstant.TaskStatus.STATUS_REWARDED);
@@ -348,7 +357,7 @@ public class SeasonTrialService {
         return total;
     }
 
-    private void grant(SimPlayerContext ctx, Map<Integer, Long> items, int taskId) {
+    private boolean grant(SimPlayerContext ctx, Map<Integer, Long> items, int taskId) {
         Map<Integer, Long> packItems = new HashMap<>(items);
         int currencyId = configService.currencyItemId();
         Long coin = currencyId == 0 ? null : packItems.remove(currencyId);
@@ -361,8 +370,10 @@ public class SeasonTrialService {
             if (result == null || !result.success()) {
                 log.warn("试炼奖励发放失败 playerId={},taskId={},code={}",
                         ctx.playerId(), taskId, result == null ? Code.EXCEPTION : result.code);
+                return false;
             }
         }
+        return true;
     }
 
     private static List<Item> toItemList(Map<Integer, Long> items) {

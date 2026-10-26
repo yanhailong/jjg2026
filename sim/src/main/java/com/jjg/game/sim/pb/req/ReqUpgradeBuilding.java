@@ -11,8 +11,10 @@ import com.jjg.game.sim.constant.SimConstant;
  * @date 2026/5/28
  */
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_GAME, cmd = SimConstant.MsgBean.REQ_UPGRADE_BUILDING)
-@ProtoDesc("升级建筑(启动CD)")
+@ProtoDesc("升级建筑")
 public class ReqUpgradeBuilding extends AbstractMessage {
     @ProtoDesc("建筑id")
     public int id;
+    @ProtoDesc("是否使用一次性升10级")
+    public boolean up10Level;
 }

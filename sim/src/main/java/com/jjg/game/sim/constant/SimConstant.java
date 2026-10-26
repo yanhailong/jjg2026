@@ -336,6 +336,13 @@ public interface SimConstant {
         //升级雇员技能
         int REQ_UPGRADE_EMPLOYEE_SKILL = BASE_MSG_PREFIX | 0xAC;
         int RES_UPGRADE_EMPLOYEE_SKILL = BASE_MSG_PREFIX | 0xAD;
+
+        //建筑区域皮肤解锁
+        int REQ_UNLOCK_BUILDING_SKIN = BASE_MSG_PREFIX | 0xAE;
+        int RES_UNLOCK_BUILDING_SKIN = BASE_MSG_PREFIX | 0xAF;
+        //使用皮肤
+        int REQ_USE_BUILDING_SKIN = BASE_MSG_PREFIX | 0xB0;
+        int RES_USE_BUILDING_SKIN = BASE_MSG_PREFIX | 0xB1;
     }
 
     interface SpecialGuest {
@@ -453,6 +460,7 @@ public interface SimConstant {
         int COLLECTION = 1;
         int EMPLOYEE = 2;
         int ACHIEVEMENT = 3;
+        int BUFF = 4;
     }
 
     interface Common {

@@ -357,6 +357,8 @@ public enum AddType {
     SIM_GOD_GAMBLERS(1834),
     //雇员技能升级消耗
     SIM_EMPLOYEE_SKILL_UPGRADE(1835),
+    //建筑区域皮肤解锁消耗
+    SIM_BUILDING_SKIN_UNLOCK(1836),
 
     //创建联盟
     ALLIANCE_CREATE(2001),

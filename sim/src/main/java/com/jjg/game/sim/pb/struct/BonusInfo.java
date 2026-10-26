@@ -13,8 +13,8 @@ public class BonusInfo {
     public int typeValue;
     @ProtoDesc("包含全部加成的实际值；游戏区/休息区为每小时产出，管理区为属性值")
     public long totalValue;
-    @ProtoDesc("固定值来源：1藏品、2雇员、3成就，当前仅返回雇员；与totalValue单位相同")
+    @ProtoDesc("固定值来源：1藏品、2雇员、3成就、4 Buff；与totalValue单位相同")
     public List<KVLongInfo> fixedValueAddList;
-    @ProtoDesc("比例来源：1藏品、2雇员、3成就，当前仅返回雇员；值为万分比，200表示2%")
+    @ProtoDesc("比例来源：1藏品、2雇员、3成就、4 Buff；值为万分比，200表示2%")
     public List<KVLongInfo> propValueAddList;
 }

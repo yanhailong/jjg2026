@@ -1,8 +1,9 @@
 package com.jjg.game.sim.data;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 
 public class BuildingUnlockEquipmentData {
     //建筑id
@@ -10,7 +11,7 @@ public class BuildingUnlockEquipmentData {
     //BuildingUpgradeTable表中该建筑，配置了UnlockEquipment参数的，最大的等级
     private int maxLevel;
     //等级对应的解锁设备
-    private Map<Integer, List<Integer>> levelEquipmentMap;
+    private NavigableMap<Integer, List<Integer>> levelEquipmentMap;
 
     public int getBuildId() {
         return buildId;
@@ -33,19 +34,20 @@ public class BuildingUnlockEquipmentData {
     }
 
     public void setLevelEquipmentMap(Map<Integer, List<Integer>> levelEquipmentMap) {
-        this.levelEquipmentMap = levelEquipmentMap;
+        this.levelEquipmentMap = levelEquipmentMap == null ? null : new TreeMap<>(levelEquipmentMap);
     }
 
     public List<Integer> getLevelUnlockEquipment(int level) {
         if(this.levelEquipmentMap == null || this.levelEquipmentMap.isEmpty()){
             return null;
         }
-        return this.levelEquipmentMap.get(level);
+        Map.Entry<Integer, List<Integer>> entry = this.levelEquipmentMap.floorEntry(level);
+        return entry == null ? null : entry.getValue();
     }
 
     public void setLevelUnlockEquipment(int level, List<Integer> list) {
         if(this.levelEquipmentMap == null){
-            this.levelEquipmentMap = new HashMap<>();
+            this.levelEquipmentMap = new TreeMap<>();
         }
         this.levelEquipmentMap.put(level, list);
     }

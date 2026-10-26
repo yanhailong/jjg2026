@@ -39,4 +39,6 @@ public class BuildingInfo {
     public long upgradeExp;
     @ProtoDesc("建筑属性分类  对应 BuildingAreaTable.xlsx 的typeValue")
     public List<Integer> buileTypeValue;
+    @ProtoDesc("建筑各区域的皮肤解锁与使用状态")
+    public List<BuildingAreaSkinInfo> areaSkinInfos;
 }
