@@ -713,10 +713,12 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
     }
 
     private long computeVisitIntervalMsResult(SimCasinoData casino, int recent, long actual, boolean show) {
-        if (show || recent < casino.getCacheGuestSize()) {
+        int capacity = casino.getCacheGuestSize();
+        //容量为零时不做满员降频，避免除零。
+        if (show || capacity <= 0 || recent < capacity) {
             return actual;
         }
-        return actual * recent / casino.getCacheGuestSize();
+        return actual * recent / capacity;
     }
 
     /**
