@@ -15,6 +15,8 @@ import com.jjg.game.sim.service.SimConfigCacheService;
 import com.jjg.game.sim.service.SimEmployeeAttributeService;
 import com.jjg.game.sim.service.SimEmployeeService;
 import com.jjg.game.sim.service.SimOperationDashboardService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +29,8 @@ import java.util.Map;
  * @date 2026/5/26
  */
 public final class SimPbConverter {
+
+    private static final Logger log = LoggerFactory.getLogger(SimPbConverter.class);
 
     private SimPbConverter() {
     }
@@ -190,6 +194,10 @@ public final class SimPbConverter {
                 .getBean(SimEmployeeAttributeService.class).snapshot(ctx);
         for (BuildingData b : ctx.getCurrentCasino().getBuildingData().values()) {
             BuildingAreaTableCfg buildingAreaTableCfg = GameDataManager.getBuildingAreaTableCfg(b.getId());
+            if(buildingAreaTableCfg == null){
+                log.warn("获取建筑配置失败 playerId={},id={}",ctx.getPlayer().getId(),b.getId());
+                continue;
+            }
             BuildingUpgradeTableCfg buildingUpgradeCfg = simConfigCacheService.getBuildingUpgradeCfg(b.getId(), b.getLevel());
             list.add(toBuildingInfo(ctx, simConfigCacheService, b, buildingUpgradeCfg,
                     buildingAreaTableCfg.getUnlockGameId(), now, attributes));
