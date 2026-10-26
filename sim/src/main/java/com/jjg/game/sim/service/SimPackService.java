@@ -86,6 +86,8 @@ public class SimPackService implements SpecialItemListener {
     @Lazy
     @Autowired
     private SeasonEconomyService seasonEconomyService;
+    //懒加载打破循环: 本类 -> SimOnlineRewardService -> PlayerPackService -> 本类
+    @Lazy
     @Autowired(required = false)
     private List<SimSpecialItemBalanceListener> balanceListeners = List.of();
 

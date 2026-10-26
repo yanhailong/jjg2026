@@ -39,6 +39,7 @@ import com.jjg.game.hall.utils.HallTool;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
 import com.jjg.game.sim.data.SimCasinoUnlock;
+import com.jjg.game.sim.listener.SimSpecialItemBalanceListener;
 import com.jjg.game.sim.service.SimCasinoService;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -100,6 +101,8 @@ public class HallService implements ConfigExcelChangeListener, TimerListener {
     private SimCasinoService simCasinoService;
     @Autowired
     private List<ItemListener> itemListenerList;
+    @Autowired
+    private List<SimSpecialItemBalanceListener> simSpecialItemBalanceListeners;
 
     //普通场次缓存信息
     private Map<Integer, List<WareHouseConfigInfo>> wareHouseConfigMap = new HashMap<>();
@@ -657,6 +660,11 @@ public class HallService implements ConfigExcelChangeListener, TimerListener {
             Map<Integer, Long> addItemsMap = new HashMap<>();
             //是否有获取的固定道具
             if (itemCfg.getGetItem() != null && !itemCfg.getGetItem().isEmpty()) {
+                long output = 1;
+                if (itemCfg.getItemType() != GameConstant.Item.ITEM_TYPE_CASINO_EXP && simSpecialItemBalanceListeners != null && !simSpecialItemBalanceListeners.isEmpty()) {
+                    output = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 12);
+                }
+
                 for (Map.Entry<Integer, Long> en : itemCfg.getGetItem().entrySet()) {
                     int addItemId = en.getKey();
                     ItemCfg addItemCfg = GameDataManager.getItemCfg(addItemId);
@@ -664,7 +672,7 @@ public class HallService implements ConfigExcelChangeListener, TimerListener {
                         log.debug("未找到获得新道具的配置 playerId = {},itemId = {}", player.getId(), addItemId);
                         continue;
                     }
-                    addItemsMap.merge(addItemId, en.getValue() * useItemCount, Long::sum);
+                    addItemsMap.merge(addItemId, output * en.getValue() * useItemCount, Long::sum);
                 }
             }
 

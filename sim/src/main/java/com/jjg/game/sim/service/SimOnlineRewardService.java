@@ -17,6 +17,8 @@ import com.jjg.game.sim.constant.BuildingOutputType;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.data.SimBaseData;
 import com.jjg.game.sim.data.SimPlayerContext;
+import com.jjg.game.sim.listener.SimSpecialItemBalanceListener;
+import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import com.jjg.game.sim.pb.res.ResSimClaimOnlineReward;
 import com.jjg.game.sim.pb.res.ResSimOnlineReward;
 import com.jjg.game.sim.pb.struct.OnlineRewardInfo;
@@ -29,7 +31,7 @@ import java.util.Map;
 
 /** 在线收益：按当前场景产出快速领取，状态归玩家所有，复用玩家串行执行与自动落库。 */
 @Service
-public class SimOnlineRewardService {
+public class SimOnlineRewardService implements SimSpecialItemBalanceListener {
     @Autowired
     private SimConfigCacheService configCache;
     @Autowired
@@ -44,6 +46,8 @@ public class SimOnlineRewardService {
     private CoreLogger coreLogger;
     @Autowired
     private SimOnlineRewardRedDotService redDotService;
+    @Autowired
+    private SimPlayerContextRegistry contextRegistry;
 
     public ResSimOnlineReward getInfo(SimPlayerContext ctx) {
         return getInfo(ctx, configCache.getOnlineRewardDiamondCosts(), globalInt(SimConstant.Global.ONLINE_REWARD_AD_CD));
@@ -169,5 +173,18 @@ public class SimOnlineRewardService {
                 ? info.diamondUsedCount : Math.max(0, info.diamondUsedCount - 1);
         Item cost = costs.get(Math.min(costIndex, costs.size() - 1));
         info.diamondCost = ItemUtils.buildItemInfo(cost.getId(), cost.getItemCount());
+    }
+
+    @Override
+    public long output(long playerId, int type) {
+        BuildingOutputType outputType = BuildingOutputType.fromCode(type);
+        if (outputType == null) {
+            return 0;
+        }
+        SimPlayerContext ctx = contextRegistry.getContext(playerId);
+        if (ctx == null || ctx.getCurrentCasino() == null) {
+            return 0;
+        }
+        return buildingService.computePerMinuteOutput(ctx, ctx.getCurrentCasino()).getOrDefault(outputType, 0L);
     }
 }

@@ -87,6 +87,8 @@ public class GameConstant {
         int ITEM_TYPE_SIM_GUEST = 3;
         //雇员
         int ITEM_TYPE_SIM_EMPLOYEE = 4;
+        //场景经验
+        int ITEM_TYPE_CASINO_EXP = 5;
     }
 
     public interface Marquee {

@@ -7,7 +7,10 @@ package com.jjg.game.sim.listener;
  */
 public interface SimSpecialItemBalanceListener {
 
-    boolean support(int itemId);
+    default boolean support(int itemId){return false;}
 
-    void onBalanceChanged(long playerId, int itemId, long balance);
+    default void onBalanceChanged(long playerId, int itemId, long balance){}
+
+    /** 当前场景每分钟产出，type 与 OnlineRewardInfo.hourlyRewards 的 itemId 一致。 */
+    default long output(long playerId, int type){return 0;}
 }
