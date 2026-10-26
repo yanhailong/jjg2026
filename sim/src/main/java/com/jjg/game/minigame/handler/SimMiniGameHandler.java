@@ -17,6 +17,11 @@ import com.jjg.game.minigame.pb.req.ReqGodGamblersSelfPoker;
 import com.jjg.game.minigame.pb.req.ReqQuickClearCheaterHuntGame;
 import com.jjg.game.minigame.pb.req.ReqStartGodGamblersGame;
 import com.jjg.game.minigame.pb.req.ReqUnlockNextLevel;
+import com.jjg.game.minigame.pb.req.ReqEnterHappyHappyFishGame;
+import com.jjg.game.minigame.pb.req.ReqStartHappyHappyFishGame;
+import com.jjg.game.minigame.pb.req.ReqCatchHappyHappyFish;
+import com.jjg.game.minigame.pb.req.ReqEndHappyHappyFishGame;
+import com.jjg.game.minigame.pb.req.ReqQuickClearHappyHappyFishGame;
 import com.jjg.game.minigame.pb.res.ResCheaterHuntGameInfo;
 import com.jjg.game.minigame.pb.res.ResEnterCheaterHuntGame;
 import com.jjg.game.minigame.pb.res.ResExitCheaterHuntGame;
@@ -28,8 +33,14 @@ import com.jjg.game.minigame.pb.res.ResGodGamblersSelfPoker;
 import com.jjg.game.minigame.pb.res.ResQuickClearCheaterHuntGame;
 import com.jjg.game.minigame.pb.res.ResStartGodGamblersGame;
 import com.jjg.game.minigame.pb.res.ResUnlockNextLevel;
+import com.jjg.game.minigame.pb.res.ResEnterHappyHappyFishGame;
+import com.jjg.game.minigame.pb.res.ResStartHappyHappyFishGame;
+import com.jjg.game.minigame.pb.res.ResCatchHappyHappyFish;
+import com.jjg.game.minigame.pb.res.ResEndHappyHappyFishGame;
+import com.jjg.game.minigame.pb.res.ResQuickClearHappyHappyFishGame;
 import com.jjg.game.minigame.service.SimMiniGameService;
 import com.jjg.game.minigame.service.GodGamblersService;
+import com.jjg.game.minigame.service.HappyHappyFishService;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import org.slf4j.Logger;
@@ -49,6 +60,8 @@ public class SimMiniGameHandler {
     private SimMiniGameService simMiniGameService;
     @Autowired
     private GodGamblersService godGamblersService;
+    @Autowired
+    private HappyHappyFishService happyHappyFishService;
 
     /** 获取关卡列表及一键通关开放状态。 */
     @Command(MiniGameConstant.MsgBean.REQ_ENTER_CHEAT_HUNT_GAME)
@@ -180,5 +193,55 @@ public class SimMiniGameHandler {
             return;
         }
         ctx.send(godGamblersService.quickBattle(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_ENTER_HAPPY_HAPPY_FISH_GAME)
+    public void reqEnterHappyHappyFishGame(PlayerController playerController, ReqEnterHappyHappyFishGame req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResEnterHappyHappyFishGame(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(happyHappyFishService.enter(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_START_HAPPY_HAPPY_FISH_GAME)
+    public void reqStartHappyHappyFishGame(PlayerController playerController, ReqStartHappyHappyFishGame req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResStartHappyHappyFishGame(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(happyHappyFishService.start(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_CATCH_HAPPY_HAPPY_FISH)
+    public void reqCatchHappyHappyFish(PlayerController playerController, ReqCatchHappyHappyFish req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResCatchHappyHappyFish(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(happyHappyFishService.catchFish(ctx, req.roundId, req.fishId));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_END_HAPPY_HAPPY_FISH_GAME)
+    public void reqEndHappyHappyFishGame(PlayerController playerController, ReqEndHappyHappyFishGame req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResEndHappyHappyFishGame(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(happyHappyFishService.end(ctx, req.roundId));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_QUICK_CLEAR_HAPPY_HAPPY_FISH_GAME)
+    public void reqQuickClearHappyHappyFishGame(PlayerController playerController, ReqQuickClearHappyHappyFishGame req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResQuickClearHappyHappyFishGame(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(happyHappyFishService.quickClear(ctx));
     }
 }

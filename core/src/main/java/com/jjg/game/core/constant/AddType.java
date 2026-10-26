@@ -359,6 +359,8 @@ public enum AddType {
     SIM_EMPLOYEE_SKILL_UPGRADE(1835),
     //建筑区域皮肤解锁消耗
     SIM_BUILDING_SKIN_UNLOCK(1836),
+    //欢乐捉鱼消耗、积分奖励及每日赠送
+    SIM_HAPPY_HAPPY_FISH(1837),
 
     //创建联盟
     ALLIANCE_CREATE(2001),

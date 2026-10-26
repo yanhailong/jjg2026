@@ -8,6 +8,8 @@ import com.jjg.game.minigame.data.CheaterHuntData;
 import com.jjg.game.minigame.data.CheaterHuntRound;
 import com.jjg.game.minigame.data.GodGamblersData;
 import com.jjg.game.minigame.data.GodGamblersRound;
+import com.jjg.game.minigame.data.HappyHappyFishData;
+import com.jjg.game.minigame.data.HappyHappyFishRound;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.sim.constant.BuildingOutputType;
 
@@ -121,6 +123,25 @@ public class SimPlayerContext {
     private GodGamblersData godGamblersData;
     //赌神搓牌本局内存状态，重新进入小游戏或退出会话时丢弃
     private GodGamblersRound godGamblersRound;
+    //欢乐捉鱼每日赠送日期；单局只留在会话中，掉线按当前积分结算
+    private HappyHappyFishData happyHappyFishData;
+    private HappyHappyFishRound happyHappyFishRound;
+
+    public HappyHappyFishData getHappyHappyFishData() {
+        return happyHappyFishData;
+    }
+
+    public void setHappyHappyFishData(HappyHappyFishData happyHappyFishData) {
+        this.happyHappyFishData = happyHappyFishData;
+    }
+
+    public HappyHappyFishRound getHappyHappyFishRound() {
+        return happyHappyFishRound;
+    }
+
+    public void setHappyHappyFishRound(HappyHappyFishRound happyHappyFishRound) {
+        this.happyHappyFishRound = happyHappyFishRound;
+    }
 
     public GodGamblersData getGodGamblersData() {
         return godGamblersData;

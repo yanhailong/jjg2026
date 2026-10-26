@@ -29,10 +29,12 @@ public class BuildingSkinCfg extends BaseCfgBean {
   protected int languageId;
   /** 解锁所需道具(与"解锁条件"任选其一) */
   protected int needItemId;
-  /** 区域皮肤字名称 */
+  /** 区域皮肤名称 */
   protected String skinFieldName;
   /** 皮肤图标 */
   protected String skinIcon;
+  /** 皮肤名称 */
+  protected int skinLanguageId;
   /** 解锁条件 */
   protected List<Integer> unlockCondition;
 
@@ -61,7 +63,7 @@ public class BuildingSkinCfg extends BaseCfgBean {
     return needItemId;
   }
 
-  /** 返回区域皮肤字名称 */
+  /** 返回区域皮肤名称 */
   public String getSkinFieldName() {
     return skinFieldName;
   }
@@ -69,6 +71,11 @@ public class BuildingSkinCfg extends BaseCfgBean {
   /** 返回皮肤图标 */
   public String getSkinIcon() {
     return skinIcon;
+  }
+
+  /** 返回皮肤名称 */
+  public int getSkinLanguageId() {
+    return skinLanguageId;
   }
 
   /** 返回解锁条件 */

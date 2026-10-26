@@ -13,6 +13,10 @@ public interface MiniGameConstant {
     int QUICK_CLEAR_CHAPTER_GLOBAL_ID = 357;
     /** 赌神搓牌只有一条配置。 */
     int GOD_GAMBLERS_CONFIG_ID = 1001;
+    /** 欢乐捉鱼一键通关的章节门槛、结算积分及沙漏配置ID。 */
+    int HAPPY_HAPPY_FISH_QUICK_CLEAR_CHAPTER_GLOBAL_ID = 359;
+    int HAPPY_HAPPY_FISH_QUICK_CLEAR_SCORE_GLOBAL_ID = 360;
+    int HAPPY_HAPPY_FISH_HOURGLASS_ID = 104;
 
     /**
      * 单局状态，与客户端协议中的state保持一致。
@@ -71,5 +75,17 @@ public interface MiniGameConstant {
         //一键比拼
         int REQ_GOD_GAMBLERS_QUICK_BATTLE = BASE_MSG_PREFIX | 0x15;
         int RES_GOD_GAMBLERS_QUICK_BATTLE = BASE_MSG_PREFIX | 0x16;
+
+        //欢乐捉鱼：进入、开局、捕获、结束、一键通关
+        int REQ_ENTER_HAPPY_HAPPY_FISH_GAME = BASE_MSG_PREFIX | 0x17;
+        int RES_ENTER_HAPPY_HAPPY_FISH_GAME = BASE_MSG_PREFIX | 0x18;
+        int REQ_START_HAPPY_HAPPY_FISH_GAME = BASE_MSG_PREFIX | 0x19;
+        int RES_START_HAPPY_HAPPY_FISH_GAME = BASE_MSG_PREFIX | 0x1A;
+        int REQ_CATCH_HAPPY_HAPPY_FISH = BASE_MSG_PREFIX | 0x1B;
+        int RES_CATCH_HAPPY_HAPPY_FISH = BASE_MSG_PREFIX | 0x1C;
+        int REQ_END_HAPPY_HAPPY_FISH_GAME = BASE_MSG_PREFIX | 0x1D;
+        int RES_END_HAPPY_HAPPY_FISH_GAME = BASE_MSG_PREFIX | 0x1E;
+        int REQ_QUICK_CLEAR_HAPPY_HAPPY_FISH_GAME = BASE_MSG_PREFIX | 0x1F;
+        int RES_QUICK_CLEAR_HAPPY_HAPPY_FISH_GAME = BASE_MSG_PREFIX | 0x20;
     }
 }
