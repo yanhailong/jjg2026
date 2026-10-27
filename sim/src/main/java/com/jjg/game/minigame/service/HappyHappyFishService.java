@@ -1,11 +1,11 @@
 package com.jjg.game.minigame.service;
 
-import com.jjg.game.common.pb.ItemInfo;
 import com.jjg.game.common.utils.TimeHelper;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
+import com.jjg.game.core.data.PlayerPack;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.minigame.constant.MiniGameConstant;
@@ -27,7 +27,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /** 欢乐捉鱼：客户端负责操作，服务器负责单局时限、积分和道具结算。 */
@@ -74,8 +73,21 @@ public class HappyHappyFishService {
         }
         res.costItems = ItemUtils.buildItemInfo(cfg.getConsumeCount());
         res.ownedItems = new ArrayList<>(cfg.getConsumeCount().size());
+
+        PlayerPack playerPack = null;
         for (Integer itemId : cfg.getConsumeCount().keySet()) {
-            res.ownedItems.add(ItemUtils.buildItemInfo(itemId, playerPackService.getItemCount(ctx.playerId(), itemId)));
+            if (itemId == ItemUtils.getGoldItemId()) {
+                res.ownedItems.add(ItemUtils.buildItemInfo(itemId, ctx.getPlayer().getGold()));
+            } else if (itemId == ItemUtils.getDiamondItemId()) {
+                res.ownedItems.add(ItemUtils.buildItemInfo(itemId, ctx.getPlayer().getDiamond()));
+            } else if (itemId == ItemUtils.getShellItemId()) {
+                res.ownedItems.add(ItemUtils.buildItemInfo(itemId, ctx.getPlayer().getShell()));
+            } else {
+                if (playerPack == null) {
+                    playerPack = playerPackService.getFromAllDB(ctx.playerId());
+                }
+                res.ownedItems.add(ItemUtils.buildItemInfo(itemId, playerPack.getItemCount(itemId)));
+            }
         }
         res.openOneClickPass = openOneClickPass(ctx);
         return res;
