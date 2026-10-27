@@ -521,7 +521,7 @@ public class HallMessageHandler implements GmListener, ChooseWareListener, Choos
             if (useResult.data != null) {
                 res.addItemInfos = ItemUtils.buildItemInfo(useResult.data);
             }
-            log.debug("使用道具 playerId = {},res = {}", playerController.playerId(), JSON.toJSONString(res));
+            log.debug("使用道具 playerId = {},useItemId={},useItemCount={},selectItemId={},res = {}", playerController.playerId(), req.itemId, req.useItemCount, req.selectItemId, JSON.toJSONString(res));
         } catch (Exception e) {
             log.error("", e);
             res.code = Code.EXCEPTION;

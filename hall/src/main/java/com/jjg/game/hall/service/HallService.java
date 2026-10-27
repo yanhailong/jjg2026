@@ -48,6 +48,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -676,17 +677,18 @@ public class HallService implements ConfigExcelChangeListener, TimerListener {
             //在线收益卡
             if (simSpecialItemBalanceListeners != null && !simSpecialItemBalanceListeners.isEmpty()) {
                 Map<Integer, Long> onlineRewardItemsMap = null;
-                if (itemCfg.getItemType() != GameConstant.Item.ITEM_TYPE_CASINO_EXP) {
+                if (itemCfg.getItemType() == GameConstant.Item.ITEM_TYPE_CASINO_EXP) {
                     onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 12);
-                } else if (itemCfg.getItemType() != GameConstant.Item.ITEM_TYPE_GOLD) {
+                } else if (itemCfg.getItemType() == GameConstant.Item.ITEM_TYPE_GOLD) {
                     onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 1);
-                } else if (itemCfg.getItemType() != GameConstant.Item.ITEM_TYPE_ONLINE_REWARD) {
+                } else if (itemCfg.getItemType() == GameConstant.Item.ITEM_TYPE_ONLINE_REWARD) {
                     onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 0);
                 }
 
                 if (onlineRewardItemsMap != null && !onlineRewardItemsMap.isEmpty()) {
+                    int timeMin = new BigDecimal(itemCfg.getTargetCondition()).intValue();
                     onlineRewardItemsMap.forEach((key, value) -> {
-                        addItemsMap.merge(key, value, Long::sum);
+                        addItemsMap.merge(key, value * timeMin, Long::sum);
                     });
                 }
             }

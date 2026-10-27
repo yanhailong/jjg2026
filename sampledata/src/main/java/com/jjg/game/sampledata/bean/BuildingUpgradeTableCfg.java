@@ -23,9 +23,9 @@ public class BuildingUpgradeTableCfg extends BaseCfgBean {
   protected int BuildingID;
   /** 升级消耗材料(最多1个) */
   protected Map<Integer,Long> CostPerLevel;
-  /** 曝光度产出(起始值,增量值) */
+  /** 曝光度产出(起始值_增量值) */
   protected List<Long> Exposure;
-  /** 交互次数（起始值,增量值） */
+  /** 交互次数（起始值_增量值） */
   protected List<Integer> InteractCount;
   /** 电子显示屏中的数量 */
   protected int MaxInteractionCount;
@@ -35,11 +35,11 @@ public class BuildingUpgradeTableCfg extends BaseCfgBean {
   protected int NeedLevel;
   /** 相对-升级物品默认中心的偏移量x、y */
   protected List<Integer> Offset;
-  /** 知名度产出(起始值,增量值) */
+  /** 知名度产出(起始值_增量值) */
   protected List<Long> Popularity;
-  /** 基础繁荣度(起始值,增量值) */
+  /** 基础繁荣度(起始值_增量值) */
   protected List<Integer> Prosperity;
-  /** 服务能力产出(起始值,增量值) */
+  /** 服务能力产出(起始值_增量值) */
   protected List<Long> Service;
   /** 解锁\升级装饰 */
   protected List<Integer> UnlockDecorationId;
@@ -47,7 +47,7 @@ public class BuildingUpgradeTableCfg extends BaseCfgBean {
   protected List<Integer> UnlockEquipment;
   /** 交互点ID */
   protected List<Integer> UnlockInteractionId;
-  /** 金币产出(起始值,增量值) */
+  /** 金币产出(起始值_增量值) */
   protected List<Long> UpgradeOutput;
   /** 等级段升级奖励(最多2个) */
   protected Map<Integer,Long> UpgradeReward;
@@ -64,12 +64,12 @@ public class BuildingUpgradeTableCfg extends BaseCfgBean {
     return CostPerLevel;
   }
 
-  /** 返回曝光度产出(起始值,增量值) */
+  /** 返回曝光度产出(起始值_增量值) */
   public List<Long> getExposure() {
     return Exposure;
   }
 
-  /** 返回交互次数（起始值,增量值） */
+  /** 返回交互次数（起始值_增量值） */
   public List<Integer> getInteractCount() {
     return InteractCount;
   }
@@ -94,17 +94,17 @@ public class BuildingUpgradeTableCfg extends BaseCfgBean {
     return Offset;
   }
 
-  /** 返回知名度产出(起始值,增量值) */
+  /** 返回知名度产出(起始值_增量值) */
   public List<Long> getPopularity() {
     return Popularity;
   }
 
-  /** 返回基础繁荣度(起始值,增量值) */
+  /** 返回基础繁荣度(起始值_增量值) */
   public List<Integer> getProsperity() {
     return Prosperity;
   }
 
-  /** 返回服务能力产出(起始值,增量值) */
+  /** 返回服务能力产出(起始值_增量值) */
   public List<Long> getService() {
     return Service;
   }
@@ -124,7 +124,7 @@ public class BuildingUpgradeTableCfg extends BaseCfgBean {
     return UnlockInteractionId;
   }
 
-  /** 返回金币产出(起始值,增量值) */
+  /** 返回金币产出(起始值_增量值) */
   public List<Long> getUpgradeOutput() {
     return UpgradeOutput;
   }
