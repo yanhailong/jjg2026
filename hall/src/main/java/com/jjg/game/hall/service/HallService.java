@@ -686,7 +686,7 @@ public class HallService implements ConfigExcelChangeListener, TimerListener {
                 }
 
                 if (onlineRewardItemsMap != null && !onlineRewardItemsMap.isEmpty()) {
-                    int timeMin = new BigDecimal(itemCfg.getTargetCondition()).intValue();
+                    long timeMin = new BigDecimal(itemCfg.getTargetCondition()).longValue() * useItemCount;
                     onlineRewardItemsMap.forEach((key, value) -> {
                         addItemsMap.merge(key, value * timeMin, Long::sum);
                     });
