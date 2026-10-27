@@ -651,7 +651,7 @@ public class HallService implements ConfigExcelChangeListener, TimerListener {
             }
 
             //检查道具类型
-            if (itemCfg.getType() != GameConstant.Item.TYPE_CAN_USE) {
+            if (itemCfg.getType() != GameConstant.Item.TYPE_CAN_USE && itemCfg.getType() != GameConstant.Item.TYPE_CAN_USE_2) {
                 result.code = Code.FORBID;
                 log.debug("改道具不可被使用，使用道具失败 playerId = {},itemId = {}", player.getId(), itemId);
                 return result;
@@ -660,11 +660,6 @@ public class HallService implements ConfigExcelChangeListener, TimerListener {
             Map<Integer, Long> addItemsMap = new HashMap<>();
             //是否有获取的固定道具
             if (itemCfg.getGetItem() != null && !itemCfg.getGetItem().isEmpty()) {
-                long output = 1;
-                if (itemCfg.getItemType() != GameConstant.Item.ITEM_TYPE_CASINO_EXP && simSpecialItemBalanceListeners != null && !simSpecialItemBalanceListeners.isEmpty()) {
-                    output = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 12);
-                }
-
                 for (Map.Entry<Integer, Long> en : itemCfg.getGetItem().entrySet()) {
                     int addItemId = en.getKey();
                     ItemCfg addItemCfg = GameDataManager.getItemCfg(addItemId);
@@ -672,7 +667,27 @@ public class HallService implements ConfigExcelChangeListener, TimerListener {
                         log.debug("未找到获得新道具的配置 playerId = {},itemId = {}", player.getId(), addItemId);
                         continue;
                     }
-                    addItemsMap.merge(addItemId, output * en.getValue() * useItemCount, Long::sum);
+                    if (en.getValue() > 0) {
+                        addItemsMap.merge(addItemId, en.getValue() * useItemCount, Long::sum);
+                    }
+                }
+            }
+
+            //在线收益卡
+            if (simSpecialItemBalanceListeners != null && !simSpecialItemBalanceListeners.isEmpty()) {
+                Map<Integer, Long> onlineRewardItemsMap = null;
+                if (itemCfg.getItemType() != GameConstant.Item.ITEM_TYPE_CASINO_EXP) {
+                    onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 12);
+                } else if (itemCfg.getItemType() != GameConstant.Item.ITEM_TYPE_GOLD) {
+                    onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 1);
+                } else if (itemCfg.getItemType() != GameConstant.Item.ITEM_TYPE_ONLINE_REWARD) {
+                    onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 0);
+                }
+
+                if (onlineRewardItemsMap != null && !onlineRewardItemsMap.isEmpty()) {
+                    onlineRewardItemsMap.forEach((key, value) -> {
+                        addItemsMap.merge(key, value, Long::sum);
+                    });
                 }
             }
 
@@ -1128,15 +1143,12 @@ public class HallService implements ConfigExcelChangeListener, TimerListener {
      */
     public List<GameListConfig> getSortGameList(long playerId, int westeId, String clientVersion) {
         List<GameListConfig> gameListConfigList = getSortGameList(westeId);
-        if (gameListConfigList == null || gameListConfigList.isEmpty()
-                || StringUtils.isEmpty(clientVersion)
-                || VersionComparator.INSTANCE.compare(clientVersion, CoreConst.Common.BRANCH_VERSION) <= 0) {
+        if (gameListConfigList == null || gameListConfigList.isEmpty() || StringUtils.isEmpty(clientVersion) || VersionComparator.INSTANCE.compare(clientVersion, CoreConst.Common.BRANCH_VERSION) <= 0) {
             return gameListConfigList;
         }
 
         SimCasinoUnlock casinoUnlock = simCasinoService.getCasinoUnlock(playerId);
-        Set<Integer> openGameTypeSet = casinoUnlock == null
-                ? Collections.emptySet() : casinoUnlock.findUnlockedGameIds();
+        Set<Integer> openGameTypeSet = casinoUnlock == null ? Collections.emptySet() : casinoUnlock.findUnlockedGameIds();
         if (openGameTypeSet.isEmpty()) {
             return Collections.emptyList();
         }

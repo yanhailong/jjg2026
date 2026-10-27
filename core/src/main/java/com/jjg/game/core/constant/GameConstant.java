@@ -64,6 +64,8 @@ public class GameConstant {
         int TYPE_CAN_USE = 1;
         //可合成道具
         int TYPE_CAN_COMPOUND = 2;
+        //可使用道具
+        int TYPE_CAN_USE_2 = 4;
 
         int TYPE_GOLD = 99;
         int TYPE_DIAMOND = 98;
@@ -89,6 +91,10 @@ public class GameConstant {
         int ITEM_TYPE_SIM_EMPLOYEE = 4;
         //场景经验
         int ITEM_TYPE_CASINO_EXP = 5;
+        //金币收益
+        int ITEM_TYPE_GOLD = 6;
+        //在线收益
+        int ITEM_TYPE_ONLINE_REWARD = 7;
     }
 
     public interface Marquee {

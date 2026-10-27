@@ -7,6 +7,7 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
+import com.jjg.game.core.data.PlayerPack;
 import com.jjg.game.core.manager.SnowflakeManager;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.utils.ItemUtils;
@@ -30,7 +31,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 赌神搓牌玩法；沿用玩家串行队列、背包和保存服务，不额外加锁或创建事务。 */
+/**
+ * 赌神搓牌玩法；沿用玩家串行队列、背包和保存服务，不额外加锁或创建事务。
+ */
 @Service
 public class GodGamblersService {
     private static final Logger log = LoggerFactory.getLogger(GodGamblersService.class);
@@ -53,19 +56,25 @@ public class GodGamblersService {
         this.snowflakeManager = snowflakeManager;
     }
 
-    /** 登录补发当天赠送，离线日期不累计。 */
+    /**
+     * 登录补发当天赠送，离线日期不累计。
+     */
     public void onLogin(SimPlayerContext ctx) {
         grantDaily(ctx, System.currentTimeMillis());
     }
 
-    /** 零点事件投递到玩家队列，执行前再次确认仍在线。 */
+    /**
+     * 零点事件投递到玩家队列，执行前再次确认仍在线。
+     */
     public void onDaily(SimPlayerContext ctx, long now) {
         if (ctx.getPlayerController() != null && ctx.getPlayerController().isOnline()) {
             grantDaily(ctx, now);
         }
     }
 
-    /** 重新进入视为放弃旧局，不返还消耗，不发放旧局奖励。 */
+    /**
+     * 重新进入视为放弃旧局，不返还消耗，不发放旧局奖励。
+     */
     public ResEnterGodGamblersGame enter(SimPlayerContext ctx) {
         ctx.setGodGamblersRound(null);
         ResEnterGodGamblersGame res = new ResEnterGodGamblersGame(grantDaily(ctx, System.currentTimeMillis()));
@@ -80,7 +89,9 @@ public class GodGamblersService {
         return res;
     }
 
-    /** 开局只扣一次费用，并先抽奖励点差，再构造两张合法牌；仅返回对手牌。 */
+    /**
+     * 开局只扣一次费用，并先抽奖励点差，再构造两张合法牌；仅返回对手牌。
+     */
     public ResStartGodGamblersGame start(SimPlayerContext ctx) {
         ResStartGodGamblersGame res = new ResStartGodGamblersGame(Code.SUCCESS);
         res.code = startRound(ctx);
@@ -92,7 +103,9 @@ public class GodGamblersService {
         return res;
     }
 
-    /** 首次仅亮出开局已决定的牌；后续搓牌扣费并按固定对手牌过滤奖励档位。 */
+    /**
+     * 首次仅亮出开局已决定的牌；后续搓牌扣费并按固定对手牌过滤奖励档位。
+     */
     public ResGodGamblersSelfPoker selfPoker(SimPlayerContext ctx, long roundId, int rubCount) {
         ResGodGamblersSelfPoker res = new ResGodGamblersSelfPoker(Code.SUCCESS);
         GodGamblersRound round = ctx.getGodGamblersRound();
@@ -132,7 +145,9 @@ public class GodGamblersService {
         return res;
     }
 
-    /** 仅在玩家取过自己的牌后结算；发奖失败保留待发奖状态供原局重试。 */
+    /**
+     * 仅在玩家取过自己的牌后结算；发奖失败保留待发奖状态供原局重试。
+     */
     public ResGodGamblersConfirmBattle confirmBattle(SimPlayerContext ctx, long roundId) {
         ResGodGamblersConfirmBattle res = new ResGodGamblersConfirmBattle(Code.SUCCESS);
         GodGamblersRound round = ctx.getGodGamblersRound();
@@ -153,7 +168,9 @@ public class GodGamblersService {
         return res;
     }
 
-    /** 一键比拼复用开局及结算，只扣一次费用；失败时可携局号走确定比拼重试发奖。 */
+    /**
+     * 一键比拼复用开局及结算，只扣一次费用；失败时可携局号走确定比拼重试发奖。
+     */
     public ResGodGamblersQuickBattle quickBattle(SimPlayerContext ctx) {
         ResGodGamblersQuickBattle res = new ResGodGamblersQuickBattle(startRound(ctx));
         GodGamblersRound round = ctx.getGodGamblersRound();
@@ -172,7 +189,9 @@ public class GodGamblersService {
         return res;
     }
 
-    /** 先校验并准备合法结果，扣费成功后才发布新局，失败不覆盖原局。 */
+    /**
+     * 先校验并准备合法结果，扣费成功后才发布新局，失败不覆盖原局。
+     */
     private int startRound(SimPlayerContext ctx) {
         GodGamblersRound current = ctx.getGodGamblersRound();
         if (current != null && current.getState() != RoundState.CLEARED) {
@@ -201,7 +220,9 @@ public class GodGamblersService {
         return code;
     }
 
-    /** 开局与重搓共用配置费用，扣费失败不改变牌及已用次数。 */
+    /**
+     * 开局与重搓共用配置费用，扣费失败不改变牌及已用次数。
+     */
     private int charge(SimPlayerContext ctx, MinigameGodofGamblersRubbingCfg cfg) {
         CommonResult<ItemOperationResult> cost = playerPackService.removeItems(ctx.getPlayer(), cfg.getItemCost(), AddType.SIM_GOD_GAMBLERS);
         if (!cost.success()) {
@@ -210,7 +231,9 @@ public class GodGamblersService {
         return cost.code;
     }
 
-    /** 只抽可形成有效牌面的正点差；不做重复抽取直到命中的循环。 */
+    /**
+     * 只抽可形成有效牌面的正点差；不做重复抽取直到命中的循环。
+     */
     private int drawDifference(SimPlayerContext ctx, MinigameGodofGamblersRubbingCfg cfg, int maxDifference) {
         List<Integer> choices = new ArrayList<>(cfg.getWinReward().size());
         for (Integer difference : cfg.getWinReward().keySet()) {
@@ -228,7 +251,9 @@ public class GodGamblersService {
         return choices.get(RandomUtils.randomInt(choices.size()));
     }
 
-    /** 取新牌时一并保存奖励，不向客户端暴露开局尚未亮出的自己牌。 */
+    /**
+     * 取新牌时一并保存奖励，不向客户端暴露开局尚未亮出的自己牌。
+     */
     private void setSelfPoker(GodGamblersRound round, MinigameGodofGamblersRubbingCfg cfg, int difference) {
         round.setSelfPoker(poker(rank(round.getOpponentPoker()) + difference));
         Map<Integer, Long> rewards = new HashMap<>(cfg.getWinReward().get(difference).size());
@@ -236,7 +261,9 @@ public class GodGamblersService {
         round.setRewards(rewards);
     }
 
-    /** 花色只影响显示；ID 0..12、13..25、26..38、39..51分别为四种花色的2..A。 */
+    /**
+     * 花色只影响显示；ID 0..12、13..25、26..38、39..51分别为四种花色的2..A。
+     */
     private int poker(int rank) {
         return RandomUtils.randomInt(SUIT_COUNT) * RANKS_PER_SUIT + rank - MIN_RANK;
     }
@@ -245,7 +272,9 @@ public class GodGamblersService {
         return poker % RANKS_PER_SUIT + MIN_RANK;
     }
 
-    /** 已完成的局保留在会话用于拦截重复结算，下次开局覆盖。 */
+    /**
+     * 已完成的局保留在会话用于拦截重复结算，下次开局覆盖。
+     */
     private int checkRound(SimPlayerContext ctx, GodGamblersRound round, long roundId) {
         if (round == null || round.getRoundId() != roundId) {
             log.warn("赌神局号不匹配 playerId={},roundId={}", ctx.playerId(), roundId);
@@ -258,7 +287,9 @@ public class GodGamblersService {
         return Code.SUCCESS;
     }
 
-    /** 发奖失败不退回进行中，避免玩家重搓已提交比拼的结果。 */
+    /**
+     * 发奖失败不退回进行中，避免玩家重搓已提交比拼的结果。
+     */
     private int settle(SimPlayerContext ctx, GodGamblersRound round) {
         round.setState(RoundState.REWARD_PENDING);
         CommonResult<ItemOperationResult> reward = playerPackService.addItems(
@@ -271,7 +302,9 @@ public class GodGamblersService {
         return Code.SUCCESS;
     }
 
-    /** 单行配置按需读取；只校验费用、次数和可用档位奖励，不缓存热更新配置。 */
+    /**
+     * 单行配置按需读取；只校验费用、次数和可用档位奖励，不缓存热更新配置。
+     */
     private MinigameGodofGamblersRubbingCfg config(SimPlayerContext ctx) {
         MinigameGodofGamblersRubbingCfg cfg = GameDataManager.getMinigameGodofGamblersRubbingCfg(MiniGameConstant.GOD_GAMBLERS_CONFIG_ID);
         if (cfg == null || cfg.getRubCount() < 1 || cfg.getItemCost() == null || cfg.getItemCost().isEmpty()
@@ -293,20 +326,37 @@ public class GodGamblersService {
         return cfg;
     }
 
-    /** 返回消耗道具的持有量，复用背包接口，支持配置多种道具。 */
+    /**
+     * 返回消耗道具的持有量，复用背包接口，支持配置多种道具。
+     */
     private List<ItemInfo> ownedItems(SimPlayerContext ctx, MinigameGodofGamblersRubbingCfg cfg) {
         if (!validItems(cfg.getItemCost())) {
             log.warn("赌神持有量查询的消耗配置错误 playerId={}", ctx.playerId());
             return List.of();
         }
         List<ItemInfo> items = new ArrayList<>(cfg.getItemCost().size());
+
+        PlayerPack playerPack = null;
         for (Integer itemId : cfg.getItemCost().keySet()) {
-            items.add(ItemUtils.buildItemInfo(itemId, playerPackService.getItemCount(ctx.playerId(), itemId)));
+            if (itemId == ItemUtils.getGoldItemId()) {
+                items.add(ItemUtils.buildItemInfo(itemId, ctx.getPlayer().getGold()));
+            } else if (itemId == ItemUtils.getDiamondItemId()) {
+                items.add(ItemUtils.buildItemInfo(itemId, ctx.getPlayer().getDiamond()));
+            } else if (itemId == ItemUtils.getShellItemId()) {
+                items.add(ItemUtils.buildItemInfo(itemId, ctx.getPlayer().getShell()));
+            } else {
+                if (playerPack == null) {
+                    playerPack = playerPackService.getFromAllDB(ctx.playerId());
+                }
+                items.add(ItemUtils.buildItemInfo(itemId, playerPack.getItemCount(itemId)));
+            }
         }
         return items;
     }
 
-    /** 响应是本次操作的快照；第一次取牌前不泄露已抽中的自己牌及奖励。 */
+    /**
+     * 响应是本次操作的快照；第一次取牌前不泄露已抽中的自己牌及奖励。
+     */
     private GodGamblersInfo info(GodGamblersRound round) {
         if (round == null) {
             return null;
@@ -320,7 +370,9 @@ public class GodGamblersService {
         return info;
     }
 
-    /** 每个自然日最多赠送一次；失败不记录日期，后续登录或进入可重试。 */
+    /**
+     * 每个自然日最多赠送一次；失败不记录日期，后续登录或进入可重试。
+     */
     private int grantDaily(SimPlayerContext ctx, long now) {
         GodGamblersData data = ctx.getGodGamblersData();
         if (data == null) {
@@ -352,7 +404,9 @@ public class GodGamblersService {
         return Code.SUCCESS;
     }
 
-    /** 赠送允许空表；已配置的道具ID和数量必须为正。 */
+    /**
+     * 赠送允许空表；已配置的道具ID和数量必须为正。
+     */
     private boolean validItems(Map<Integer, Long> items) {
         return items != null && items.entrySet().stream().allMatch(e ->
                 e.getKey() != null && e.getKey() > 0 && e.getValue() != null && e.getValue() > 0);

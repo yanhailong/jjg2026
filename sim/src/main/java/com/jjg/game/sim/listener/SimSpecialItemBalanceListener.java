@@ -1,5 +1,7 @@
 package com.jjg.game.sim.listener;
 
+import java.util.Map;
+
 /**
  * 调用节点上的 sim 特殊资源余额同步。
  * <p>
@@ -11,6 +13,6 @@ public interface SimSpecialItemBalanceListener {
 
     default void onBalanceChanged(long playerId, int itemId, long balance){}
 
-    /** 当前场景每分钟产出，type 与 OnlineRewardInfo.hourlyRewards 的 itemId 一致。 */
-    default long output(long playerId, int type){return 0;}
+    /** 当前场景每分钟产出，key 与 OnlineRewardInfo.hourlyRewards 的 itemId 一致，type 为 0 时返回全部类型。 */
+    default Map<Integer, Long> output(long playerId, int type){return Map.of();}
 }

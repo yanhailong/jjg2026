@@ -26,10 +26,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 在线收益：按当前场景产出快速领取，状态归玩家所有，复用玩家串行执行与自动落库。 */
+/**
+ * 在线收益：按当前场景产出快速领取，状态归玩家所有，复用玩家串行执行与自动落库。
+ */
 @Service
 public class SimOnlineRewardService implements SimSpecialItemBalanceListener {
     @Autowired
@@ -123,7 +126,7 @@ public class SimOnlineRewardService implements SimSpecialItemBalanceListener {
         CommonResult<ItemOperationResult> result = watchAd
                 ? playerPackService.addItems(ctx.playerId(), items, AddType.SIM_ONLINE_REWARD)
                 : playerPackService.useItem(ctx.getPlayer(), res.info.diamondCost.itemId,
-                        res.info.diamondCost.count, items, AddType.SIM_ONLINE_REWARD);
+                res.info.diamondCost.count, items, AddType.SIM_ONLINE_REWARD);
         if (result == null || !result.success()) {
             res.code = result == null ? Code.FAIL : result.code;
             return res;
@@ -176,15 +179,46 @@ public class SimOnlineRewardService implements SimSpecialItemBalanceListener {
     }
 
     @Override
-    public long output(long playerId, int type) {
-        BuildingOutputType outputType = BuildingOutputType.fromCode(type);
-        if (outputType == null) {
-            return 0;
+    public Map<Integer, Long> output(long playerId, int type) {
+        if (type < 0) {
+            return Map.of();
         }
         SimPlayerContext ctx = contextRegistry.getContext(playerId);
         if (ctx == null || ctx.getCurrentCasino() == null) {
-            return 0;
+            return Map.of();
         }
-        return buildingService.computePerMinuteOutput(ctx, ctx.getCurrentCasino()).getOrDefault(outputType, 0L);
+        Map<Integer, Long> rewards = new HashMap<>();
+        for (ItemInfo item : buildingService.computeRewardItems(ctx, 1)) {
+            if (type == 0 || item.itemId == type) {
+                int newItemId = transItemId(item.itemId);
+                if (newItemId > 0) {
+                    rewards.put(newItemId, item.count);
+                }
+            }
+        }
+        return rewards;
+    }
+
+    private int transItemId(int originId) {
+        switch (originId) {
+            case 1 -> {
+                return ItemUtils.getGoldItemId();
+            }
+            case 2 -> {
+                return SimConstant.Item.ID_POWER;
+            }
+            case 5 -> {
+                return SimConstant.Item.ID_AWARENESS;
+            }
+            case 6 -> {
+                return SimConstant.Item.ID_EXPOD;
+            }
+            case 12 -> {
+                return SimConstant.Item.CASINO_EXP;
+            }
+            default -> {
+                return 0;
+            }
+        }
     }
 }
