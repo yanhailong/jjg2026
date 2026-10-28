@@ -40,7 +40,10 @@ public class SimEmployeeAttributeService {
                     key -> new EnumMap<>(BuildingOutputType.class));
             EmployeeLevelCfg level = configCache.getEmployeeLevelCfgByIdAndLevel(employeeId, employee.getLevel());
             if (level != null && level.getAttributeValue() != null) {
-                level.getAttributeValue().forEach((type, value) -> addEmployeeAttribute(bonuses, type, value));
+                long offset = (long) employee.getLevel() - level.getLevel();
+                Map<Integer, Integer> additions = level.getAddAttribute();
+                level.getAttributeValue().forEach((type, value) -> addEmployeeAttribute(bonuses, type,
+                        value + offset * (additions == null ? 0 : additions.getOrDefault(type, 0))));
             }
             if (employee.getSkillLevels() == null) {
                 continue;

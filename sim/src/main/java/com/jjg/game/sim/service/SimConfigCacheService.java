@@ -83,8 +83,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private Map<Integer, Integer> guestQulityItemMap = new HashMap<>();
 
 
-    //EmployeeLevel配置 employeeId -> level -> cfg
-    private Map<Integer, Map<Integer, EmployeeLevelCfg>> employeeLevelCfgMap;
+    //EmployeeLevel配置 employeeId -> 区间起始等级 -> cfg，热更新整体替换
+    private volatile Map<Integer, NavigableMap<Integer, EmployeeLevelCfg>> employeeLevelCfgMap = Map.of();
     //EmployeeStar配置 employeeId -> star -> cfg
     private Map<Integer, Map<Integer, EmployeeStarCfg>> employeeStarCfgMap;
     //EmployeeSkillConfig配置 groupId -> level -> cfg，热更新整体替换
@@ -401,9 +401,9 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
      * 加载 EmployeeLevel 配置
      */
     private void loadEmployeeLevelConfig() {
-        Map<Integer, Map<Integer, EmployeeLevelCfg>> tmp = new HashMap<>();
+        Map<Integer, NavigableMap<Integer, EmployeeLevelCfg>> tmp = new HashMap<>();
         for (EmployeeLevelCfg cfg : GameDataManager.getEmployeeLevelCfgList()) {
-            tmp.computeIfAbsent(cfg.getEmployeeID(), k -> new HashMap<>()).put(cfg.getLevel(), cfg);
+            tmp.computeIfAbsent(cfg.getEmployeeID(), k -> new TreeMap<>()).put(cfg.getLevel(), cfg);
         }
         this.employeeLevelCfgMap = tmp;
     }
@@ -1003,21 +1003,36 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return visitorStarCfgMap;
     }
 
-    public Map<Integer, Map<Integer, EmployeeLevelCfg>> getEmployeeLevelCfgMap() {
-        return employeeLevelCfgMap;
+    /** 获取当前等级所在区间的起始配置。 */
+    public EmployeeLevelCfg getEmployeeLevelCfgByIdAndLevel(int employeeId, int level) {
+        NavigableMap<Integer, EmployeeLevelCfg> levels = employeeLevelCfgMap.get(employeeId);
+        Map.Entry<Integer, EmployeeLevelCfg> entry = levels == null ? null : levels.floorEntry(level);
+        return entry == null ? null : entry.getValue();
     }
 
-    public EmployeeLevelCfg getEmployeeLevelCfgByIdAndLevel(int employeeId, int level) {
-        if (this.employeeLevelCfgMap == null || this.employeeLevelCfgMap.isEmpty()) {
+    /** 当前等级升一级的费用；无配置或已达最高配置等级时返回 null，空费用表示免费升级。 */
+    public Map<Integer, Long> getEmployeeUpgradeCost(int employeeId, int level) {
+        NavigableMap<Integer, EmployeeLevelCfg> levels = employeeLevelCfgMap.get(employeeId);
+        if (levels == null || level >= levels.lastKey()) {
             return null;
         }
-
-        Map<Integer, EmployeeLevelCfg> tmpMap = this.employeeLevelCfgMap.get(employeeId);
-        if (tmpMap == null || tmpMap.isEmpty()) {
+        Map.Entry<Integer, EmployeeLevelCfg> entry = levels.floorEntry(level);
+        if (entry == null) {
             return null;
         }
-
-        return tmpMap.get(level);
+        EmployeeLevelCfg cfg = entry.getValue();
+        Map<Integer, Long> base = cfg.getUpgradeCost();
+        Map<Integer, Long> additions = cfg.getAddCost();
+        long offset = (long) level - cfg.getLevel();
+        if (base == null || base.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        if (offset == 0 || additions == null || additions.isEmpty()) {
+            return base;
+        }
+        Map<Integer, Long> cost = new HashMap<>(base.size());
+        base.forEach((itemId, count) -> cost.put(itemId, count + offset * additions.getOrDefault(itemId, 0L)));
+        return cost;
     }
 
     public Map<Integer, Map<Integer, EmployeeStarCfg>> getEmployeeStarCfgMap() {
@@ -1055,6 +1070,24 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
             }
         }
         return Collections.emptyMap();
+    }
+
+    /**
+     * 获取高于当前等级且奖励非空的最近建筑等级配置。
+     */
+    public BuildingUpgradeTableCfg getNextBuildingUpgradeRewardCfg(int buildingId, int level) {
+        if (buildingUpgradeCfgMap == null || level >= getBuildingMaxLevel(buildingId)) {
+            return null;
+        }
+        NavigableMap<Integer, BuildingUpgradeTableCfg> levels = buildingUpgradeCfgMap.get(buildingId);
+        if (levels != null) {
+            for (BuildingUpgradeTableCfg cfg : levels.tailMap(level, false).values()) {
+                if (cfg.getUpgradeReward() != null && !cfg.getUpgradeReward().isEmpty()) {
+                    return cfg;
+                }
+            }
+        }
+        return null;
     }
 
     public List<BuildingUpgradeAreaCfg> getBuildingUpgradeAreaCfgs(int buildingId) {

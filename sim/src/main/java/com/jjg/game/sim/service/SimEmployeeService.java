@@ -223,19 +223,19 @@ public class SimEmployeeService implements SimTaskStateReporter {
                 ctx.send(res);
                 return;
             }
-            EmployeeLevelCfg currentCfg = getLevelCfg(employeeId, data.getLevel());
-            if (currentCfg == null) {
-                log.warn("升级雇员失败, 获取等级配置失败 playerId={},employeeId={},level={}", ctx.playerId(), employeeId, data.getLevel());
+            Map<Integer, Long> cost = configCache.getEmployeeUpgradeCost(employeeId, data.getLevel());
+            if (cost == null) {
+                log.warn("升级雇员失败, 等级配置不存在或已满级 playerId={},employeeId={},level={}", ctx.playerId(), employeeId, data.getLevel());
                 res.code = Code.LEVEL_MAX;
                 ctx.send(res);
                 return;
             }
 
             Map<Integer, Long> changeEndItemNum = null;
-            if (currentCfg.getUpgradeCost() != null && !currentCfg.getUpgradeCost().isEmpty()) {
-                CommonResult<ItemOperationResult> removeResult = playerPackService.removeItems(ctx.getPlayer(), currentCfg.getUpgradeCost(), AddType.SIM_EMPLOYEE_LEVEL_UP, null);
+            if (!cost.isEmpty()) {
+                CommonResult<ItemOperationResult> removeResult = playerPackService.removeItems(ctx.getPlayer(), cost, AddType.SIM_EMPLOYEE_LEVEL_UP, null);
                 if (!removeResult.success()) {
-                    log.warn("升级雇员失败, 扣除道具失败 playerId={},employeeId={},level={},cost={},code={}", ctx.playerId(), employeeId, data.getLevel(), currentCfg.getUpgradeCost(), removeResult.code);
+                    log.warn("升级雇员失败, 扣除道具失败 playerId={},employeeId={},level={},cost={},code={}", ctx.playerId(), employeeId, data.getLevel(), cost, removeResult.code);
                     res.code = Code.NOT_ENOUGH_ITEM;
                     ctx.send(res);
                     return;
@@ -548,15 +548,6 @@ public class SimEmployeeService implements SimTaskStateReporter {
         info.attributes.sort(Comparator.comparingInt(attribute -> attribute.key));
         info.skills = skillInfos(data);
         return info;
-    }
-
-    private EmployeeLevelCfg getLevelCfg(int employeeId, int level) {
-        Map<Integer, Map<Integer, EmployeeLevelCfg>> levelMap = configCache.getEmployeeLevelCfgMap();
-        if (levelMap == null) {
-            return null;
-        }
-        Map<Integer, EmployeeLevelCfg> m = levelMap.get(employeeId);
-        return m == null ? null : m.get(level);
     }
 
     private EmployeeStarCfg getStarCfg(int employeeId, int star) {

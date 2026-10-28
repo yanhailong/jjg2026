@@ -1,5 +1,6 @@
 package com.jjg.game.sim.pb.struct;
 
+import com.jjg.game.common.pb.ItemInfo;
 import com.jjg.game.common.proto.ProtoDesc;
 import com.jjg.game.common.proto.ProtobufMessage;
 import com.jjg.game.core.pb.KVInfo;
@@ -41,4 +42,8 @@ public class BuildingInfo {
     public List<Integer> buileTypeValue;
     @ProtoDesc("建筑各区域的皮肤解锁与使用状态")
     public List<BuildingAreaSkinInfo> areaSkinInfos;
+    @ProtoDesc("目标可奖励的等级， 为0可视为已达到最大等级")
+    public int targetLevel;
+    @ProtoDesc("达到目标后的奖励")
+    public List<ItemInfo> nextRewards;
 }

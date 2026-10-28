@@ -3,6 +3,7 @@ package com.jjg.game.sim.pb;
 import com.jjg.game.common.utils.CommonUtil;
 import com.jjg.game.core.pb.KVInfo;
 import com.jjg.game.core.pb.KVLongInfo;
+import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
 import com.jjg.game.sim.constant.BuildingOutputType;
@@ -71,6 +72,9 @@ public final class SimPbConverter {
         BuildingInfo info = new BuildingInfo();
         info.id = buildingData.getId();
         info.level = buildingData.getLevel();
+        BuildingUpgradeTableCfg nextRewardCfg = simConfigCacheService.getNextBuildingUpgradeRewardCfg(info.id, info.level);
+        info.targetLevel = nextRewardCfg == null ? 0 : nextRewardCfg.getLevel();
+        info.nextRewards = nextRewardCfg == null ? List.of() : ItemUtils.buildItemInfo(nextRewardCfg.getUpgradeReward());
         info.cdEndTime = 0;
         info.progress = 0;
         info.watchAdCount = 0;

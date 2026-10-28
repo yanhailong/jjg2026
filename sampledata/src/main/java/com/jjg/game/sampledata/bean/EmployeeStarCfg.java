@@ -27,7 +27,7 @@ public class EmployeeStarCfg extends BaseCfgBean {
   protected int Star;
   /** 升星碎片消耗 */
   protected int StarUpCost;
-  /** 主管加成 */
+  /** 自身属性加成万分比 */
   protected Map<Integer,Integer> SupervisorBonus;
 
   /** 返回雇员ID */
@@ -50,7 +50,7 @@ public class EmployeeStarCfg extends BaseCfgBean {
     return StarUpCost;
   }
 
-  /** 返回主管加成 */
+  /** 返回自身属性加成万分比 */
   public Map<Integer,Integer> getSupervisorBonus() {
     return SupervisorBonus;
   }

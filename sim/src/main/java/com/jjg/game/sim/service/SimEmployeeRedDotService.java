@@ -10,7 +10,6 @@ import com.jjg.game.core.pb.reddot.RedDotDetails;
 import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.sampledata.GameDataManager;
-import com.jjg.game.sampledata.bean.EmployeeLevelCfg;
 import com.jjg.game.sampledata.bean.EmployeeProfileCfg;
 import com.jjg.game.sampledata.bean.EmployeeStarCfg;
 import com.jjg.game.sampledata.bean.PoolListCfg;
@@ -329,21 +328,13 @@ public class SimEmployeeRedDotService implements IRedDotService, ItemAddListener
             if (levelCap > 0 && employee.getLevel() >= levelCap) {
                 continue;
             }
-            // 升级接口扣除当前等级配置的费用，红点必须使用同一份配置，
-            // 否则下一等级费用较低时会出现材料不足却点亮红点。
-            EmployeeLevelCfg currentLevelCfg = getEmployeeLevelCfg(employee.getEmployeeId(), employee.getLevel());
-            if (currentLevelCfg != null) {
-                Map<Integer, Long> cost = currentLevelCfg.getUpgradeCost();
-                requirements.add(new Requirement(employee.getEmployeeId(), "levelUpIds", cost == null ? Map.of() : cost));
+            // 与升级接口共用区间费用计算及配置等级上限。
+            Map<Integer, Long> cost = configCache.getEmployeeUpgradeCost(employee.getEmployeeId(), employee.getLevel());
+            if (cost != null) {
+                requirements.add(new Requirement(employee.getEmployeeId(), "levelUpIds", cost));
             }
         }
         return requirements;
-    }
-
-    private EmployeeLevelCfg getEmployeeLevelCfg(int employeeId, int level) {
-        Map<Integer, Map<Integer, EmployeeLevelCfg>> levelCfgMap = configCache.getEmployeeLevelCfgMap();
-        Map<Integer, EmployeeLevelCfg> employeeCfg = levelCfgMap == null ? null : levelCfgMap.get(employeeId);
-        return employeeCfg == null ? null : employeeCfg.get(level);
     }
 
     private EmployeeStarCfg getEmployeeStarCfg(int employeeId, int star) {

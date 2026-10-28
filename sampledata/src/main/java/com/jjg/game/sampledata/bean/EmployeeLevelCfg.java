@@ -27,6 +27,10 @@ public class EmployeeLevelCfg extends BaseCfgBean {
   protected int Level;
   /** 升级消耗 */
   protected Map<Integer,Long> UpgradeCost;
+  /** 每级属性增加 */
+  protected Map<Integer,Integer> addAttribute;
+  /** 每级消耗增加 */
+  protected Map<Integer,Long> addCost;
 
   /** 返回属性值 */
   public Map<Integer,Integer> getAttributeValue() {
@@ -46,6 +50,16 @@ public class EmployeeLevelCfg extends BaseCfgBean {
   /** 返回升级消耗 */
   public Map<Integer,Long> getUpgradeCost() {
     return UpgradeCost;
+  }
+
+  /** 返回每级属性增加 */
+  public Map<Integer,Integer> getAddAttribute() {
+    return addAttribute;
+  }
+
+  /** 返回每级消耗增加 */
+  public Map<Integer,Long> getAddCost() {
+    return addCost;
   }
 
   @Override
