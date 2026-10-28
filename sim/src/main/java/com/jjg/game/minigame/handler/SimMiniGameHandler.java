@@ -22,6 +22,12 @@ import com.jjg.game.minigame.pb.req.ReqStartHappyHappyFishGame;
 import com.jjg.game.minigame.pb.req.ReqCatchHappyHappyFish;
 import com.jjg.game.minigame.pb.req.ReqEndHappyHappyFishGame;
 import com.jjg.game.minigame.pb.req.ReqQuickClearHappyHappyFishGame;
+import com.jjg.game.minigame.pb.req.ReqEnterSpeedyDeliveryGame;
+import com.jjg.game.minigame.pb.req.ReqStartSpeedyDeliveryGame;
+import com.jjg.game.minigame.pb.req.ReqDeliverSpeedyDeliveryGoods;
+import com.jjg.game.minigame.pb.req.ReqDeductSpeedyDeliveryTime;
+import com.jjg.game.minigame.pb.req.ReqEndSpeedyDeliveryGame;
+import com.jjg.game.minigame.pb.req.ReqQuickClearSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.res.ResCheaterHuntGameInfo;
 import com.jjg.game.minigame.pb.res.ResEnterCheaterHuntGame;
 import com.jjg.game.minigame.pb.res.ResExitCheaterHuntGame;
@@ -38,9 +44,16 @@ import com.jjg.game.minigame.pb.res.ResStartHappyHappyFishGame;
 import com.jjg.game.minigame.pb.res.ResCatchHappyHappyFish;
 import com.jjg.game.minigame.pb.res.ResEndHappyHappyFishGame;
 import com.jjg.game.minigame.pb.res.ResQuickClearHappyHappyFishGame;
+import com.jjg.game.minigame.pb.res.ResEnterSpeedyDeliveryGame;
+import com.jjg.game.minigame.pb.res.ResStartSpeedyDeliveryGame;
+import com.jjg.game.minigame.pb.res.ResDeliverSpeedyDeliveryGoods;
+import com.jjg.game.minigame.pb.res.ResDeductSpeedyDeliveryTime;
+import com.jjg.game.minigame.pb.res.ResEndSpeedyDeliveryGame;
+import com.jjg.game.minigame.pb.res.ResQuickClearSpeedyDeliveryGame;
 import com.jjg.game.minigame.service.SimMiniGameService;
 import com.jjg.game.minigame.service.GodGamblersService;
 import com.jjg.game.minigame.service.HappyHappyFishService;
+import com.jjg.game.minigame.service.SpeedyDeliveryService;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import org.slf4j.Logger;
@@ -62,6 +75,8 @@ public class SimMiniGameHandler {
     private GodGamblersService godGamblersService;
     @Autowired
     private HappyHappyFishService happyHappyFishService;
+    @Autowired
+    private SpeedyDeliveryService speedyDeliveryService;
 
     /** 获取关卡列表及一键通关开放状态。 */
     @Command(MiniGameConstant.MsgBean.REQ_ENTER_CHEAT_HUNT_GAME)
@@ -243,5 +258,65 @@ public class SimMiniGameHandler {
             return;
         }
         ctx.send(happyHappyFishService.quickClear(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_ENTER_SPEEDY_DELIVERY_GAME)
+    public void reqEnterSpeedyDeliveryGame(PlayerController playerController, ReqEnterSpeedyDeliveryGame req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResEnterSpeedyDeliveryGame(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.enter(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_START_SPEEDY_DELIVERY_GAME)
+    public void reqStartSpeedyDeliveryGame(PlayerController playerController, ReqStartSpeedyDeliveryGame req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResStartSpeedyDeliveryGame(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.start(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_DELIVER_SPEEDY_DELIVERY_GOODS)
+    public void reqDeliverSpeedyDeliveryGoods(PlayerController playerController, ReqDeliverSpeedyDeliveryGoods req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResDeliverSpeedyDeliveryGoods(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.deliver(ctx, req.goodsIds, req.truckId));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_DEDUCT_SPEEDY_DELIVERY_TIME)
+    public void reqDeductSpeedyDeliveryTime(PlayerController playerController, ReqDeductSpeedyDeliveryTime req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResDeductSpeedyDeliveryTime(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.deductTime(ctx, req.seconds));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_END_SPEEDY_DELIVERY_GAME)
+    public void reqEndSpeedyDeliveryGame(PlayerController playerController, ReqEndSpeedyDeliveryGame req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResEndSpeedyDeliveryGame(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.end(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_QUICK_CLEAR_SPEEDY_DELIVERY_GAME)
+    public void reqQuickClearSpeedyDeliveryGame(PlayerController playerController, ReqQuickClearSpeedyDeliveryGame req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResQuickClearSpeedyDeliveryGame(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.quickClear(ctx));
     }
 }

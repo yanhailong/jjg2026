@@ -1,0 +1,381 @@
+package com.jjg.game.minigame.service;
+
+import com.jjg.game.common.utils.TimeHelper;
+import com.jjg.game.core.constant.AddType;
+import com.jjg.game.core.constant.Code;
+import com.jjg.game.core.data.CommonResult;
+import com.jjg.game.core.data.ItemOperationResult;
+import com.jjg.game.core.service.PlayerPackService;
+import com.jjg.game.core.utils.ItemUtils;
+import com.jjg.game.minigame.constant.MiniGameConstant;
+import com.jjg.game.minigame.constant.MiniGameConstant.RoundState;
+import com.jjg.game.minigame.dao.SpeedyDeliveryDao;
+import com.jjg.game.minigame.data.SpeedyDeliveryData;
+import com.jjg.game.minigame.data.SpeedyDeliveryRound;
+import com.jjg.game.minigame.pb.res.*;
+import com.jjg.game.sampledata.GameDataManager;
+import com.jjg.game.sampledata.bean.GlobalConfigCfg;
+import com.jjg.game.sampledata.bean.MinigameSpeedyDeliveryCfg;
+import com.jjg.game.sampledata.bean.MinigameTruckCfg;
+import com.jjg.game.sampledata.bean.MinigamegoodsCfg;
+import com.jjg.game.sim.data.SimPlayerContext;
+import com.jjg.game.sim.listener.SimPlayerTickListener;
+import com.jjg.game.sim.service.SimAutoSaveService;
+import com.jjg.game.sim.service.SimChapterService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/** 飞驰快送：客户端负责操作，服务器负责时限、计分、扣费和发奖。 */
+@Service
+public class SpeedyDeliveryService implements SimPlayerTickListener {
+    private static final Logger log = LoggerFactory.getLogger(SpeedyDeliveryService.class);
+    private static final long END_TOLERANCE_MILLIS = 2000L;
+
+    private final SpeedyDeliveryDao dao;
+    private final SimAutoSaveService autoSaveService;
+    private final PlayerPackService playerPackService;
+    private final SimChapterService chapterService;
+    private final MiniGameConditionService conditionService;
+
+    public SpeedyDeliveryService(SpeedyDeliveryDao dao, SimAutoSaveService autoSaveService,
+                                PlayerPackService playerPackService, SimChapterService chapterService,
+                                MiniGameConditionService conditionService) {
+        this.dao = dao;
+        this.autoSaveService = autoSaveService;
+        this.playerPackService = playerPackService;
+        this.chapterService = chapterService;
+        this.conditionService = conditionService;
+    }
+
+    public void onLogin(SimPlayerContext ctx) {
+        //退出发奖失败时重试原会话中的交付，不恢复游戏过程。
+        SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
+        if (round != null && round.getState() == RoundState.REWARD_PENDING) {
+            onExit(ctx);
+        }
+        grantDaily(ctx, config(), System.currentTimeMillis());
+    }
+
+    public void onDaily(SimPlayerContext ctx, long now) {
+        if (ctx.getPlayerController() != null && ctx.getPlayerController().isOnline()) {
+            grantDaily(ctx, config(), now);
+        }
+    }
+
+    public ResEnterSpeedyDeliveryGame enter(SimPlayerContext ctx) {
+        MinigameSpeedyDeliveryCfg cfg = config();
+        ResEnterSpeedyDeliveryGame res = new ResEnterSpeedyDeliveryGame(grantDaily(ctx, cfg, System.currentTimeMillis()));
+        if (res.code != Code.SUCCESS) {
+            return res;
+        }
+        res.costItems = ItemUtils.buildItemInfo(cfg.getConsumeCount());
+        res.ownedItems = new ArrayList<>(cfg.getConsumeCount().size());
+        for (int itemId : cfg.getConsumeCount().keySet()) {
+            long count;
+            if (itemId == ItemUtils.getGoldItemId()) {
+                count = ctx.getPlayer().getGold();
+            } else if (itemId == ItemUtils.getDiamondItemId()) {
+                count = ctx.getPlayer().getDiamond();
+            } else if (itemId == ItemUtils.getShellItemId()) {
+                count = ctx.getPlayer().getShell();
+            } else {
+                count = playerPackService.getItemCount(ctx.playerId(), itemId);
+            }
+            res.ownedItems.add(ItemUtils.buildItemInfo(itemId, count));
+        }
+        res.openOneClickPass = openOneClickPass(ctx);
+        return res;
+    }
+
+    public ResStartSpeedyDeliveryGame start(SimPlayerContext ctx) {
+        ResStartSpeedyDeliveryGame res = new ResStartSpeedyDeliveryGame(Code.SUCCESS);
+        MinigameSpeedyDeliveryCfg cfg = config();
+        res.code = cfg == null ? Code.SAMPLE_ERROR : prepareStart(ctx);
+        if (res.code == Code.SUCCESS) {
+            res.code = charge(ctx, cfg);
+            if (res.code == Code.SUCCESS) {
+                res.endTime = ctx.getSpeedyDeliveryRound().getEndTime();
+            }
+        }
+        return res;
+    }
+
+    /** 先校验整批货物再入账，使用百分比分子合计，最后一次向上取整。 */
+    public ResDeliverSpeedyDeliveryGoods deliver(SimPlayerContext ctx, List<Integer> goodsIds, int truckId) {
+        SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
+        ResDeliverSpeedyDeliveryGoods res = new ResDeliverSpeedyDeliveryGoods(checkPlaying(round));
+        if (round != null) {
+            res.score = round.getScore();
+        }
+        if (res.code != Code.SUCCESS) {
+            return res;
+        }
+        if (goodsIds == null || goodsIds.isEmpty() || goodsIds.size() > round.getConfig().getBackpackCapacity()) {
+            res.code = Code.PARAM_ERROR;
+            return res;
+        }
+        MinigameTruckCfg truck = GameDataManager.getMinigameTruckCfg(truckId);
+        if (truck == null) {
+            res.code = Code.PARAM_ERROR;
+            return res;
+        }
+        long numerator = 0;
+        long limit = (Integer.MAX_VALUE - (long) round.getScore()) * 100;
+        for (Integer goodsId : goodsIds) {
+            MinigamegoodsCfg goods = goodsId == null ? null : GameDataManager.getMinigamegoodsCfg(goodsId);
+            if (goods == null) {
+                res.code = Code.PARAM_ERROR;
+                return res;
+            }
+            int multiplier = switch (goods.getType()) {
+                case 1 -> truck.getNormalMultiplier();
+                case 2 -> truck.getFragileMultiplier();
+                case 3 -> truck.getDangerMultiplier();
+                default -> -1;
+            };
+            if (goods.getScore() < 0 || multiplier < 0) {
+                res.code = Code.SAMPLE_ERROR;
+                return res;
+            }
+            long value = (long) goods.getScore() * multiplier;
+            if (value > limit - numerator) {
+                res.code = Code.PARAM_ERROR;
+                return res;
+            }
+            numerator += value;
+        }
+        res.deliveryScore = (int) ((numerator + 99) / 100);
+        round.setScore(round.getScore() + res.deliveryScore);
+        res.score = round.getScore();
+        return res;
+    }
+
+    public ResDeductSpeedyDeliveryTime deductTime(SimPlayerContext ctx, int seconds) {
+        SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
+        ResDeductSpeedyDeliveryTime res = new ResDeductSpeedyDeliveryTime(checkPlaying(round));
+        if (res.code == Code.SUCCESS) {
+            if (seconds <= 0) {
+                res.code = Code.PARAM_ERROR;
+            } else {
+                //转long后换算，扣至过去的截止时间仍按原值保留，不延长结算宽限。
+                round.setEndTime(round.getEndTime() - seconds * 1000L);
+            }
+        }
+        if (round != null) {
+            res.endTime = round.getEndTime();
+        }
+        return res;
+    }
+
+    /** 中途退出也走结束协议；待发奖重试不再受游戏时限限制。 */
+    public ResEndSpeedyDeliveryGame end(SimPlayerContext ctx) {
+        SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
+        ResEndSpeedyDeliveryGame res = new ResEndSpeedyDeliveryGame(Code.SUCCESS);
+        if (round == null) {
+            res.code = Code.ERROR_REQ;
+        } else {
+            res.score = round.getScore();
+            if (round.getState() == RoundState.CLEARED) {
+                res.code = Code.REPEAT_OP;
+            } else if (round.getState() == RoundState.PLAYING
+                    && System.currentTimeMillis() > round.getEndTime() + END_TOLERANCE_MILLIS) {
+                res.code = Code.EXPIRE;
+            } else {
+                res.code = settle(ctx, round);
+                if (res.code == Code.SUCCESS) {
+                    res.rewards = ItemUtils.buildItemInfo(round.getRewards());
+                }
+            }
+        }
+        return res;
+    }
+
+    public ResQuickClearSpeedyDeliveryGame quickClear(SimPlayerContext ctx) {
+        ResQuickClearSpeedyDeliveryGame res = new ResQuickClearSpeedyDeliveryGame(Code.SUCCESS);
+        SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
+        if (round == null || round.getState() != RoundState.REWARD_PENDING || !round.isQuickClear()) {
+            MinigameSpeedyDeliveryCfg cfg = config();
+            GlobalConfigCfg scoreCfg = GameDataManager.getGlobalConfigCfg(MiniGameConstant.SPEEDY_DELIVERY_QUICK_CLEAR_SCORE_GLOBAL_ID);
+            if (cfg == null || scoreCfg == null || scoreCfg.getIntValue() < 0) {
+                res.code = Code.SAMPLE_ERROR;
+            } else if (!openOneClickPass(ctx)) {
+                res.code = Code.NOT_UNLOCKED;
+            } else {
+                res.code = prepareStart(ctx);
+                if (res.code == Code.SUCCESS) {
+                    res.code = charge(ctx, cfg);
+                    if (res.code == Code.SUCCESS) {
+                        round = ctx.getSpeedyDeliveryRound();
+                        round.setQuickClear(true);
+                        round.setScore(scoreCfg.getIntValue());
+                    }
+                }
+            }
+        }
+        if (res.code == Code.SUCCESS) {
+            res.code = settle(ctx, round);
+            res.score = round.getScore();
+            if (res.code == Code.SUCCESS) {
+                res.rewards = ItemUtils.buildItemInfo(round.getRewards());
+            }
+        }
+        return res;
+    }
+
+    /** 复用玩家tick，在两秒宽限结束后兜底结算；失败保留状态供结束协议或退出重试。 */
+    @Override
+    public void onTick(SimPlayerContext ctx, long now) {
+        SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
+        if (round != null && round.getState() == RoundState.PLAYING
+                && now > round.getEndTime() + END_TOLERANCE_MILLIS) {
+            ResEndSpeedyDeliveryGame res = new ResEndSpeedyDeliveryGame(settle(ctx, round));
+            res.score = round.getScore();
+            if (res.code == Code.SUCCESS) {
+                res.rewards = ItemUtils.buildItemInfo(round.getRewards());
+            }
+            ctx.send(res);
+        }
+    }
+
+    public int onExit(SimPlayerContext ctx) {
+        SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
+        if (round != null && round.getState() != RoundState.CLEARED) {
+            int code = settle(ctx, round);
+            if (code != Code.SUCCESS) {
+                return code;
+            }
+        }
+        ctx.setSpeedyDeliveryRound(null);
+        return Code.SUCCESS;
+    }
+
+    private int checkPlaying(SpeedyDeliveryRound round) {
+        if (round == null) {
+            return Code.ERROR_REQ;
+        }
+        if (round.getState() != RoundState.PLAYING) {
+            return Code.REPEAT_OP;
+        }
+        return System.currentTimeMillis() > round.getEndTime() ? Code.EXPIRE : Code.SUCCESS;
+    }
+
+    /** 已过期的上一局必须先发奖成功，才能扣除下一局费用。 */
+    private int prepareStart(SimPlayerContext ctx) {
+        SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
+        if (round == null || round.getState() == RoundState.CLEARED) {
+            return Code.SUCCESS;
+        }
+        if (round.getState() == RoundState.PLAYING
+                && System.currentTimeMillis() > round.getEndTime() + END_TOLERANCE_MILLIS) {
+            return settle(ctx, round);
+        }
+        return Code.REPEAT_OP;
+    }
+
+    private int charge(SimPlayerContext ctx, MinigameSpeedyDeliveryCfg cfg) {
+        int code = grantDaily(ctx, cfg, System.currentTimeMillis());
+        if (code != Code.SUCCESS) {
+            return code;
+        }
+        code = playerPackService.removeItems(ctx.getPlayer(), cfg.getConsumeCount(), AddType.SIM_SPEEDY_DELIVERY).code;
+        if (code == Code.SUCCESS) {
+            ctx.setSpeedyDeliveryRound(new SpeedyDeliveryRound(cfg, System.currentTimeMillis() + cfg.getDuration() * 1000L));
+            conditionService.onRoundStarted(ctx, 4);
+        }
+        return code;
+    }
+
+    /** 奖励表只扫描一次，缓存选定奖励，失败重试不会重新扣费或变更档位。 */
+    private int settle(SimPlayerContext ctx, SpeedyDeliveryRound round) {
+        round.setState(RoundState.REWARD_PENDING);
+        if (round.getRewards() == null) {
+            int threshold = 0;
+            for (int key : round.getConfig().getReward().keySet()) {
+                if (key <= round.getScore() && key > threshold) {
+                    threshold = key;
+                }
+            }
+            Map<Integer, Integer> selected = round.getConfig().getReward().get(threshold);
+            Map<Integer, Long> rewards = new HashMap<>(selected.size());
+            selected.forEach((itemId, count) -> rewards.put(itemId, count.longValue()));
+            round.setRewards(rewards);
+        }
+        CommonResult<ItemOperationResult> result = playerPackService.addItems(
+                ctx.playerId(), round.getRewards(), AddType.SIM_SPEEDY_DELIVERY, true);
+        if (result.success()) {
+            round.setState(RoundState.CLEARED);
+        } else {
+            log.warn("飞驰快送发奖失败 playerId={},score={},code={}", ctx.playerId(), round.getScore(), result.code);
+        }
+        return result.code;
+    }
+
+    private boolean openOneClickPass(SimPlayerContext ctx) {
+        GlobalConfigCfg cfg = GameDataManager.getGlobalConfigCfg(MiniGameConstant.SPEEDY_DELIVERY_QUICK_CLEAR_CHAPTER_GLOBAL_ID);
+        if (cfg == null || cfg.getIntValue() <= 0) {
+            return false;
+        }
+        if (ctx.getSimChapterData() == null && chapterService.getResChapterInfo(ctx).code != Code.SUCCESS) {
+            return false;
+        }
+        return ctx.getSimChapterData().getLevelId() >= cfg.getIntValue();
+    }
+
+    private int grantDaily(SimPlayerContext ctx, MinigameSpeedyDeliveryCfg cfg, long now) {
+        if (cfg == null) {
+            return Code.SAMPLE_ERROR;
+        }
+        SpeedyDeliveryData data = ctx.getSpeedyDeliveryData();
+        if (data == null) {
+            data = dao.findById(ctx.playerId()).orElseGet(() -> {
+                SpeedyDeliveryData created = new SpeedyDeliveryData();
+                created.setPlayerId(ctx.playerId());
+                return created;
+            });
+            ctx.setSpeedyDeliveryData(data);
+        }
+        if (data.getLastDailyGrantTime() >= now || TimeHelper.inSameDay(data.getLastDailyGrantTime(), now)) {
+            return Code.SUCCESS;
+        }
+        if (!cfg.getGrantCount().isEmpty()) {
+            CommonResult<ItemOperationResult> result = playerPackService.addItems(
+                    ctx.playerId(), cfg.getGrantCount(), AddType.SIM_SPEEDY_DELIVERY, true);
+            if (!result.success()) {
+                log.warn("飞驰快送每日赠送失败 playerId={},code={}", ctx.playerId(), result.code);
+                return result.code;
+            }
+        }
+        data.setLastDailyGrantTime(now);
+        autoSaveService.enqueueSave(data);
+        return Code.SUCCESS;
+    }
+
+    private MinigameSpeedyDeliveryCfg config() {
+        Map<Integer, MinigameSpeedyDeliveryCfg> configs = GameDataManager.getMinigameSpeedyDeliveryCfgMap();
+        if (configs.size() != 1) {
+            return null;
+        }
+        MinigameSpeedyDeliveryCfg cfg = configs.values().iterator().next();
+        if (cfg.getDuration() <= 0 || cfg.getBackpackCapacity() <= 0 || !validItems(cfg.getConsumeCount())
+                || cfg.getConsumeCount().isEmpty() || !validItems(cfg.getGrantCount())
+                || cfg.getReward() == null || !cfg.getReward().containsKey(0)) {
+            return null;
+        }
+        for (var entry : cfg.getReward().entrySet()) {
+            if (entry.getKey() < 0 || !validItems(entry.getValue())) {
+                return null;
+            }
+        }
+        return cfg;
+    }
+
+    private boolean validItems(Map<Integer, ? extends Number> items) {
+        return items != null && items.entrySet().stream().allMatch(e -> e.getKey() > 0 && e.getValue().longValue() > 0);
+    }
+}

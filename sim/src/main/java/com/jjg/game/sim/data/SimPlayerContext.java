@@ -10,6 +10,8 @@ import com.jjg.game.minigame.data.GodGamblersData;
 import com.jjg.game.minigame.data.GodGamblersRound;
 import com.jjg.game.minigame.data.HappyHappyFishData;
 import com.jjg.game.minigame.data.HappyHappyFishRound;
+import com.jjg.game.minigame.data.SpeedyDeliveryData;
+import com.jjg.game.minigame.data.SpeedyDeliveryRound;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.sim.constant.BuildingOutputType;
 
@@ -126,6 +128,24 @@ public class SimPlayerContext {
     //欢乐捉鱼每日赠送日期；单局只留在会话中，掉线按当前积分结算
     private HappyHappyFishData happyHappyFishData;
     private HappyHappyFishRound happyHappyFishRound;
+    private SpeedyDeliveryData speedyDeliveryData;
+    private SpeedyDeliveryRound speedyDeliveryRound;
+
+    public SpeedyDeliveryData getSpeedyDeliveryData() {
+        return speedyDeliveryData;
+    }
+
+    public void setSpeedyDeliveryData(SpeedyDeliveryData speedyDeliveryData) {
+        this.speedyDeliveryData = speedyDeliveryData;
+    }
+
+    public SpeedyDeliveryRound getSpeedyDeliveryRound() {
+        return speedyDeliveryRound;
+    }
+
+    public void setSpeedyDeliveryRound(SpeedyDeliveryRound speedyDeliveryRound) {
+        this.speedyDeliveryRound = speedyDeliveryRound;
+    }
 
     public HappyHappyFishData getHappyHappyFishData() {
         return happyHappyFishData;

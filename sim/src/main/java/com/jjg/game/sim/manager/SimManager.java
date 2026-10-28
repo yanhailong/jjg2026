@@ -20,8 +20,10 @@ import com.jjg.game.core.service.PlayerStatService;
 import com.jjg.game.minigame.dao.CheaterHuntDao;
 import com.jjg.game.minigame.dao.GodGamblersDao;
 import com.jjg.game.minigame.dao.HappyHappyFishDao;
+import com.jjg.game.minigame.dao.SpeedyDeliveryDao;
 import com.jjg.game.minigame.service.GodGamblersService;
 import com.jjg.game.minigame.service.HappyHappyFishService;
+import com.jjg.game.minigame.service.SpeedyDeliveryService;
 import com.jjg.game.minigame.service.SimMiniGameService;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.ItemCfg;
@@ -123,6 +125,8 @@ public class SimManager {
     @Autowired
     private HappyHappyFishDao happyHappyFishDao;
     @Autowired
+    private SpeedyDeliveryDao speedyDeliveryDao;
+    @Autowired
     private SimDropService simDropService;
     @Autowired
     private SimStatsService simStatsService;
@@ -172,6 +176,8 @@ public class SimManager {
     private GodGamblersService godGamblersService;
     @Autowired
     private HappyHappyFishService happyHappyFishService;
+    @Autowired
+    private SpeedyDeliveryService speedyDeliveryService;
     @Autowired
     private SeasonFreeGameService seasonFreeGameService;
     @Autowired
@@ -421,6 +427,9 @@ public class SimManager {
             if (ctx.getHappyHappyFishRound() != null) {
                 happyHappyFishService.onExit(ctx);
             }
+            if (ctx.getSpeedyDeliveryRound() != null) {
+                speedyDeliveryService.onExit(ctx);
+            }
             //离开会话丢弃小游戏本局，退出保存排队期间重登也不恢复。
             ctx.setCheaterHuntRound(null);
             ctx.setGodGamblersRound(null);
@@ -542,6 +551,7 @@ public class SimManager {
             simMiniGameService.onLogin(ctx);
             godGamblersService.onLogin(ctx);
             happyHappyFishService.onLogin(ctx);
+            speedyDeliveryService.onLogin(ctx);
         }
         return ctx;
     }
@@ -691,6 +701,9 @@ public class SimManager {
                 }
                 if (ctx.getHappyHappyFishData() != null) {
                     happyHappyFishDao.save(ctx.getHappyHappyFishData());
+                }
+                if (ctx.getSpeedyDeliveryData() != null) {
+                    speedyDeliveryDao.save(ctx.getSpeedyDeliveryData());
                 }
                 //落库完成后再删路由; 玩家可能在复活等待超时后已重建 ctx, 此时路由必须保留
                 if (simPlayerContextRegistry.getContext(playerId) == null) {
