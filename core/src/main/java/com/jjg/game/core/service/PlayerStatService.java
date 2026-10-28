@@ -53,6 +53,12 @@ public class PlayerStatService {
     public static final int CARD_POOL_DRAW = 12283;
     public static final int DAILY_AD_WATCH = 12284;
     public static final int DAILY_PASS_CONDITION = 12285;
+    public static final int CHAPTER_LEVEL = 12286;
+    public static final int CHEATER_HUNT_PLAY = 12287;
+    public static final int GOD_GAMBLERS_PLAY = 12288;
+    public static final int HAPPY_HAPPY_FISH_PLAY = 12289;
+    public static final int EMPLOYEE_MAX_LEVEL = 12291;
+    public static final int SHOP_DIAMOND_CONSUME = 12292;
 
     public static final int GOLD_ITEM_ID = 1990000;
     public static final int DIAMOND_ITEM_ID = 1980000;
@@ -66,7 +72,8 @@ public class PlayerStatService {
     public static boolean supports(int conditionId) {
         return conditionId == BUILDING_LEVEL
                 || conditionId == ALL_SCENE_LEVEL
-                || conditionId >= SLOT_ITEM && conditionId <= DAILY_PASS_CONDITION && conditionId != 12258;
+                || conditionId >= SLOT_ITEM && conditionId <= SHOP_DIAMOND_CONSUME
+                && conditionId != 12258 && conditionId != 12290;
     }
 
     public static boolean recorded(int conditionId) {
@@ -76,7 +83,8 @@ public class PlayerStatService {
                     CURRENCY_CONSUME, GUEST_POOL_DRAW, EMPLOYEE_POOL_DRAW, SLOT_BET,
                     SLOT_WIN, WEALTH_GOD_MODE, ALLIANCE_DONATE, VISIT_GIFT, VISIT_SLOT_SPIN,
                     DOUXIAN_SETTLEMENT, SEASON_GEM_CRAFT, CARD_POOL_DRAW,
-                    DAILY_AD_WATCH, DAILY_PASS_CONDITION -> true;
+                    DAILY_AD_WATCH, DAILY_PASS_CONDITION, CHEATER_HUNT_PLAY, GOD_GAMBLERS_PLAY,
+                    HAPPY_HAPPY_FISH_PLAY, SHOP_DIAMOND_CONSUME -> true;
             default -> false;
         };
     }
@@ -142,6 +150,22 @@ public class PlayerStatService {
 
     public void recordPassCondition(long playerId) {
         incrementDimensionPlayer(DAILY_PASS_CONDITION, TimeHelper.getDayNumerical2(), playerId, 1);
+    }
+
+    public void recordMiniGamePlay(long playerId, int miniGameId) {
+        int statId = switch (miniGameId) {
+            case 1 -> CHEATER_HUNT_PLAY;
+            case 2 -> GOD_GAMBLERS_PLAY;
+            case 3 -> HAPPY_HAPPY_FISH_PLAY;
+            default -> throw new IllegalArgumentException("Unsupported mini game: " + miniGameId);
+        };
+        incrementPlayer(statId, playerId, 1);
+    }
+
+    public void recordShopDiamondConsume(long playerId, long amount) {
+        if (amount > 0) {
+            incrementPlayer(SHOP_DIAMOND_CONSUME, playerId, amount);
+        }
     }
 
     public void recordGuestRecruit(long playerId, boolean paid, long count) {
@@ -288,7 +312,8 @@ public class PlayerStatService {
             case SLOT_WIN -> getDimensionsPlayer(SLOT_WIN, condition.spec().intParameter(0),
                     condition.spec().intParameter(1), playerId);
             case WEALTH_GOD_MODE -> getPlayer(WEALTH_GOD_MODE, playerId);
-            case ALLIANCE_DONATE, VISIT_GIFT, DOUXIAN_SETTLEMENT, CARD_POOL_DRAW ->
+            case ALLIANCE_DONATE, VISIT_GIFT, DOUXIAN_SETTLEMENT, CARD_POOL_DRAW,
+                    CHEATER_HUNT_PLAY, GOD_GAMBLERS_PLAY, HAPPY_HAPPY_FISH_PLAY, SHOP_DIAMOND_CONSUME ->
                     getPlayer(conditionId, playerId);
             case DAILY_AD_WATCH, DAILY_PASS_CONDITION ->
                     getDimensionPlayer(conditionId, TimeHelper.getDayNumerical2(), playerId);

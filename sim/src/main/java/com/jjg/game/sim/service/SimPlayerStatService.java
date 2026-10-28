@@ -6,6 +6,7 @@ import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.BuildingAreaTableCfg;
 import com.jjg.game.sampledata.bean.EmployeeProfileCfg;
 import com.jjg.game.sim.dao.SimCasinoDao;
+import com.jjg.game.sim.dao.SimChapterDao;
 import com.jjg.game.sim.data.BuildingData;
 import com.jjg.game.sim.data.GuestData;
 import com.jjg.game.sim.data.SimCasinoData;
@@ -28,12 +29,14 @@ public class SimPlayerStatService {
     private final PlayerStatService playerStatService;
     private final SimCasinoDao simCasinoDao;
     private final SimSkillService simSkillService;
+    private final SimChapterDao simChapterDao;
 
     public SimPlayerStatService(PlayerStatService playerStatService, SimCasinoDao simCasinoDao,
-                                @Lazy SimSkillService simSkillService) {
+                                @Lazy SimSkillService simSkillService, SimChapterDao simChapterDao) {
         this.playerStatService = playerStatService;
         this.simCasinoDao = simCasinoDao;
         this.simSkillService = simSkillService;
+        this.simChapterDao = simChapterDao;
     }
 
     public boolean supports(PreparedCondition condition) {
@@ -70,8 +73,25 @@ public class SimPlayerStatService {
                     condition.spec().intParameter(0));
             case PlayerStatService.SKILL_LEVEL -> skillLevel(ctx,
                     condition.spec().intParameter(0), condition.spec().intParameter(1));
+            case PlayerStatService.CHAPTER_LEVEL -> chapterLevel(ctx);
+            case PlayerStatService.EMPLOYEE_MAX_LEVEL -> employeeMaxLevel(ctx);
             default -> 0;
         };
+    }
+
+    private long chapterLevel(SimPlayerContext ctx) {
+        if (ctx.getSimChapterData() == null) {
+            ctx.setSimChapterData(simChapterDao.findById(ctx.playerId()).orElse(null));
+        }
+        return ctx.getSimChapterData() == null ? 0 : ctx.getSimChapterData().getLevelId();
+    }
+
+    private long employeeMaxLevel(SimPlayerContext ctx) {
+        long maxLevel = 0;
+        for (SimEmployeeData employee : ctx.getEmployeeMap().values()) {
+            maxLevel = Math.max(maxLevel, employee.getLevel());
+        }
+        return maxLevel;
     }
 
     private long buildingCount(SimPlayerContext ctx, int minLevel) {

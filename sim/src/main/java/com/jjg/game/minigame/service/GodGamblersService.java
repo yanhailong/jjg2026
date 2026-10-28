@@ -47,13 +47,16 @@ public class GodGamblersService {
     private final SimAutoSaveService autoSaveService;
     private final PlayerPackService playerPackService;
     private final SnowflakeManager snowflakeManager;
+    private final MiniGameConditionService conditionService;
 
     public GodGamblersService(GodGamblersDao dao, SimAutoSaveService autoSaveService,
-                              PlayerPackService playerPackService, SnowflakeManager snowflakeManager) {
+                              PlayerPackService playerPackService, SnowflakeManager snowflakeManager,
+                              MiniGameConditionService conditionService) {
         this.dao = dao;
         this.autoSaveService = autoSaveService;
         this.playerPackService = playerPackService;
         this.snowflakeManager = snowflakeManager;
+        this.conditionService = conditionService;
     }
 
     /**
@@ -216,6 +219,7 @@ public class GodGamblersService {
         int code = charge(ctx, cfg);
         if (code == Code.SUCCESS) {
             ctx.setGodGamblersRound(round);
+            conditionService.onRoundStarted(ctx, 2);
         }
         return code;
     }

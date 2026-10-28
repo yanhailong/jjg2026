@@ -177,7 +177,7 @@ final class DefaultConditionRules {
         rules.add(action(12234, 2, 2, 1, ProgressMode.ADD, ActionConditionEvent.Type.VISIT_SLOT_SPIN,
                 (s, e) -> e.matchesSubject(s.parameter(0)), (s, e) -> positiveCount(e)));
 
-        //12251-12285 与上面的接取型条件判定口径一致，进度由玩家统计提供而非任务计数器。
+        //12251 起的累积条件由玩家统计或当前状态提供进度，而非任务计数器。
         rules.add(game(12251, 3, 3, 2, ProgressMode.ADD,
                 (s, e) -> e.matchesGame(s.parameter(0)), (s, e) -> e.itemGain(s.intParameter(1))));
         rules.add(game(12252, 3, 3, 2, ProgressMode.ADD,
@@ -256,6 +256,19 @@ final class DefaultConditionRules {
                 (s, e) -> true, (s, e) -> positiveCount(e)));
         rules.add(action(12285, 1, 1, 0, ProgressMode.ADD, ActionConditionEvent.Type.PASS_CONDITION_TRIGGERED,
                 (s, e) -> true, (s, e) -> positiveCount(e)));
+        rules.add(action(12286, 1, 1, 0, ProgressMode.SET, ActionConditionEvent.Type.CHAPTER_LEVEL,
+                (s, e) -> true, (s, e) -> e.value()));
+        rules.add(action(12287, 1, 1, 0, ProgressMode.ADD, ActionConditionEvent.Type.MINI_GAME_PLAY,
+                (s, e) -> e.subjectId() == 1, (s, e) -> e.count()));
+        rules.add(action(12288, 1, 1, 0, ProgressMode.ADD, ActionConditionEvent.Type.MINI_GAME_PLAY,
+                (s, e) -> e.subjectId() == 2, (s, e) -> e.count()));
+        rules.add(action(12289, 1, 1, 0, ProgressMode.ADD, ActionConditionEvent.Type.MINI_GAME_PLAY,
+                (s, e) -> e.subjectId() == 3, (s, e) -> e.count()));
+        //12290 送货小游戏尚未实现，暂不注册。
+        rules.add(action(12291, 1, 1, 0, ProgressMode.SET, ActionConditionEvent.Type.EMPLOYEE_LEVEL,
+                (s, e) -> true, (s, e) -> e.value()));
+        rules.add(action(12292, 1, 1, 0, ProgressMode.ADD, ActionConditionEvent.Type.SHOP_DIAMOND_CONSUME,
+                (s, e) -> true, (s, e) -> e.value()));
     }
 
     private static void addAllianceRules(List<ConditionRule<?>> rules) {

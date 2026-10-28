@@ -1,6 +1,7 @@
 package com.jjg.game.sim.service;
 
 import com.jjg.game.core.constant.AddType;
+import com.jjg.game.core.base.condition.numeric.ActionConditionEvent;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
@@ -30,12 +31,14 @@ public class SimChapterService {
     private final SimChapterDao simChapterDao;
     private final SimConfigCacheService simConfigCacheService;
     private final SimEmployeeService simEmployeeService;
+    private final SimTaskService simTaskService;
 
-    public SimChapterService(PlayerPackService playerPackService, SimChapterDao simChapterDao, SimConfigCacheService simConfigCacheService, SimEmployeeService simEmployeeService) {
+    public SimChapterService(PlayerPackService playerPackService, SimChapterDao simChapterDao, SimConfigCacheService simConfigCacheService, SimEmployeeService simEmployeeService, SimTaskService simTaskService) {
         this.playerPackService = playerPackService;
         this.simChapterDao = simChapterDao;
         this.simConfigCacheService = simConfigCacheService;
         this.simEmployeeService = simEmployeeService;
+        this.simTaskService = simTaskService;
     }
 
     /**
@@ -152,6 +155,8 @@ public class SimChapterService {
         ctx.getSimChapterData().setLevelId(levelId);
         ctx.getSimChapterData().setGirdIndex(0);
         ctx.getSimChapterData().setGirdLightCount(0);
+        simTaskService.onConditionEvent(ctx, new ActionConditionEvent(ActionConditionEvent.Type.CHAPTER_LEVEL,
+                0, 0, levelId, 0, 0, false));
         return res;
     }
 

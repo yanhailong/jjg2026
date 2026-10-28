@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -75,12 +76,8 @@ public final class SimPbConverter {
         BuildingUpgradeTableCfg nextRewardCfg = simConfigCacheService.getNextBuildingUpgradeRewardCfg(info.id, info.level);
         info.targetLevel = nextRewardCfg == null ? 0 : nextRewardCfg.getLevel();
         info.nextRewards = nextRewardCfg == null ? List.of() : ItemUtils.buildItemInfo(nextRewardCfg.getUpgradeReward());
-        info.cdEndTime = 0;
-        info.progress = 0;
-        info.watchAdCount = 0;
-        info.cdZero = false;
-
-        info.skillConditionPass = true;
+        info.buildingUpgrade1ConditonInfo = toBuildingUpgradeConditonInfo(simConfigCacheService, buildingData, 1);
+        info.buildingUpgrade10ConditonInfo = toBuildingUpgradeConditonInfo(simConfigCacheService, buildingData, 10);
 
         //交互次数
         info.interactCount = buildingData.getReceptCount();
@@ -146,6 +143,27 @@ public final class SimPbConverter {
 
             info.upgradeOutput *= 60L;
         }
+        return info;
+    }
+
+    private static BuildingUpgradeConditonInfo toBuildingUpgradeConditonInfo(SimConfigCacheService config,
+                                                                            BuildingData building, int levelCount) {
+        int targetLevel = Math.min(config.getBuildingMaxLevel(building.getId()), building.getLevel() + levelCount);
+        if (targetLevel <= building.getLevel()) {
+            return null;
+        }
+        BuildingUpgradeConditonInfo info = new BuildingUpgradeConditonInfo();
+        Map<Integer, Long> totalCost = new HashMap<>();
+        //与实际升级一致，每一级按升级前等级选档，跨档时累计消耗并取最高场景等级要求。
+        for (int level = building.getLevel(); level < targetLevel; level++) {
+            BuildingUpgradeTableCfg cfg = config.getBuildingUpgradeCfg(building.getId(), level);
+            if (cfg == null || cfg.getCostPerLevel() == null || cfg.getCostPerLevel().isEmpty()) {
+                return null;
+            }
+            info.needLevel = Math.max(info.needLevel, cfg.getNeedLevel());
+            cfg.getCostPerLevel().forEach((id, count) -> totalCost.merge(id, count, Long::sum));
+        }
+        info.needItems = ItemUtils.buildItemInfo(totalCost);
         return info;
     }
 

@@ -39,13 +39,16 @@ public class HappyHappyFishService {
     private final SimAutoSaveService autoSaveService;
     private final PlayerPackService playerPackService;
     private final SimChapterService chapterService;
+    private final MiniGameConditionService conditionService;
 
     public HappyHappyFishService(HappyHappyFishDao dao, SimAutoSaveService autoSaveService,
-                                PlayerPackService playerPackService, SimChapterService chapterService) {
+                                PlayerPackService playerPackService, SimChapterService chapterService,
+                                MiniGameConditionService conditionService) {
         this.dao = dao;
         this.autoSaveService = autoSaveService;
         this.playerPackService = playerPackService;
         this.chapterService = chapterService;
+        this.conditionService = conditionService;
     }
 
     public void onLogin(SimPlayerContext ctx) {
@@ -225,7 +228,11 @@ public class HappyHappyFishService {
     }
 
     private int charge(SimPlayerContext ctx, MinigameHappyHappyFishCfg cfg) {
-        return playerPackService.removeItems(ctx.getPlayer(), cfg.getConsumeCount(), AddType.SIM_HAPPY_HAPPY_FISH).code;
+        int code = playerPackService.removeItems(ctx.getPlayer(), cfg.getConsumeCount(), AddType.SIM_HAPPY_HAPPY_FISH).code;
+        if (code == Code.SUCCESS) {
+            conditionService.onRoundStarted(ctx, 3);
+        }
+        return code;
     }
 
     private boolean canStart(SimPlayerContext ctx) {

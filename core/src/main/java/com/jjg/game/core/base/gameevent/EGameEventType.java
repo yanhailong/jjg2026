@@ -29,6 +29,8 @@ public enum EGameEventType {
     DAILY_SIGN_IN(""),
     //广告观看成功
     AD_WATCH(""),
+    //商城购买成功支付钻石
+    SHOP_DIAMOND_CONSUME(""),
     ;
 
     // 配置表中的类型

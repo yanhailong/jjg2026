@@ -46,7 +46,11 @@ public record ActionConditionEvent(Type type, int subjectId, int relatedId, long
         SEASON_GEM_EQUIP,
         SEASON_GEM_CRAFT,
         DAILY_SIGN_IN,
-        PASS_CONDITION_TRIGGERED
+        PASS_CONDITION_TRIGGERED,
+        CHAPTER_LEVEL,
+        MINI_GAME_PLAY,
+        EMPLOYEE_LEVEL,
+        SHOP_DIAMOND_CONSUME
     }
 
     public boolean matchesSubject(long expected) {

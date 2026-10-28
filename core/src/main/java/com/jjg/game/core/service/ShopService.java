@@ -5,6 +5,9 @@ import cn.hutool.core.util.NumberUtil;
 import com.jjg.game.common.cluster.ClusterSystem;
 import com.jjg.game.common.pb.ItemInfo;
 import com.jjg.game.common.utils.TimeHelper;
+import com.jjg.game.core.base.gameevent.EGameEventType;
+import com.jjg.game.core.base.gameevent.GameEventManager;
+import com.jjg.game.core.base.gameevent.PlayerEvent;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.constant.GameConstant;
@@ -53,6 +56,10 @@ public class ShopService implements OrderGenerate {
     private MailService mailService;
     @Autowired
     private PlayerSessionTokenDao playerSessionTokenDao;
+    @Autowired
+    private PlayerStatService playerStatService;
+    @Autowired
+    private GameEventManager gameEventManager;
     //商城商品
     private Map<Long, ShopProduct> shopProductMap = Map.of();
     //商城商品
@@ -114,6 +121,12 @@ public class ShopService implements OrderGenerate {
         CommonResult<ItemOperationResult> result = playerPackService.useItem(playerController.getPlayer(), shopProduct.getPayType(), useItemCount, addItemMap, AddType.ITEM_EXCHANGE);
         if (!result.success()) {
             return result;
+        }
+
+        if (shopProduct.getPayType() == ItemUtils.getDiamondItemId() && useItemCount > 0) {
+            playerStatService.recordShopDiamondConsume(playerController.playerId(), useItemCount);
+            gameEventManager.triggerEvent(new PlayerEvent(playerController.getPlayer(),
+                    EGameEventType.SHOP_DIAMOND_CONSUME, useItemCount, null));
         }
 
         PlayerSessionToken playerSessionToken = playerSessionTokenDao.getByPlayerId(playerController.playerId());

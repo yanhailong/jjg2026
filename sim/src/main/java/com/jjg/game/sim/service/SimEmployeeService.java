@@ -245,6 +245,8 @@ public class SimEmployeeService implements SimTaskStateReporter {
 
             data.setLevel(data.getLevel() + 1);
             res.level = data.getLevel();
+            simTaskService.onConditionEvent(ctx, new ActionConditionEvent(ActionConditionEvent.Type.EMPLOYEE_LEVEL,
+                    employeeId, 0, data.getLevel(), 0, 0, false));
             employeeRedDotService.updateRedDots(ctx.playerId(),
                     SimConstant.Employee.RED_DOT_EMPLOYEE_GROWTH);
             log.info("升级雇员成功 playerId={},employeeId={},newLevel={},changeEndItemNum={}", ctx.playerId(), employeeId, data.getLevel(), changeEndItemNum);
@@ -384,7 +386,9 @@ public class SimEmployeeService implements SimTaskStateReporter {
         }
         // 职业 -> (星级 -> 恰好该星级的数量)
         Map<Integer, SortedMap<Integer, Long>> byProfession = new HashMap<>();
+        long maxLevel = 0;
         for (SimEmployeeData employee : employees.values()) {
+            maxLevel = Math.max(maxLevel, employee.getLevel());
             EmployeeProfileCfg cfg = GameDataManager.getEmployeeProfileCfg(employee.getEmployeeId());
             if (cfg == null) {
                 continue;
@@ -395,6 +399,8 @@ public class SimEmployeeService implements SimTaskStateReporter {
         byProfession.forEach((profession, starCounts) ->
                 SimConditionEventFactory.emitOwnershipCounts(sink,
                         ActionConditionEvent.Type.EMPLOYEE_COUNT, profession, starCounts));
+        sink.accept(new ActionConditionEvent(ActionConditionEvent.Type.EMPLOYEE_LEVEL,
+                0, 0, maxLevel, 0, 0, false));
     }
 
     /**

@@ -43,13 +43,16 @@ public class SimMiniGameService {
     private final SimAutoSaveService autoSaveService;
     private final PlayerPackService playerPackService;
     private final SimChapterService chapterService;
+    private final MiniGameConditionService conditionService;
 
     public SimMiniGameService(CheaterHuntDao dao, SimAutoSaveService autoSaveService,
-                              PlayerPackService playerPackService, SimChapterService chapterService) {
+                              PlayerPackService playerPackService, SimChapterService chapterService,
+                              MiniGameConditionService conditionService) {
         this.dao = dao;
         this.autoSaveService = autoSaveService;
         this.playerPackService = playerPackService;
         this.chapterService = chapterService;
+        this.conditionService = conditionService;
     }
 
     /** 登录结算当天赠送，离线日期不累计补发。 */
@@ -120,6 +123,7 @@ public class SimMiniGameService {
                             round.setCheaterSpots(drawn);
                             round.setEndTime(cfg.getTimeLimit() == -1 ? -1
                                     : System.currentTimeMillis() + cfg.getTimeLimit() * 1000L);
+                            conditionService.onRoundStarted(ctx, 1);
                         }
                     }
                 }
@@ -255,6 +259,7 @@ public class SimMiniGameService {
                         //跳过场景与点位生成，避免为一键通关分配无用的随机数据。
                         round = newRound(ctx, data);
                         round.setState(RoundState.REWARD_PENDING);
+                        conditionService.onRoundStarted(ctx, 1);
                     }
                 }
             }
