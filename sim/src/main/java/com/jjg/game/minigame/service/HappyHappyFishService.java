@@ -153,7 +153,7 @@ public class HappyHappyFishService {
         return res;
     }
 
-    /** 正常结束仅接受当前截止时间前后两秒；已提交的发奖失败重试不再受时限影响。 */
+    /** 允许中途退出并按当前积分结算；截止后保留两秒容差，已提交的发奖失败可继续重试。 */
     public ResEndHappyHappyFishGame end(SimPlayerContext ctx, long roundId) {
         ResEndHappyHappyFishGame res = new ResEndHappyHappyFishGame(Code.SUCCESS);
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
@@ -162,9 +162,7 @@ public class HappyHappyFishService {
             return res;
         }
         long now = System.currentTimeMillis();
-        if (round.getState() == RoundState.PLAYING && now < round.getEndTime() - END_TOLERANCE_MILLIS) {
-            res.code = Code.ERROR_REQ;
-        } else if (round.getState() == RoundState.PLAYING && now > round.getEndTime() + END_TOLERANCE_MILLIS) {
+        if (round.getState() == RoundState.PLAYING && now > round.getEndTime() + END_TOLERANCE_MILLIS) {
             res.code = Code.EXPIRE;
         } else {
             res.code = settle(ctx, round);
