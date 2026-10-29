@@ -75,8 +75,12 @@ public class SimChapterService {
         res.girdIndex = ctx.getSimChapterData().getGirdIndex();
         res.girdLightCount = ctx.getSimChapterData().getGirdLightCount();
 
-        ChapterLevelCfg chapterLevelCfg = GameDataManager.getChapterLevelCfg(chapterLevelId);
-        if (chapterLevelCfg != null && chapterLevelCfg.getBattleValue() > 0) {
+        int nextChapterLevelId = simConfigCacheService.getNextChapterLevelId(res.levelId);
+        ChapterLevelCfg chapterLevelCfg = GameDataManager.getChapterLevelCfg(nextChapterLevelId);
+        if (chapterLevelCfg != null && chapterLevelCfg.getLevelType() == 2
+                && chapterLevelCfg.getBattleValue() > 0
+                && res.girdIndex == chapterLevelCfg.getSpecification().get(0) * chapterLevelCfg.getSpecification().get(1) - 1
+                && res.girdLightCount >= chapterLevelCfg.getNumOperations()) {
             res.chapterPKInfo = new ChapterPKInfo();
             res.chapterPKInfo.selfPower = simEmployeeService.calAllCombatPower(ctx);
             res.chapterPKInfo.targetPower = chapterLevelCfg.getBattleValue();

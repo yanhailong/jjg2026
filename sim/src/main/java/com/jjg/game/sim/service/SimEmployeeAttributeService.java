@@ -4,6 +4,7 @@ import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.EmployeeLevelCfg;
 import com.jjg.game.sampledata.bean.EmployeeProfileCfg;
 import com.jjg.game.sampledata.bean.EmployeeSkillConfigCfg;
+import com.jjg.game.sampledata.bean.EmployeeStarCfg;
 import com.jjg.game.sim.constant.BuildingOutputType;
 import com.jjg.game.sim.data.SimAttributeBonus;
 import com.jjg.game.sim.data.SimEmployeeData;
@@ -29,6 +30,7 @@ public class SimEmployeeAttributeService {
         Map<Integer, Map<BuildingOutputType, SimAttributeBonus>> professions = new HashMap<>();
         Map<Integer, Map<BuildingOutputType, SimAttributeBonus>> buildings = new HashMap<>();
         Map<Integer, Integer> employeeProfessions = new HashMap<>();
+        Map<Integer, Map<Integer, EmployeeStarCfg>> starConfigs = configCache.getEmployeeStarCfgMap();
         for (SimEmployeeData employee : ctx.getEmployeeMap().values()) {
             int employeeId = employee.getEmployeeId();
             EmployeeProfileCfg profile = GameDataManager.getEmployeeProfileCfg(employeeId);
@@ -44,6 +46,11 @@ public class SimEmployeeAttributeService {
                 Map<Integer, Integer> additions = level.getAddAttribute();
                 level.getAttributeValue().forEach((type, value) -> addEmployeeAttribute(bonuses, type,
                         value + offset * (additions == null ? 0 : additions.getOrDefault(type, 0))));
+            }
+            Map<Integer, EmployeeStarCfg> stars = starConfigs == null ? null : starConfigs.get(employeeId);
+            EmployeeStarCfg star = stars == null ? null : stars.get(employee.getStar());
+            if (star != null && star.getSupervisorBonus() != null) {
+                star.getSupervisorBonus().forEach((type, value) -> addEmployeeAttribute(bonuses, type, value));
             }
             if (employee.getSkillLevels() == null) {
                 continue;
