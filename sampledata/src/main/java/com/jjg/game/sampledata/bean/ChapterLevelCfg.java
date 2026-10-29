@@ -39,6 +39,10 @@ public class ChapterLevelCfg extends BaseCfgBean {
   protected int numOperations;
   /** 单次点亮获得道具 */
   protected Map<Integer,Long> rewardProps;
+  /** 战斗角色敌方 */
+  protected int roleID_Enemy;
+  /** 战斗角色我方 */
+  protected int roleID_Mine;
   /** 剧情脚本id */
   protected int scriptId;
   /** 剧情跳过简介多语言ID */
@@ -96,6 +100,16 @@ public class ChapterLevelCfg extends BaseCfgBean {
   /** 返回单次点亮获得道具 */
   public Map<Integer,Long> getRewardProps() {
     return rewardProps;
+  }
+
+  /** 返回战斗角色敌方 */
+  public int getRoleID_Enemy() {
+    return roleID_Enemy;
+  }
+
+  /** 返回战斗角色我方 */
+  public int getRoleID_Mine() {
+    return roleID_Mine;
   }
 
   /** 返回剧情脚本id */
