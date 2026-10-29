@@ -1124,7 +1124,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         return result;
     }
 
-    /** 加载或切换场景时，补齐当前设备已经满足条件的区域。 */
+    /** 加载或切换场景时，补齐当前设备和装饰已经满足条件的区域。 */
     public void initializeBuildingAreas(SimCasinoData casino) {
         if (casino == null || casino.getBuildingData() == null) {
             return;
@@ -1137,12 +1137,15 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         if (areas.isEmpty()) {
             return;
         }
-        BuildingUnlockEquipmentData equipment = configCache.getBuildingUnlockEquipmentDataByBuildId(data.getId());
-        List<Integer> unlocked = equipment == null ? null : equipment.getLevelUnlockEquipment(data.getLevel());
+        Set<Integer> unlocked = configCache.getBuildingAreaUnlockIds(data.getId(), data.getLevel());
         for (BuildingUpgradeAreaCfg area : areas) {
             List<Integer> required = area.getUnlockEquipment();
-            if (required == null || required.isEmpty() || (unlocked != null && unlocked.containsAll(required))) {
+            if (required == null || required.isEmpty() || unlocked.containsAll(required)) {
                 data.getUnlockedAreaIds().add(area.getId());
+            }
+            if (data.getUnlockedAreaIds().contains(area.getId())
+                    && area.getSkinId() != null && !area.getSkinId().isEmpty()) {
+                data.getUnlockedSkinIds().add(area.getSkinId().getFirst());
             }
         }
     }

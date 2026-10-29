@@ -102,6 +102,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private volatile Map<Integer, Map<Integer, List<BuildLevelMaxInfo>>> buildingLevelMaxInfoMap;
     //建筑等级解锁设备的信息
     private volatile Map<Integer, BuildingUnlockEquipmentData> buildingUnlockEquipmentDataMap;
+    //建筑区域解锁条件：buildingId -> level -> 累计已解锁设备和装饰
+    private volatile Map<Integer, NavigableMap<Integer, Set<Integer>>> buildingAreaUnlockIdsMap = Map.of();
     //建筑区域配置 buildingId -> cfgs
     private volatile Map<Integer, List<BuildingUpgradeAreaCfg>> buildingUpgradeAreaCfgMap = Map.of();
 
@@ -467,6 +469,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         Map<Integer, NavigableMap<Integer, BuildingUpgradeTableCfg>> tmp = new HashMap<>();
         Map<Integer, Map<Integer, List<BuildLevelMaxInfo>>> tmpBuildingLevelMaxInfoMap = new HashMap<>();
         Map<Integer, BuildingUnlockEquipmentData> tmpBuildingUnlockEquipmentDataMap = new HashMap<>();
+        Map<Integer, NavigableMap<Integer, Set<Integer>>> tmpBuildingAreaUnlockIdsMap = new HashMap<>();
         for (BuildingUpgradeTableCfg cfg : GameDataManager.getBuildingUpgradeTableCfgList()) {
             tmp.computeIfAbsent(cfg.getBuildingID(), k -> new TreeMap<>()).put(cfg.getLevel(), cfg);
         }
@@ -477,14 +480,22 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
             BuildingUnlockEquipmentData equipmentData = new BuildingUnlockEquipmentData();
             equipmentData.setBuildId(buildingId);
             Set<Integer> equipmentIds = new LinkedHashSet<>();
+            Set<Integer> areaUnlockIds = new HashSet<>();
+            NavigableMap<Integer, Set<Integer>> areaUnlockLevels = new TreeMap<>();
             for (BuildingUpgradeTableCfg cfg : levels.values()) {
                 if (cfg.getUnlockEquipment() != null && !cfg.getUnlockEquipment().isEmpty()) {
                     equipmentIds.addAll(cfg.getUnlockEquipment());
+                    areaUnlockIds.addAll(cfg.getUnlockEquipment());
                     equipmentData.setMaxLevel(cfg.getLevel());
                     equipmentData.setLevelUnlockEquipment(cfg.getLevel(), List.copyOf(equipmentIds));
                 }
+                if (cfg.getUnlockDecorationId() != null) {
+                    areaUnlockIds.addAll(cfg.getUnlockDecorationId());
+                }
+                areaUnlockLevels.put(cfg.getLevel(), Set.copyOf(areaUnlockIds));
             }
             tmpBuildingUnlockEquipmentDataMap.put(buildingId, equipmentData);
+            tmpBuildingAreaUnlockIdsMap.put(buildingId, areaUnlockLevels);
 
             BuildingAreaTableCfg areaCfg = GameDataManager.getBuildingAreaTableCfg(buildingId);
             if (areaCfg == null) {
@@ -519,6 +530,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         this.buildingUpgradeCfgMap = tmp;
         this.buildingLevelMaxInfoMap = tmpBuildingLevelMaxInfoMap;
         this.buildingUnlockEquipmentDataMap = tmpBuildingUnlockEquipmentDataMap;
+        this.buildingAreaUnlockIdsMap = tmpBuildingAreaUnlockIdsMap;
     }
 
     private void loadBuildingUpgradeAreaConfig() {
@@ -1092,6 +1104,12 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
     public List<BuildingUpgradeAreaCfg> getBuildingUpgradeAreaCfgs(int buildingId) {
         return buildingUpgradeAreaCfgMap.getOrDefault(buildingId, Collections.emptyList());
+    }
+
+    public Set<Integer> getBuildingAreaUnlockIds(int buildingId, int level) {
+        NavigableMap<Integer, Set<Integer>> levels = buildingAreaUnlockIdsMap.get(buildingId);
+        Map.Entry<Integer, Set<Integer>> entry = levels == null ? null : levels.floorEntry(level);
+        return entry == null ? Set.of() : entry.getValue();
     }
 
     public static long getBuildingLevelValue(List<? extends Number> values, int level, int startLevel) {
