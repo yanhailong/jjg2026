@@ -6,7 +6,6 @@ import com.jjg.game.core.pb.KVLongInfo;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
-import com.jjg.game.sim.constant.BuildingOutputType;
 import com.jjg.game.sim.constant.BuildingType;
 import com.jjg.game.sim.constant.ServerBuildingType;
 import com.jjg.game.sim.data.*;
@@ -73,11 +72,13 @@ public final class SimPbConverter {
         BuildingInfo info = new BuildingInfo();
         info.id = buildingData.getId();
         info.level = buildingData.getLevel();
+        BuildingAreaTableCfg buildingAreaTableCfg = GameDataManager.getBuildingAreaTableCfg(buildingData.getId());
         BuildingUpgradeTableCfg nextRewardCfg = simConfigCacheService.getNextBuildingUpgradeRewardCfg(info.id, info.level);
         info.targetLevel = nextRewardCfg == null ? 0 : nextRewardCfg.getLevel();
         info.nextRewards = nextRewardCfg == null ? List.of() : ItemUtils.buildItemInfo(nextRewardCfg.getUpgradeReward());
         info.buildingUpgrade1ConditonInfo = toBuildingUpgradeConditonInfo(simConfigCacheService, buildingData, 1);
-        info.buildingUpgrade10ConditonInfo = toBuildingUpgradeConditonInfo(simConfigCacheService, buildingData, 10);
+        info.buildingUpgrade10ConditonInfo = info.level >= buildingAreaTableCfg.getUnlockUp10Level()
+                ? toBuildingUpgradeConditonInfo(simConfigCacheService, buildingData, 10) : null;
 
         //交互次数
         info.interactCount = buildingData.getReceptCount();
@@ -90,22 +91,6 @@ public final class SimPbConverter {
                 //运营看板每分钟获客量
                 info.interactCount = Math.toIntExact(CommonUtil.getContext()
                         .getBean(SimOperationDashboardService.class).customerAcquisitionPerMinute(ctx, casinoCfg, ctx.getCurrentCasino(), System.currentTimeMillis()));
-            }
-        } else {
-            int marketBuildId = simConfigCacheService.getCasinoManageBuildId(ctx.getCurrentCasino().getCasinoId(), ServerBuildingType.MARKETING);
-            if (marketBuildId == info.id) {
-                List<OperationVisitorQualityRate> qualityRates = CommonUtil.getContext()
-                        .getBean(SimOperationDashboardService.class)
-                        .marketingVisitorQualityRates(ctx.getCurrentCasino());
-                if (!qualityRates.isEmpty()) {
-                    info.guestQualityList = new ArrayList<>();
-                    for (OperationVisitorQualityRate rate : qualityRates) {
-                        KVInfo kvInfo = new KVInfo();
-                        kvInfo.key = rate.quality;
-                        kvInfo.value = rate.rate / 100;
-                        info.guestQualityList.add(kvInfo);
-                    }
-                }
             }
         }
 
@@ -125,23 +110,14 @@ public final class SimPbConverter {
             info.areaSkinInfos.add(skins);
         }
 
-        BuildingAreaTableCfg buildingAreaTableCfg = GameDataManager.getBuildingAreaTableCfg(buildingData.getId());
-
-        info.upgradeOutput = buildingService.getBaseOutput(buildingData.getId(), buildingData.getLevel())
-                .getOrDefault(BuildingOutputType.GOLD, 0L);
-        info.upgradeExp = 0;
-
-        info.buileTypeValue = buildingAreaTableCfg.getTypeValue();
-
         if (buildingAreaTableCfg.getType() == BuildingType.GAME.code() || buildingAreaTableCfg.getType() == BuildingType.REST.code()) {
             for (BonusInfo bonusInfo : info.bonusInfos) {
+                bonusInfo.baseValue *= 60L;
                 bonusInfo.totalValue *= 60L;
                 for (KVLongInfo bonus : bonusInfo.fixedValueAddList) {
                     bonus.value *= 60L;
                 }
             }
-
-            info.upgradeOutput *= 60L;
         }
         return info;
     }

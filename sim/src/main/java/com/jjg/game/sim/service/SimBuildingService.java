@@ -648,6 +648,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
             if (bonusInfos != null) {
                 BonusInfo info = new BonusInfo();
                 info.typeValue = type.getCode();
+                info.baseValue = baseVal;
                 info.totalValue = actual;
                 info.fixedValueAddList = new ArrayList<>();
                 info.fixedValueAddList.add(new KVLongInfo(SimConstant.BonusSource.EMPLOYEE, employeeFixed));
@@ -1149,35 +1150,33 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
     /**
      * 获取该建筑指定等级的基础值 (不含主管/雇员加成):
      * 游戏区/休息区为每分钟产出, 管理区为部门属性值。
+     * 产出类型取建筑 typeValue 与 UpgradeOutput 的交集。
+     * 各产出按当前等级段的起始值 + 等级差 × 同类型增量计算。
      */
     public Map<BuildingOutputType, Long> getBaseOutput(int buildingId, int level) {
-        BuildingAreaTableCfg buildingAreaTableCfg = GameDataManager.getBuildingAreaTableCfg(buildingId);
-        if (buildingAreaTableCfg == null) {
+        BuildingAreaTableCfg areaCfg = GameDataManager.getBuildingAreaTableCfg(buildingId);
+        if (areaCfg == null) {
             return Collections.emptyMap();
         }
-        List<Integer> typeValues = buildingAreaTableCfg.getTypeValue();
+        List<Integer> typeValues = areaCfg.getTypeValue();
         if (typeValues == null || typeValues.isEmpty()) {
             return Collections.emptyMap();
         }
         BuildingUpgradeTableCfg cfg = configCache.getBuildingUpgradeCfg(buildingId, level);
-        if (cfg == null) {
+        if (cfg == null || cfg.getUpgradeOutput() == null || cfg.getUpgradeOutput().isEmpty()) {
             return Collections.emptyMap();
         }
+        Map<Integer, Long> additions = cfg.getUpgradeOutputAdd();
+        long offset = (long) level - cfg.getLevel();
         Map<BuildingOutputType, Long> map = new EnumMap<>(BuildingOutputType.class);
         for (Integer typeValue : typeValues) {
             BuildingOutputType outputType = BuildingOutputType.fromCode(typeValue);
-            if (outputType == null) {
+            Long initial = cfg.getUpgradeOutput().get(typeValue);
+            if (outputType == null || initial == null) {
                 continue;
             }
-            List<? extends Number> values;
-            switch (outputType) {
-                case GOLD -> values = cfg.getUpgradeOutput();
-                case SERVICE -> values = cfg.getService();
-                case AWARENESS -> values = cfg.getPopularity();
-                case EXPOSURE -> values = cfg.getExposure();
-                default -> { continue; }
-            }
-            map.put(outputType, SimConfigCacheService.getBuildingLevelValue(values, level, cfg.getLevel()));
+            long addition = additions == null ? 0 : additions.getOrDefault(typeValue, 0L);
+            map.put(outputType, initial + offset * addition);
         }
         return map;
     }

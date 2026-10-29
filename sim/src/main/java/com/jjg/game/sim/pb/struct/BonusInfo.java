@@ -9,8 +9,10 @@ import java.util.List;
 @ProtobufMessage
 @ProtoDesc("建筑加成信息")
 public class BonusInfo {
-    @ProtoDesc("BuildingAreaTable表的typeValue值")
+    @ProtoDesc("产出类型，BuildingOutputType编号")
     public int typeValue;
+    @ProtoDesc("当前等级未加成的基础值；与totalValue单位相同")
+    public long baseValue;
     @ProtoDesc("包含全部加成的实际值；游戏区/休息区为每小时产出，管理区为属性值")
     public long totalValue;
     @ProtoDesc("固定值来源：1藏品、2雇员、3成就、4 Buff；与totalValue单位相同")
