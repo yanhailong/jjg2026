@@ -33,6 +33,8 @@ public class ChapterLevelCfg extends BaseCfgBean {
   protected int levelLimit;
   /** 关卡类型 */
   protected int levelType;
+  /** 关卡ID任务进度用 */
+  protected int levelnumId;
   /** 关卡名称多语言ID */
   protected int nameId;
   /** 单格点亮次数 */
@@ -85,6 +87,11 @@ public class ChapterLevelCfg extends BaseCfgBean {
   /** 返回关卡类型 */
   public int getLevelType() {
     return levelType;
+  }
+
+  /** 返回关卡ID任务进度用 */
+  public int getLevelnumId() {
+    return levelnumId;
   }
 
   /** 返回关卡名称多语言ID */

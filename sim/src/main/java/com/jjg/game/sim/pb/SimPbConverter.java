@@ -102,11 +102,12 @@ public final class SimPbConverter {
         for (BuildingUpgradeAreaCfg area : simConfigCacheService.getBuildingUpgradeAreaCfgs(buildingData.getId())) {
             BuildingAreaSkinInfo skins = new BuildingAreaSkinInfo();
             skins.areaId = area.getAreaId();
+            skins.areaLanguageId = area.getLanguageId();
             skins.unlocked = buildingData.getUnlockedAreaIds().contains(area.getId());
-            skins.unlockedSkinIds = area.getSkinId() == null ? List.of()
-                    : area.getSkinId().stream().filter(buildingData.getUnlockedSkinIds()::contains).toList();
+            List<Integer> skinIds = area.getSkinId() == null ? List.of() : area.getSkinId();
+            skins.skinOriginInfos = skinIds.stream().map(id -> toSkinOriginInfo(buildingData, id)).toList();
             int using = buildingData.getUsingSkinIds().getOrDefault(area.getId(), 0);
-            skins.usingSkinId = skins.unlockedSkinIds.contains(using) ? using : 0;
+            skins.usingSkinId = skinIds.contains(using) && buildingData.getUnlockedSkinIds().contains(using) ? using : 0;
             info.areaSkinInfos.add(skins);
         }
 
@@ -117,6 +118,28 @@ public final class SimPbConverter {
                 for (KVLongInfo bonus : bonusInfo.fixedValueAddList) {
                     bonus.value *= 60L;
                 }
+            }
+        }
+        return info;
+    }
+
+    private static SkinOriginInfo toSkinOriginInfo(BuildingData building, int skinId) {
+        BuildingSkinCfg cfg = GameDataManager.getBuildingSkinCfg(skinId);
+        SkinOriginInfo info = new SkinOriginInfo();
+        info.id = skinId;
+        info.languageId = cfg.getLanguageId();
+        info.skinLanguageId = cfg.getSkinLanguageId();
+        info.unlock = building.getUnlockedSkinIds().contains(skinId);
+        info.unlockTypeItems = List.of();
+        info.needItems = cfg.getNeedItemId() > 0
+                ? List.of(ItemUtils.buildItemInfo(cfg.getNeedItemId(), 1L)) : List.of();
+        List<Integer> condition = cfg.getUnlockCondition();
+        if (condition != null && !condition.isEmpty()) {
+            info.unlockType = condition.getFirst();
+            if (info.unlockType == 2 && condition.size() == 3) {
+                info.unlockTypeItems = List.of(ItemUtils.buildItemInfo(condition.get(1), condition.get(2).longValue()));
+            } else if (info.unlockType >= 3 && info.unlockType <= 6 && condition.size() > 1) {
+                info.unlockTypeValue = condition.get(1);
             }
         }
         return info;
