@@ -388,7 +388,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
             int targetLevel = Math.min(areaCfg.getMaxLevel(), beforeLevel + (up10Level ? 10 : 1));
             Map<Integer, Long> totalCost = new HashMap<>();
             Map<Integer, Long> totalReward = new HashMap<>();
-            //每一级按升级前等级选档；整次预检通过前不扣费、不修改等级。
+            //消耗按升级前等级选档，奖励按到达等级精确匹配；整次预检通过前不扣费、不修改等级。
             for (int level = beforeLevel; level < targetLevel; level++) {
                 BuildingUpgradeTableCfg cfg = configCache.getBuildingUpgradeCfg(buildingId, level);
                 res.code = checkBuildingUpgrade(ctx, buildingId, level, cfg);
@@ -396,7 +396,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                     return;
                 }
                 cfg.getCostPerLevel().forEach((id, count) -> totalCost.merge(id, count, Long::sum));
-                configCache.getBuildingUpgradeReward(buildingId, level)
+                configCache.getBuildingUpgradeReward(buildingId, level + 1)
                         .forEach((id, count) -> totalReward.merge(id, count, Long::sum));
             }
             CommonResult<ItemOperationResult> removed = playerPackService.removeItems(

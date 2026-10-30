@@ -1068,20 +1068,15 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return entry == null ? null : entry.getValue();
     }
 
+    /** 按实际到达等级精确获取阶段奖励。 */
     public Map<Integer, Long> getBuildingUpgradeReward(int buildingId, int level) {
         if (buildingUpgradeCfgMap == null) {
             return Collections.emptyMap();
         }
         NavigableMap<Integer, BuildingUpgradeTableCfg> levels = buildingUpgradeCfgMap.get(buildingId);
-        Integer startLevel = levels == null ? null : levels.floorKey(level);
-        if (startLevel != null) {
-            for (BuildingUpgradeTableCfg cfg : levels.tailMap(startLevel, true).values()) {
-                if (cfg.getUpgradeReward() != null && !cfg.getUpgradeReward().isEmpty()) {
-                    return cfg.getUpgradeReward();
-                }
-            }
-        }
-        return Collections.emptyMap();
+        BuildingUpgradeTableCfg cfg = levels == null ? null : levels.get(level);
+        return cfg == null || cfg.getUpgradeReward() == null
+                ? Collections.emptyMap() : cfg.getUpgradeReward();
     }
 
     /**
