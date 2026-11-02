@@ -419,7 +419,6 @@ public class SimTaskService implements IRedDotService {
             }
             taskLogger.completeTask(ctx.playerId(), cfg.getId());
             unlockTaskFunction(ctx, cfg.getFunctionId());
-            guideService.trigger(ctx, SimConstant.GuideCondition.TASK_COMPLETED, cfg.getId(), true);
             if (cfg.getTaskType() == TaskConstant.TaskType.MAIN_LINE) {
                 mainTaskLogger.completed(ctx.playerId(), player.getNickName(), cfg.getId(),
                         conditionId, target, target, now);
@@ -784,7 +783,6 @@ public class SimTaskService implements IRedDotService {
         taskLogger.completeTask(player.getId(), node.getConfigId());
         log.info("玩家[{}]完成 sim 任务[{}]", player.getId(), node.getConfigId());
         unlockTaskFunction(ctx, cfg.getFunctionId());
-        guideService.trigger(ctx, SimConstant.GuideCondition.TASK_COMPLETED, node.getConfigId(), true);
         if (cfg.getTaskType() == TaskConstant.TaskType.MAIN_LINE) {
             mainTaskLogger.completed(player.getId(), player.getNickName(), cfg.getId(),
                     conditionId, completedProgress, target, now);
@@ -813,6 +811,9 @@ public class SimTaskService implements IRedDotService {
                 achievementTaskLogger.rewarded(player.getId(), player.getNickName(), cfg.getId(),
                         cfg.getBadgeID(), Collections.emptyList(), now);
             }
+            // 无奖励任务没有手动领奖步骤，进入已领取态即等同于领奖成功。
+            guideService.trigger(ctx, SimConstant.GuideCondition.TASK_REWARD_CLAIMED,
+                    node.getConfigId(), true);
             Task next = advance(ctx, player, data, node, cfg);
             if (next != null) {
                 changed.add(next);
@@ -843,6 +844,10 @@ public class SimTaskService implements IRedDotService {
      * 领取任务奖励: 校验完成态 -> 发奖 -> 已领取 -> 续接下一节点。
      */
     public ResSimTaskReward claimReward(SimPlayerContext ctx, int taskId) {
+        return claimReward(ctx, taskId, null);
+    }
+
+    public ResSimTaskReward claimReward(SimPlayerContext ctx, int taskId, String currentGuidePath) {
         ResSimTaskReward res = new ResSimTaskReward(Code.SUCCESS);
         SimTaskData data = ctx.getSimTaskData();
         Player player = resolvePlayer(ctx);
@@ -911,6 +916,11 @@ public class SimTaskService implements IRedDotService {
             simMedalService.refreshAchievementState(ctx);
         }
         res.rewards = ItemUtils.buildItemInfosByItem(rewardItems);
+        res.guideGroupIds = currentGuidePath == null
+                ? guideService.trigger(ctx, SimConstant.GuideCondition.TASK_REWARD_CLAIMED,
+                taskId, false)
+                : guideService.triggerForPath(ctx, SimConstant.GuideCondition.TASK_REWARD_CLAIMED,
+                taskId, currentGuidePath, false);
         //领奖后强制下个 tick 尽快落库(走 autosave 规范路径), 收窄崩溃重复领取窗口
         ctx.setLastSaveTime(0);
         updateTaskRedDot(ctx);

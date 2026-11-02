@@ -392,13 +392,13 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
 
     @Override
     @RpcCallSetting(processorModKey = "#arg0")
-    public ResSimTaskReward claimSimTaskReward(long playerId, int taskId) {
+    public ResSimTaskReward claimSimTaskReward(long playerId, int taskId, String currentGuidePath) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
         if (ctx == null) {
             log.warn("领取 sim 任务奖励失败，未找到玩家 sim 数据 playerId={},taskId={}", playerId, taskId);
             return new ResSimTaskReward(Code.NOT_FOUND);
         }
-        return simTaskService.claimReward(ctx, taskId);
+        return simTaskService.claimReward(ctx, taskId, currentGuidePath);
     }
 
     @Override
