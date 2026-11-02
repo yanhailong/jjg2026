@@ -349,6 +349,10 @@ public interface SimConstant {
         int RES_TOKEN_SHOP = BASE_MSG_PREFIX | 0xB3;
         int REQ_TOKEN_SHOP_EXCHANGE = BASE_MSG_PREFIX | 0xB4;
         int RES_TOKEN_SHOP_EXCHANGE = BASE_MSG_PREFIX | 0xB5;
+
+        //领取建筑累计的游客奖励
+        int REQ_CLAIM_BUILDING_GUEST_REWARDS = BASE_MSG_PREFIX | 0xB6;
+        int RES_CLAIM_BUILDING_GUEST_REWARDS = BASE_MSG_PREFIX | 0xB7;
     }
 
     interface SpecialGuest {

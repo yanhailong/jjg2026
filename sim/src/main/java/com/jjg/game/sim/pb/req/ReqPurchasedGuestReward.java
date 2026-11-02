@@ -11,7 +11,7 @@ import com.jjg.game.sim.constant.SimConstant;
  * @date 2026/6/15
  */
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_GAME, cmd = SimConstant.MsgBean.REQ_PURCHASED_GUEST_REWARD)
-@ProtoDesc("请求领取购买游客奖励 (按目的地逐个领取)")
+@ProtoDesc("确认购买游客到达目的地，将该点奖励存入建筑")
 public class ReqPurchasedGuestReward extends AbstractMessage {
     @ProtoDesc("购买游客唯一id")
     public String uid;

@@ -24,6 +24,8 @@ public class BuildingData {
     private int progress;
     //接待次数
     private int receptCount;
+    //待领取的游客奖励 (道具 id -> 累计数量)
+    private Map<Integer, Long> guestRewards = new HashMap<>();
     //已解锁的 BuildingUpgradeArea 配置 id
     private Set<Integer> unlockedAreaIds = new HashSet<>();
     //已解锁皮肤；全部参与所属区域的 Buff 计算
@@ -77,6 +79,14 @@ public class BuildingData {
 
     public void setReceptCount(int receptCount) {
         this.receptCount = receptCount;
+    }
+
+    public Map<Integer, Long> getGuestRewards() {
+        return guestRewards;
+    }
+
+    public void setGuestRewards(Map<Integer, Long> guestRewards) {
+        this.guestRewards = guestRewards;
     }
 
     public Set<Integer> getUnlockedAreaIds() {

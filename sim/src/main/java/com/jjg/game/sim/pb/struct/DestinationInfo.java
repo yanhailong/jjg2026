@@ -21,7 +21,7 @@ public class DestinationInfo {
     public int deviceId;
     @ProtoDesc("奖励")
     public List<ItemInfo> rewards;
-    @ProtoDesc("购买游客该目的地奖励是否已领取 (重连时据此判断剩余可领)")
+    @ProtoDesc("购买游客该目的地奖励是否已存入建筑 (重连时据此判断剩余行程)")
     public boolean claimed;
     @ProtoDesc("交互时间(单位:毫秒)")
     public int interactTime;

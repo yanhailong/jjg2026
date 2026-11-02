@@ -31,4 +31,6 @@ public class BuildingInfo {
     public BuildingUpgradeConditonInfo buildingUpgrade1ConditonInfo;
     @ProtoDesc("升10级的条件，建筑等级低于unlockUp10Level时为空")
     public BuildingUpgradeConditonInfo buildingUpgrade10ConditonInfo;
+    @ProtoDesc("建筑累计待领取的游客奖励 (道具id及数量)")
+    public List<ItemInfo> guestRewards;
 }

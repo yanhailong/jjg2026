@@ -294,7 +294,7 @@ public class SimManager {
                 res.researchPoint = (int) playerPackService.getItemCount(ctx.playerId(), itemCfg.getId());
             }
 
-            //已生成待领奖的购买游客 (断线重连补发, 客户端凭 uid 领奖)
+            //尚未完成行程的购买游客 (断线重连补发，客户端凭 uid 确认到达目的地)
             Map<String, PurchasedGuestData> purchasedGuestMap = ctx.getCurrentCasino().getPurchasedGuestMap();
             if (purchasedGuestMap != null && !purchasedGuestMap.isEmpty()) {
                 res.purchasedGuests = new ArrayList<>();
@@ -313,7 +313,6 @@ public class SimManager {
                 Iterator<GuestInfo> it = ctx.getCurrentCasino().getCacheGuestInfoList().iterator();
                 while (it.hasNext()) {
                     GuestInfo guestInfo = it.next();
-                    simGuestService.handCacheGuest(ctx, guestInfo);
                     res.purchasedGuests.add(guestInfo);
                     it.remove();
                     cacheGuestSize++;
@@ -441,16 +440,6 @@ public class SimManager {
             //循环赛季对局中掉线: 记录离线时刻, 再次进入赛季时据此自动补完对局
             if (ctx.getSeasonPlayerData() != null) {
                 ctx.getSeasonPlayerData().markMatchOffline(now);
-            }
-
-            if (ctx.getCurrentCasino().getCacheGuestInfoList() != null && !ctx.getCurrentCasino().getCacheGuestInfoList().isEmpty()) {
-                //处理缓存的游客
-                Iterator<GuestInfo> it = ctx.getCurrentCasino().getCacheGuestInfoList().iterator();
-                while (it.hasNext()) {
-                    GuestInfo guestInfo = it.next();
-                    simGuestService.handCacheGuest(ctx, guestInfo);
-                    it.remove();
-                }
             }
 
             exitSaveData(playerId);

@@ -91,6 +91,43 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         return SimPlayerTickListener.super.order();
     }
 
+    /** 领取当前场景指定建筑的游客奖励；入账失败保留缓存，成功后先清空再推进统计。 */
+    public ResClaimBuildingGuestRewards claimGuestRewards(SimPlayerContext ctx, int buildingId) {
+        ResClaimBuildingGuestRewards res = new ResClaimBuildingGuestRewards(Code.SUCCESS);
+        res.buildingId = buildingId;
+        if (buildingId <= 0) {
+            res.code = Code.PARAM_ERROR;
+            return res;
+        }
+        SimCasinoData casino = ctx.getCurrentCasino();
+        BuildingData building = casino == null ? null : casino.findBuilding(buildingId);
+        if (building == null) {
+            res.code = Code.NOT_FOUND;
+            return res;
+        }
+        Map<Integer, Long> rewards = building.getGuestRewards();
+        if (rewards.isEmpty()) {
+            res.rewards = Collections.emptyList();
+            return res;
+        }
+        CommonResult<ItemOperationResult> result = playerPackService.addItems(
+                ctx.playerId(), rewards, AddType.SIM_GUEST_REWARDS, null, true);
+        if (result == null || !result.success()) {
+            res.code = result == null ? Code.FAIL : result.code;
+            log.warn("领取建筑游客奖励入账失败 playerId={},buildingId={},code={}",
+                    ctx.playerId(), buildingId, res.code);
+            return res;
+        }
+        building.setGuestRewards(new HashMap<>());
+        ctx.setLastSaveTime(0);
+        res.rewards = ItemUtils.buildItemInfo(rewards);
+        SimBaseData base = ctx.getSimBaseData();
+        base.addBusinessIncome(rewards.getOrDefault(ItemUtils.getGoldItemId(), 0L));
+        base.recordGuestOutputRewards(rewards, System.currentTimeMillis());
+        allianceEventService.onBusinessIncome(ctx.playerId(), rewards);
+        return res;
+    }
+
     /**
      * 获取建筑信息
      *

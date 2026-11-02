@@ -281,7 +281,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
 
     /**
      * 生成购买游客
-     * 预生成目的地序列和奖励并分配唯一 uid; 奖励不添加到玩家身上, 待客户端发起领奖请求时才添加
+     * 预生成目的地序列和奖励并分配唯一 uid; 客户端确认到达目的地后将奖励存入对应建筑
      *
      * @param ctx
      * @param guestId 购买的游客id
@@ -346,7 +346,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
                 continue;
             }
 
-            //预生成目的地序列和奖励 (奖励此时不添加到玩家身上, 待领奖请求时才添加)
+            //预生成目的地序列和奖励，到达目的地时存入对应建筑
             List<DestinationInfo> destinations = planDestinations(guest, visitorQuestCfg, casino, rewardedCount);
             if (destinations.isEmpty()) {
 //            log.warn("生成购买游客失败，目的地序列为空 playerId={},guestId={}", ctx.playerId(), guestId);
@@ -385,9 +385,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
     }
 
     /**
-     * 领取购买游客单个目的地的奖励 (客户端凭 uid + 目的地序号逐个发起):
-     * 奖励已在购买时预生成, 此时才添加到玩家身上 (无奖励交互点返回空); 同一目的地重复领取幂等;
-     * 全部目的地领取完毕后移除该购买游客。
+     * 确认购买游客到达单个目的地，将预生成奖励存入建筑；全部目的地完成后移除该游客。
      *
      * @param ctx
      * @param uid   购买游客唯一id
@@ -398,59 +396,53 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         res.uid = uid;
         res.index = index;
 
-        if (uid == null || uid.isEmpty()) {
+        if (uid == null || uid.isEmpty() || index < 0) {
+            res.code = Code.PARAM_ERROR;
+            ctx.send(res);
             log.warn("领取购买游客奖励失败，uid参数错误 playerId={},uid={}", ctx.playerId(), uid);
             return;
         }
 
         SimCasinoData casino = ctx.getCurrentCasino();
         if (casino == null) {
+            res.code = Code.NOT_FOUND;
+            ctx.send(res);
             log.warn("领取购买游客奖励失败，当前场景数据不存在 playerId={},uid={}", ctx.playerId(), uid);
             return;
         }
         PurchasedGuestData data = casino.findPurchasedGuest(uid);
         if (data == null) {
+            res.code = Code.NOT_FOUND;
+            ctx.send(res);
             log.warn("领取购买游客奖励失败，未找到对应购买游客 playerId={},uid={}", ctx.playerId(), uid);
             return;
         }
 
         Map<Integer, DestinationInfo> destinations = data.getDestinations();
-        if (destinations == null || index < 0 || destinations.isEmpty()) {
-            casino.removePurchasedGuest(uid);
+        if (destinations == null || destinations.isEmpty()) {
+            res.code = Code.NOT_FOUND;
+            ctx.send(res);
             log.warn("领取购买游客奖励失败，destinations为空 playerId={},uid={},index={}", ctx.playerId(), uid, index);
             return;
         }
 
         DestinationInfo dest = destinations.get(index);
         if (dest == null) {
-            casino.removePurchasedGuest(uid);
+            res.code = Code.NOT_FOUND;
+            ctx.send(res);
             log.warn("领取购买游客奖励失败，该目的地未找到 playerId={},uid={},index={}", ctx.playerId(), uid, index);
             return;
         }
 
-        //首次领取才添加道具; 重复领取直接回已有奖励 (幂等)
-        if (!dest.claimed) {
-            //奖励已在购买时预生成, 此时才添加到玩家身上
-            if (dest.rewards != null && !dest.rewards.isEmpty()) {
-                Map<Integer, Long> rewardsMap = new HashMap<>();
-                for (ItemInfo itemInfo : dest.rewards) {
-                    rewardsMap.merge(itemInfo.itemId, itemInfo.count, Long::sum);
-                }
-                //添加道具
-                CommonResult<ItemOperationResult> addResult = playerPackService.addItems(
-                        ctx.playerId(), rewardsMap, AddType.SIM_GUEST_REWARDS, null, false);
-                if (addResult == null || !addResult.success()) {
-                    res.code = addResult == null ? Code.FAIL : addResult.code;
-                    log.warn("领取购买游客奖励入账失败 playerId={},uid={},index={},code={}",
-                            ctx.playerId(), uid, index, res.code);
-                    ctx.send(res);
-                    return;
-                }
-                //经营信息: 购买游客交互产出金币计入经营收益
-                long destGold = rewardsMap.getOrDefault(ItemUtils.getGoldItemId(), 0L);
-                ctx.getSimBaseData().addBusinessIncome(destGold);
-                ctx.getSimBaseData().recordGuestOutputRewards(rewardsMap, System.currentTimeMillis());
-                allianceEventService.onBusinessIncome(ctx.playerId(), rewardsMap);
+        if (!dest.claimed && dest.rewards != null && !dest.rewards.isEmpty()) {
+            BuildingData building = casino.findBuilding(dest.buildingId);
+            if (building == null) {
+                res.code = Code.NOT_FOUND;
+                ctx.send(res);
+                return;
+            }
+            for (ItemInfo item : dest.rewards) {
+                building.getGuestRewards().merge(item.itemId, item.count, Long::sum);
             }
         }
         dest.claimed = true;
@@ -460,7 +452,8 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         if (destinations.isEmpty()) {
             casino.removePurchasedGuest(uid);
         }
-        log.info("领取购买游客奖励成功 playerId={},guestId={},uid={},index={}", ctx.playerId(), data.getGuestId(), uid, index);
+        log.info("购买游客目的地奖励存入建筑 playerId={},guestId={},uid={},index={},buildingId={}",
+                ctx.playerId(), data.getGuestId(), uid, index, dest.buildingId);
         ctx.send(res);
     }
 
@@ -483,18 +476,16 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
 
         for (int i = 0; i < num; i++) {
             //生成单个游客
+            GuestInfo guestInfo = generateOneGuest(ctx, guestDataWeightRandom, casinoCfg, now, specifyGuest);
+            if (guestInfo == null) {
+                continue;
+            }
             if (ctx.getInCasino().get() || ctx.getCurrentCasino().cacheGuestInfoListSize() > ctx.getCurrentCasino().getCacheGuestSize()) {
-                GuestInfo guestInfo = generateOneGuest(ctx, guestDataWeightRandom, casinoCfg, now, specifyGuest);
-                if (guestInfo != null) {
-                    //将游客信息放入列表
-                    notify.guests.add(guestInfo);
-                }
+                //将游客信息放入列表
+                notify.guests.add(guestInfo);
             } else {
-                GuestInfo guestInfo = generateOneGuest(ctx, guestDataWeightRandom, casinoCfg, now, specifyGuest, false);
-                if (guestInfo != null) {
-                    ctx.getCurrentCasino().addCacheGuestInfo(guestInfo);
-                    cacheSize++;
-                }
+                ctx.getCurrentCasino().addCacheGuestInfo(guestInfo);
+                cacheSize++;
             }
         }
 
@@ -541,10 +532,6 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         return guests;
     }
 
-    private GuestInfo generateOneGuest(SimPlayerContext ctx, WeightRandom<GuestData> guestDataWeightRandom, CasinoStatsSheetCfg casinoCfg, long now, GuestData specifyGuest) {
-        return generateOneGuest(ctx, guestDataWeightRandom, casinoCfg, now, specifyGuest, true);
-    }
-
     /**
      * 生成单个游客，不推送消息
      *
@@ -555,7 +542,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
      * @param specifyGuest
      * @return
      */
-    private GuestInfo generateOneGuest(SimPlayerContext ctx, WeightRandom<GuestData> guestDataWeightRandom, CasinoStatsSheetCfg casinoCfg, long now, GuestData specifyGuest, boolean addItems) {
+    private GuestInfo generateOneGuest(SimPlayerContext ctx, WeightRandom<GuestData> guestDataWeightRandom, CasinoStatsSheetCfg casinoCfg, long now, GuestData specifyGuest) {
         //加权随机选一个已解锁的游客
         GuestData guest = specifyGuest;
         if (guest == null) {
@@ -596,30 +583,16 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             return null;
         }
 
-        Map<Integer, Long> rewardsMap = new HashMap<>();
+        //奖励生成即存入建筑；场景外缓存的游客仅用于补发展示。
         for (DestinationInfo info : destinations) {
             if (info.rewards == null || info.rewards.isEmpty()) {
                 continue;
             }
 
-            for (ItemInfo itemInfo : info.rewards) {
-                rewardsMap.merge(itemInfo.itemId, itemInfo.count, Long::sum);
+            BuildingData building = ctx.getCurrentCasino().findBuilding(info.buildingId);
+            for (ItemInfo item : info.rewards) {
+                building.getGuestRewards().merge(item.itemId, item.count, Long::sum);
             }
-        }
-        if (!rewardsMap.isEmpty() && addItems) {
-            //添加道具
-            CommonResult<ItemOperationResult> addResult = playerPackService.addItems(
-                    ctx.playerId(), rewardsMap, AddType.SIM_GUEST_REWARDS, null, false);
-            if (addResult == null || !addResult.success()) {
-                log.warn("生成游客奖励入账失败 playerId={},guestId={},code={}", ctx.playerId(), guest.getId(),
-                        addResult == null ? Code.FAIL : addResult.code);
-                return null;
-            }
-
-            long guestGold = rewardsMap.getOrDefault(ItemUtils.getGoldItemId(), 0L);
-            ctx.getSimBaseData().addBusinessIncome(guestGold);
-            ctx.getSimBaseData().recordGuestOutputRewards(rewardsMap, now);
-            allianceEventService.onBusinessIncome(ctx.playerId(), rewardsMap);
         }
 
         //累加经验
@@ -2475,7 +2448,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         int completed = 0;
         for (String uid : logInfo.getGuestIds()) {
             PurchasedGuestData guest = casino.findPurchasedGuest(uid);
-            //游客领奖结束后会移除，找不到即表示该游客已全部领取。
+            //游客全部目的地完成后会移除，找不到即表示该游客行程已结束。
             if (guest == null || guest.getDestinations() == null) {
                 completed++;
                 continue;
@@ -2494,7 +2467,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         return completed;
     }
 
-    /** 游客奖励全部领取或订单超过十分钟后可领广告、品质商品奖励，入账成功后删除订单记录。 */
+    /** 游客行程全部完成或订单超过十分钟后可领广告、品质商品奖励，入账成功后删除订单记录。 */
     public void claimSpecialGuestRewards(SimPlayerContext ctx, String orderId) {
         ResSpecialGuestRewards res = new ResSpecialGuestRewards(Code.SUCCESS);
         try {
@@ -2545,7 +2518,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             }
             if (!canClaimSpecialGuestRewards(casino, logInfo, System.currentTimeMillis())) {
                 res.code = Code.FAIL;
-                log.warn("领取特殊游客订单奖励失败，游客奖励尚未全部领取且订单未超过十分钟 playerId={},casinoId={},orderId={},poolId={},cfgId={}",
+                log.warn("领取特殊游客订单奖励失败，游客行程尚未全部完成且订单未超过十分钟 playerId={},casinoId={},orderId={},poolId={},cfgId={}",
                         ctx.playerId(), casino.getCasinoId(), orderId, logInfo.getPoolId(), logInfo.getCfgId());
                 return;
             }
@@ -2909,39 +2882,6 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             }
         } catch (Exception e) {
             log.error("", e);
-        }
-    }
-
-    public void handCacheGuest(SimPlayerContext ctx, GuestInfo guestInfo) {
-        if (guestInfo.destinations == null || guestInfo.destinations.isEmpty()) {
-            return;
-        }
-
-        Map<Integer, Long> rewardsMap = new HashMap<>();
-        for (DestinationInfo info : guestInfo.destinations) {
-            if (info.rewards == null || info.rewards.isEmpty()) {
-                continue;
-            }
-
-            for (ItemInfo itemInfo : info.rewards) {
-                rewardsMap.merge(itemInfo.itemId, itemInfo.count, Long::sum);
-            }
-        }
-
-        if (!rewardsMap.isEmpty()) {
-            //添加道具
-            CommonResult<ItemOperationResult> addResult = playerPackService.addItems(
-                    ctx.playerId(), rewardsMap, AddType.SIM_GUEST_REWARDS, null, false);
-            if (addResult == null || !addResult.success()) {
-                log.warn("缓存游客奖励入账失败 playerId={},guestId={},code={}", ctx.playerId(), guestInfo.id,
-                        addResult == null ? Code.FAIL : addResult.code);
-                return;
-            }
-
-            long guestGold = rewardsMap.getOrDefault(ItemUtils.getGoldItemId(), 0L);
-            ctx.getSimBaseData().addBusinessIncome(guestGold);
-            ctx.getSimBaseData().recordGuestOutputRewards(rewardsMap, System.currentTimeMillis());
-            allianceEventService.onBusinessIncome(ctx.playerId(), rewardsMap);
         }
     }
 

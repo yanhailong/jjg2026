@@ -528,6 +528,12 @@ public class SimMessageHandler implements GmListener {
         }, ReqAllBuildingInfo.class);
     }
 
+    @Command(SimConstant.MsgBean.REQ_CLAIM_BUILDING_GUEST_REWARDS)
+    public void reqClaimBuildingGuestRewards(PlayerController playerController, ReqClaimBuildingGuestRewards req) {
+        execute(playerController, ctx -> ctx.send(buildingService.claimGuestRewards(ctx, req.buildingId)),
+                ReqClaimBuildingGuestRewards.class);
+    }
+
     /**
      * 升级建筑
      */
