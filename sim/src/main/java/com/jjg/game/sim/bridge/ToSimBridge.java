@@ -86,7 +86,7 @@ public interface ToSimBridge extends IGameRpc {
     /**
      * 在玩家的 sim owner 节点领取主线/成就任务奖励。
      */
-    ResSimTaskReward claimSimTaskReward(long playerId, int taskId);
+    ResSimTaskReward claimSimTaskReward(long playerId, int taskId, String currentGuidePath);
 
     /**
      * 在玩家所属 SIM 节点执行指定赌场拜访。

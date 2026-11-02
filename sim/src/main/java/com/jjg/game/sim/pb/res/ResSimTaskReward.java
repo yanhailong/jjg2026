@@ -25,6 +25,8 @@ public class ResSimTaskReward extends AbstractResponse {
     public Task nextTask;
     @ProtoDesc("任务奖励道具")
     public List<ItemInfo> rewards;
+    @ProtoDesc("本次领奖后首次触发的新手引导组，由当前玩家节点在领奖响应后通知")
+    public List<Integer> guideGroupIds;
 
     public ResSimTaskReward() {
         super(0);

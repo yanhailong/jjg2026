@@ -383,12 +383,12 @@ public interface SimConstant {
     }
 
     interface GuideCondition {
-        // 当前 Guide.xlsx 约定：1=创建新号、2=完成任务、3=场景累计等级、4=玩家等级、5=道具不足、6=获得道具、7=功能解锁、8=引导组完成、10=客户端事件。
+        // 当前 Guide.xlsx 约定：1=创建新号、2=领取任务奖励、3=场景累计等级、4=玩家等级、5=道具不足、6=获得道具、7=功能解锁、8=引导组完成、10=客户端事件。
         int NEW_PLAYER = 1;
         /**
-         * 完成模拟经营任务，参数为任务ID；任务达到完成态时触发，不要求领取奖励。
+         * 领取模拟经营任务奖励，参数为任务ID；只有奖励领取成功后才触发。
          */
-        int TASK_COMPLETED = 2;
+        int TASK_REWARD_CLAIMED = 2;
         int SCENE_TOTAL_LEVEL = 3;
         int PLAYER_LEVEL = 4;
         int ITEM_NOT_ENOUGH = 5;
@@ -404,7 +404,7 @@ public interface SimConstant {
 
     interface GuideTiming {
         /**
-         * 完成上一引导组后，延迟通知条件8触发的新引导组，给客户端留出结束表现时间。
+         * 业务响应后延迟通知新引导组，给客户端留出处理响应或结束上一组表现的时间。
          */
         long GROUP_FINISH_NOTIFY_DELAY_MILLIS = 300L;
         /**

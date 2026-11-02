@@ -42,7 +42,16 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
     private SimPackService simPackService;
 
     public List<Integer> trigger(SimPlayerContext ctx, int condition, int param, boolean notify) {
-        return trigger(ctx, condition, param, notify, true);
+        return trigger(ctx, condition, param, notify, true, null);
+    }
+
+    /**
+     * 按发起请求的实际场景触发引导。用于玩家在 SLOT 等非 SIM 节点操作后，
+     * 由 SIM owner 修改状态、再把首次触发结果返回当前节点通知客户端。
+     */
+    public List<Integer> triggerForPath(SimPlayerContext ctx, int condition, int param,
+                                        String currentPathName, boolean notify) {
+        return trigger(ctx, condition, param, notify, true, currentPathName);
     }
 
     /**
@@ -53,11 +62,11 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
         if (condition != SimConstant.GuideCondition.CLIENT_EVENT || param <= 0) {
             return Collections.emptyList();
         }
-        return trigger(ctx, condition, param, false, false);
+        return trigger(ctx, condition, param, false, false, null);
     }
 
     private List<Integer> trigger(SimPlayerContext ctx, int condition, int param,
-                                  boolean notify, boolean checkPath) {
+                                  boolean notify, boolean checkPath, String currentPathName) {
         if (ctx == null || ctx.getSimBaseData() == null) {
             return Collections.emptyList();
         }
@@ -70,7 +79,11 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
         List<Integer> deferred = new ArrayList<>(groups.size());
         for (int groupId : groups) {
             String requiredPathName = configService.pathNameOfGroup(groupId);
-            if (!checkPath || pathMatches(ctx, requiredPathName)) {
+            boolean pathMatched = currentPathName == null
+                    ? pathMatches(ctx, requiredPathName)
+                    : requiredPathName == null || requiredPathName.isBlank()
+                    || requiredPathName.equals(currentPathName);
+            if (!checkPath || pathMatched) {
                 if (base.triggerGuideGroup(groupId)) {
                     triggered.add(groupId);
                 }

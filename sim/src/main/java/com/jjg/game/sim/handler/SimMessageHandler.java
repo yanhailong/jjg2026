@@ -355,9 +355,7 @@ public class SimMessageHandler implements GmListener {
         }
     }
 
-    /**
-     * 在 poker 等当前游戏节点延迟发送条件8触发通知，保持响应先于通知。
-     */
+    /** 在当前游戏节点延迟发送引导触发通知，保持业务响应先于通知。 */
     private void notifyGuideTriggersDelayedOnCurrentNode(PlayerController playerController,
                                                          List<Integer> guideGroupIds) {
         if (guideGroupIds == null || guideGroupIds.isEmpty()) {
@@ -379,7 +377,7 @@ public class SimMessageHandler implements GmListener {
                                         NotifyGuideTrigger notify = new NotifyGuideTrigger(Code.SUCCESS);
                                         notify.guideGroupIds = groupSnapshot;
                                         playerController.send(notify);
-                                        log.info("当前游戏节点延迟发送新手引导组通知 playerId={},delayMs={},groups={}",
+                                        log.info("当前节点延迟发送新手引导组通知 playerId={},delayMs={},groups={}",
                                                 playerId,
                                                 SimConstant.GuideTiming.GROUP_FINISH_NOTIFY_DELAY_MILLIS,
                                                 groupSnapshot);
@@ -964,13 +962,18 @@ public class SimMessageHandler implements GmListener {
     public void reqSimTaskReward(PlayerController playerController, ReqSimTaskReward req) {
         long playerId = playerController.playerId();
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
+        String currentGuidePath = currentGuidePath(playerController, ctx);
         ResSimTaskReward response = ctx == null
-                ? claimTaskRewardRemotely(playerController, req.taskId)
-                : taskService.claimReward(ctx, req.taskId);
+                ? claimTaskRewardRemotely(playerController, req.taskId, currentGuidePath)
+                : taskService.claimReward(ctx, req.taskId, currentGuidePath);
         playerController.send(response);
+        if (response.code == Code.SUCCESS) {
+            notifyGuideTriggersDelayedOnCurrentNode(playerController, response.guideGroupIds);
+        }
     }
 
-    private ResSimTaskReward claimTaskRewardRemotely(PlayerController playerController, int taskId) {
+    private ResSimTaskReward claimTaskRewardRemotely(PlayerController playerController, int taskId,
+                                                     String currentGuidePath) {
         long playerId = playerController.playerId();
         ClusterClient client = simNodeService.getSimClusterClient(playerId, playerController.ipAddress());
         if (client == null) {
@@ -983,7 +986,7 @@ public class SimMessageHandler implements GmListener {
         try {
             rpcContext.withReqParameterBuilder(RpcReqParameterBuilder.create()
                     .addClusterClient(client).setTryMillisPerClient(1000));
-            ResSimTaskReward response = toSimBridge.claimSimTaskReward(playerId, taskId);
+            ResSimTaskReward response = toSimBridge.claimSimTaskReward(playerId, taskId, currentGuidePath);
             return response == null ? new ResSimTaskReward(Code.EXCEPTION) : response;
         } catch (Exception e) {
             log.error("跨节点领取 sim 任务奖励异常 playerId={},taskId={}", playerId, taskId, e);
@@ -991,6 +994,18 @@ public class SimMessageHandler implements GmListener {
         } finally {
             rpcContext.setReqParameterBuilder(previousBuilder);
         }
+    }
+
+    private String currentGuidePath(PlayerController playerController, SimPlayerContext ctx) {
+        if (ctx != null) {
+            return SimConstant.GuidePath.SIM_HALL;
+        }
+        Object scene = playerController.getScene();
+        if (scene != null && "com.jjg.game.slots.controller.SlotsRoomController"
+                .equals(scene.getClass().getName())) {
+            return SimConstant.GuidePath.SLOTS;
+        }
+        return null;
     }
 
     /**
