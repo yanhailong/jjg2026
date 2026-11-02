@@ -203,24 +203,24 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
             return 0;
         }
 
-        log.warn("newbieGuideDraw={}", newbieGuideDraw);
+//        log.warn("newbieGuideDraw={}", newbieGuideDraw);
 
         Integer fixedItemId = newbieGuideDraw.getFirst();
-        log.warn("fixedItemId={}", fixedItemId);
+//        log.warn("fixedItemId={}", fixedItemId);
         if (fixedItemId == null || fixedItemId <= 0) {
             return 0;
         }
 
         //首个引导id
         Integer firstGuideId = newbieGuideDraw.get(1);
-        log.warn("firstGuideId={}", firstGuideId);
+//        log.warn("firstGuideId={}", firstGuideId);
         if (firstGuideId == null || firstGuideId <= 0) {
             return 0;
         }
 
         //获取该引导所在的引导组
         int groupId = groupOfGuide(firstGuideId);
-        log.warn("firstGuideId={},groupId={}", firstGuideId, groupId);
+//        log.warn("firstGuideId={},groupId={}", firstGuideId, groupId);
         if (groupId < 1) {
             return 0;
         }
@@ -233,20 +233,17 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
 
         //获取指定引导组包含的全部步骤ID
         List<Integer> allGuideList = guideIdsOfGroup(groupId);
-        log.warn("allGuideList={}", allGuideList);
         if (allGuideList == null || allGuideList.isEmpty()) {
             return 0;
         }
 
         int maxGuideId = 0;
         for (int id : allGuideList) {
-            log.warn("hasCompletedGuideId={}", baseData.hasCompletedGuideId(id));
             if (baseData.hasCompletedGuideId(id) && id > maxGuideId) {
                 maxGuideId = id;
             }
         }
 
-        log.warn("maxGuideId={}", maxGuideId);
         if (maxGuideId < 1) {
             return 0;
         }

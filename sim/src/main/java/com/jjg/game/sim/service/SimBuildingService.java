@@ -9,7 +9,6 @@ import com.jjg.game.common.utils.TimeHelper;
 import com.jjg.game.core.base.condition.numeric.ActionConditionEvent;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
-import com.jjg.game.core.constant.GameConstant;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.logger.CoreLogger;
@@ -664,7 +663,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                                                              BuildingData building,
                                                              SimEmployeeAttributeService.Snapshot attributes,
                                                              List<BonusInfo> bonusInfos) {
-        long employeeOutput = attributes.professionAttribute(areaCfg.getEmployeeProfile()) / GameConstant.TEN_THOUSAND;
+        long employeeOutput = attributes.professionAttribute(areaCfg.getEmployeeProfile()) / 60;
         Map<BuildingOutputType, SimAttributeBonus> skinBonuses = buildingSkinBonuses(building);
         Map<BuildingOutputType, Long> result = new EnumMap<>(BuildingOutputType.class);
         for (Map.Entry<BuildingOutputType, Long> en : base.entrySet()) {
