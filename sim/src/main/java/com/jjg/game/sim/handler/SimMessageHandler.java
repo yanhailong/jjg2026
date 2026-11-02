@@ -86,6 +86,8 @@ public class SimMessageHandler implements GmListener {
     @Autowired
     private SimMiniShopService miniShopService;
     @Autowired
+    private TokenShopService tokenShopService;
+    @Autowired
     private SimNoAdsService noAdsService;
     @Autowired
     private SimTaskService taskService;
@@ -113,6 +115,49 @@ public class SimMessageHandler implements GmListener {
     private ToSimBridge toSimBridge;
     @Autowired
     private SimChapterService simChapterService;
+
+    @Command(SimConstant.MsgBean.REQ_TOKEN_SHOP)
+    public void reqTokenShop(PlayerController pc, ReqTokenShop req) {
+        ResTokenShop res = executeTokenShop(pc, ctx -> tokenShopService.list(ctx, req.type),
+                () -> toSimBridge.tokenShop(pc.playerId(), req.type), ResTokenShop::new);
+        res.type = req.type;
+        pc.send(res);
+    }
+
+    @Command(SimConstant.MsgBean.REQ_TOKEN_SHOP_EXCHANGE)
+    public void reqTokenShopExchange(PlayerController pc, ReqTokenShopExchange req) {
+        ResTokenShopExchange res = executeTokenShop(pc, ctx -> tokenShopService.exchange(ctx, req.goodsId, req.count),
+                () -> toSimBridge.tokenShopExchange(pc.playerId(), req.goodsId, req.count), ResTokenShopExchange::new);
+        res.goodsId = req.goodsId;
+        pc.send(res);
+    }
+
+    private <T extends AbstractResponse> T executeTokenShop(PlayerController pc, Function<SimPlayerContext, T> local,
+                                                           Supplier<T> remote, IntFunction<T> error) {
+        try {
+            SimPlayerContext ctx = simPlayerContextRegistry.getContext(pc.playerId());
+            if (ctx != null) {
+                return local.apply(ctx);
+            }
+            ClusterClient client = simNodeService.getSimClusterClient(pc.playerId(), pc.ipAddress());
+            if (client == null) {
+                return error.apply(Code.NOT_FOUND);
+            }
+            GameRpcContext rpc = GameRpcContext.getContext();
+            RpcReqParameterBuilder previous = rpc.getReqParameterBuilder();
+            try {
+                rpc.withReqParameterBuilder(RpcReqParameterBuilder.create()
+                        .addClusterClient(client).setTryMillisPerClient(1000));
+                T res = remote.get();
+                return res == null ? error.apply(Code.EXCEPTION) : res;
+            } finally {
+                rpc.setReqParameterBuilder(previous);
+            }
+        } catch (RuntimeException e) {
+            log.error("代币商店请求处理异常 playerId={}", pc.playerId(), e);
+            return error.apply(Code.EXCEPTION);
+        }
+    }
 
     @Command(SimConstant.MsgBean.REQ_BUY_MINI_SHOP)
     public void reqBuyMiniShop(PlayerController playerController, ReqBuyMiniShop req) {

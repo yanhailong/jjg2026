@@ -89,6 +89,19 @@ public class SimBaseData extends AbstractData {
     private boolean noads;
     // 已发放免广告赠品的订单，权益落库重试时不重复发奖。
     private String noAdsOrderId;
+    //代币商店限购记录，玩家全局共享，不随场景、赛季或联盟变化清空
+    private Map<Integer, TokenShopPurchaseData> tokenShopPurchases;
+
+    public Map<Integer, TokenShopPurchaseData> getTokenShopPurchases() {
+        if (tokenShopPurchases == null) {
+            tokenShopPurchases = new HashMap<>();
+        }
+        return tokenShopPurchases;
+    }
+
+    public void setTokenShopPurchases(Map<Integer, TokenShopPurchaseData> tokenShopPurchases) {
+        this.tokenShopPurchases = tokenShopPurchases;
+    }
 
     public String getNoAdsOrderId() {
         return noAdsOrderId;

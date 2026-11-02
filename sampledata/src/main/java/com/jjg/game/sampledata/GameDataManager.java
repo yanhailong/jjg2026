@@ -267,6 +267,7 @@ public class GameDataManager {
     containerMap.put(StatusCfg.class, new StatusCfgContainer());
     containerMap.put(TaskCfg.class, new TaskCfgContainer());
     containerMap.put(TexasCfg.class, new TexasCfgContainer());
+    containerMap.put(TokenShopCfg.class, new TokenShopCfgContainer());
     containerMap.put(UndergarmentCfg.class, new UndergarmentCfgContainer());
     containerMap.put(UpcomingMobileGameCfg.class, new UpcomingMobileGameCfgContainer());
     containerMap.put(VideoRewardCfg.class, new VideoRewardCfgContainer());
@@ -2501,6 +2502,18 @@ public class GameDataManager {
 
   public static List<TexasCfg> getTexasCfgList() {
     return getInstance().getCfgContainer(TexasCfg.class).getCfgBeanList();
+  }
+
+  public static TokenShopCfg getTokenShopCfg(int key) {
+    return getInstance().getCfgContainer(TokenShopCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, TokenShopCfg> getTokenShopCfgMap() {
+    return getInstance().getCfgContainer(TokenShopCfg.class).getCfgBeanMap();
+  }
+
+  public static List<TokenShopCfg> getTokenShopCfgList() {
+    return getInstance().getCfgContainer(TokenShopCfg.class).getCfgBeanList();
   }
 
   public static UndergarmentCfg getUndergarmentCfg(int key) {

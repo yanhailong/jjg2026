@@ -43,6 +43,8 @@ import com.jjg.game.sim.pb.res.NotifySimTaskUpdate;
 import com.jjg.game.sim.pb.res.ResSimTaskReward;
 import com.jjg.game.sim.pb.res.ResSlotsStatistics;
 import com.jjg.game.sim.pb.res.ResBuyMiniShop;
+import com.jjg.game.sim.pb.res.ResTokenShop;
+import com.jjg.game.sim.pb.res.ResTokenShopExchange;
 import com.jjg.game.sim.pb.res.NotifyTogetherPlayInvite;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
 import com.jjg.game.sim.service.SimCoopTaskService;
@@ -53,6 +55,7 @@ import com.jjg.game.sim.service.SimPackService;
 import com.jjg.game.sim.service.SimSkillService;
 import com.jjg.game.sim.service.SimTaskService;
 import com.jjg.game.sim.service.SimMiniShopService;
+import com.jjg.game.sim.service.TokenShopService;
 import com.jjg.game.sim.service.SimNodeService;
 import com.jjg.game.sim.service.SimVisitService;
 import com.jjg.game.sim.service.SlotsStatisticsService;
@@ -109,6 +112,8 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
     private SimTaskService simTaskService;
     @Autowired
     private SimMiniShopService simMiniShopService;
+    @Autowired
+    private TokenShopService tokenShopService;
     @Autowired
     private SimNodeService simNodeService;
     @Autowired
@@ -359,6 +364,30 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
             return response;
         }
         return simMiniShopService.buy(ctx, productId);
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public ResTokenShop tokenShop(long playerId, int type) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
+        if (ctx == null) {
+            ResTokenShop res = new ResTokenShop(Code.NOT_FOUND);
+            res.type = type;
+            return res;
+        }
+        return tokenShopService.list(ctx, type);
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public ResTokenShopExchange tokenShopExchange(long playerId, int goodsId, int count) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
+        if (ctx == null) {
+            ResTokenShopExchange res = new ResTokenShopExchange(Code.NOT_FOUND);
+            res.goodsId = goodsId;
+            return res;
+        }
+        return tokenShopService.exchange(ctx, goodsId, count);
     }
 
     @Override

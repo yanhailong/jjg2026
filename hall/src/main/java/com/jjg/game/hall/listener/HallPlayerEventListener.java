@@ -249,7 +249,7 @@ public class HallPlayerEventListener implements SessionCloseListener, SessionEnt
             res.backgroundId = player.getBackgroundId();
             res.cardBackgroundId = player.getCardBackgroundId();
             //添加游戏列表
-            res.gameList = hallService.getSortGameList(player.getId(), playerSessionToken.getWesteId(), playerSessionToken.getClientVersion());
+//            res.gameList = hallService.getSortGameList(player.getId(), playerSessionToken.getWesteId(), playerSessionToken.getClientVersion());
             //添加跑马灯
             res.marqueeInfo = addMarquee();
 

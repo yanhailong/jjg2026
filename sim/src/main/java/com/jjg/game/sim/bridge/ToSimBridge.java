@@ -10,6 +10,8 @@ import com.jjg.game.season.pb.res.ResSeasonTrialProgress;
 import com.jjg.game.sim.data.*;
 import com.jjg.game.sim.pb.res.ResActivePass;
 import com.jjg.game.sim.pb.res.ResBuyMiniShop;
+import com.jjg.game.sim.pb.res.ResTokenShop;
+import com.jjg.game.sim.pb.res.ResTokenShopExchange;
 import com.jjg.game.sim.pb.res.ResSimTaskReward;
 import com.jjg.game.sim.pb.res.ResSlotsStatistics;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
@@ -22,6 +24,10 @@ import java.util.Map;
  * @date 2026/5/25
  */
 public interface ToSimBridge extends IGameRpc {
+    ResTokenShop tokenShop(long playerId, int type);
+
+    ResTokenShopExchange tokenShopExchange(long playerId, int goodsId, int count);
+
     /**
      * 在玩家所属 SIM 节点购买迷你商店商品。
      */

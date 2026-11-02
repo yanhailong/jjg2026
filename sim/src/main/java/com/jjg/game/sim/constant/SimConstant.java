@@ -343,6 +343,12 @@ public interface SimConstant {
         //使用皮肤
         int REQ_USE_BUILDING_SKIN = BASE_MSG_PREFIX | 0xB0;
         int RES_USE_BUILDING_SKIN = BASE_MSG_PREFIX | 0xB1;
+
+        //代币商店
+        int REQ_TOKEN_SHOP = BASE_MSG_PREFIX | 0xB2;
+        int RES_TOKEN_SHOP = BASE_MSG_PREFIX | 0xB3;
+        int REQ_TOKEN_SHOP_EXCHANGE = BASE_MSG_PREFIX | 0xB4;
+        int RES_TOKEN_SHOP_EXCHANGE = BASE_MSG_PREFIX | 0xB5;
     }
 
     interface SpecialGuest {

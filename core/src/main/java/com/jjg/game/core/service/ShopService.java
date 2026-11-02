@@ -124,9 +124,7 @@ public class ShopService implements OrderGenerate {
         }
 
         if (shopProduct.getPayType() == ItemUtils.getDiamondItemId() && useItemCount > 0) {
-            playerStatService.recordShopDiamondConsume(playerController.playerId(), useItemCount);
-            gameEventManager.triggerEvent(new PlayerEvent(playerController.getPlayer(),
-                    EGameEventType.SHOP_DIAMOND_CONSUME, useItemCount, null));
+            onDiamondConsume(playerController.getPlayer(), useItemCount);
         }
 
         PlayerSessionToken playerSessionToken = playerSessionTokenDao.getByPlayerId(playerController.playerId());
@@ -136,6 +134,15 @@ public class ShopService implements OrderGenerate {
         }
         coreLogger.shop(playerController.getPlayer(), shopProduct, registerChannel, useItemCount);
         return result;
+    }
+
+    /** 商城成功消费钻石后的累计统计与任务事件，供各类道具商城复用。 */
+    public void onDiamondConsume(Player player, long amount) {
+        if (amount > 0) {
+            playerStatService.recordShopDiamondConsume(player.getId(), amount);
+            gameEventManager.triggerEvent(new PlayerEvent(player,
+                    EGameEventType.SHOP_DIAMOND_CONSUME, amount, null));
+        }
     }
 
     /**
