@@ -23,7 +23,7 @@ public class BuildingInfo {
     public List<BonusInfo> bonusInfos;
     @ProtoDesc("建筑各区域的皮肤解锁与使用状态")
     public List<BuildingAreaSkinInfo> areaSkinInfos;
-    @ProtoDesc("目标可奖励的等级， 为0可视为已达到最大等级")
+    @ProtoDesc("下一档奖励等级，为0表示没有后续阶段奖励")
     public int targetLevel;
     @ProtoDesc("达到目标后的奖励")
     public List<ItemInfo> nextRewards;
@@ -33,4 +33,6 @@ public class BuildingInfo {
     public BuildingUpgradeConditonInfo buildingUpgrade10ConditonInfo;
     @ProtoDesc("建筑累计待领取的游客奖励 (道具id及数量)")
     public List<ItemInfo> guestRewards;
+    @ProtoDesc("建筑等级上限，当前等级大于等于此值时为满级")
+    public int maxLevel;
 }

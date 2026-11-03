@@ -411,7 +411,7 @@ public abstract class AbstractSlotsGameManager<T extends SlotsPlayerGameData, L 
                 // 避免跨模块响应类未进入 MessageUtil 映射时 send(Object) 静默丢弃。
                 PFMessage guideMessage = new PFMessage(SimConstant.MsgBean.NOTIFY_GUIDE_TRIGGER, ProtostuffUtil.serialize(notify));
                 playerController.send(guideMessage);
-                log.info("玩家进入SLOT游戏后发送新手引导通知 playerId={},groups={},msgId={},gatePath={}", playerId, result.data, guideMessage.cmd, playerController.getSession().getGatePath());
+                log.info("玩家进入SLOT游戏后发送新手引导通知 playerId={},blankPage=unknown,simContextPresent=false,groups={},msgId={},gatePath={}", playerId, result.data, guideMessage.cmd, playerController.getSession().getGatePath());
             }
         }.setHandlerParamWithSelf("slots guide after game enter")), SimConstant.GuideTiming.SLOTS_ENTER_TRIGGER_DELAY_MILLIS, TimeUnit.MILLISECONDS);
     }

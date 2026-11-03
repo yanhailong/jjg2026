@@ -459,7 +459,7 @@ public class SlotsRPCLinkManager {
                 guideNotify.guideGroupIds = result.data.getGuideGroupIds();
                 playerController.send(new PFMessage(SimConstant.MsgBean.NOTIFY_GUIDE_TRIGGER,
                         ProtostuffUtil.serialize(guideNotify)));
-                log.info("SLOT任务完成后发送新手引导通知 playerId={},groups={}",
+                log.info("SLOT任务完成后发送新手引导通知 playerId={},blankPage=unknown,simContextPresent=false,groups={}",
                         playerId, guideNotify.guideGroupIds);
             } else {
                 log.info("SLOT任务完成后玩家已离开，待重新进入场景恢复引导 playerId={},groups={}",

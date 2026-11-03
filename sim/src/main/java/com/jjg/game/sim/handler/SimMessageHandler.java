@@ -267,6 +267,7 @@ public class SimMessageHandler implements GmListener {
     @Command(SimConstant.MsgBean.REQ_SIM_BLANK_PAGE)
     public void reqSimBlankPage(PlayerController playerController, ReqSimBlankPage req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        boolean wasBlankPage = ctx != null && ctx.isBlankPage();
         ResSimBlankPage res = new ResSimBlankPage(ctx == null ? Code.NOT_FOUND : Code.SUCCESS);
         if (ctx != null) {
             ctx.setBlankPage(req.blankPage);
@@ -274,7 +275,11 @@ public class SimMessageHandler implements GmListener {
         res.blankPage = req.blankPage;
         playerController.send(res);
         if (ctx != null) {
-            guideService.triggerBlankPage(ctx, true);
+            List<Integer> groups = guideService.triggerBlankPage(ctx, false);
+            if (req.blankPage && !wasBlankPage) {
+                groups = guideService.pendingBlankPageGuideGroupIds(ctx);
+            }
+            guideService.notifyTriggeredGroups(ctx, groups);
         }
     }
 
@@ -391,12 +396,21 @@ public class SimMessageHandler implements GmListener {
                                                     playerId, groupSnapshot);
                                             return;
                                         }
-                                        NotifyGuideTrigger notify = new NotifyGuideTrigger(Code.SUCCESS);
-                                        notify.guideGroupIds = groupSnapshot;
-                                        playerController.send(notify);
-                                        log.info("当前节点延迟发送新手引导组通知 playerId={},delayMs={},groups={}",
+                                        SimPlayerContext currentContext =
+                                                simPlayerContextRegistry.getContext(playerId);
+                                        if (currentContext != null) {
+                                            guideService.notifyTriggeredGroups(currentContext, groupSnapshot);
+                                        } else {
+                                            NotifyGuideTrigger notify = new NotifyGuideTrigger(Code.SUCCESS);
+                                            notify.guideGroupIds = groupSnapshot;
+                                            playerController.send(notify);
+                                            log.info("跨节点延迟下发新手引导触发通知 playerId={},blankPage=unknown,simContextPresent=false,groups={}",
+                                                    playerId, groupSnapshot);
+                                        }
+                                        log.info("当前节点延迟检查新手引导组通知 playerId={},delayMs={},blankPage={},groups={}",
                                                 playerId,
                                                 SimConstant.GuideTiming.GROUP_FINISH_NOTIFY_DELAY_MILLIS,
+                                                currentContext == null ? "unknown" : currentContext.isBlankPage(),
                                                 groupSnapshot);
                                     }
                                 }.setHandlerParamWithSelf("remote sim guide group finish delayed notify")),
@@ -435,6 +449,8 @@ public class SimMessageHandler implements GmListener {
             NotifyGuideTrigger notify = new NotifyGuideTrigger(Code.SUCCESS);
             notify.guideGroupIds = result.data;
             playerController.send(notify);
+            log.info("客户端事件下发新手引导触发通知 playerId={},blankPage={},simContextPresent={},groups={}",
+                    playerId, ctx == null ? "unknown" : ctx.isBlankPage(), ctx != null, result.data);
         }
         log.info("处理客户端新手引导事件 playerId={},condition={},param={},code={},groups={}",
                 playerId, req.condition, req.param, res.code,

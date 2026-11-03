@@ -74,6 +74,7 @@ public final class SimPbConverter {
         info.level = buildingData.getLevel();
         info.guestRewards = ItemUtils.buildItemInfo(buildingData.getGuestRewards());
         BuildingAreaTableCfg buildingAreaTableCfg = GameDataManager.getBuildingAreaTableCfg(buildingData.getId());
+        info.maxLevel = buildingAreaTableCfg.getMaxLevel();
         BuildingUpgradeTableCfg nextRewardCfg = simConfigCacheService.getNextBuildingUpgradeRewardCfg(info.id, info.level);
         info.targetLevel = nextRewardCfg == null ? 0 : nextRewardCfg.getLevel();
         info.nextRewards = nextRewardCfg == null ? List.of() : ItemUtils.buildItemInfo(nextRewardCfg.getUpgradeReward());

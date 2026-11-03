@@ -121,8 +121,10 @@ public class SimMiniGameService {
                                 drawn.add(spots[i]);
                             }
                             round.setCheaterSpots(drawn);
+                            //玩家首局额外增加120秒，不限时关卡保持-1。
                             round.setEndTime(cfg.getTimeLimit() == -1 ? -1
-                                    : System.currentTimeMillis() + cfg.getTimeLimit() * 1000L);
+                                    : System.currentTimeMillis() + cfg.getTimeLimit() * 1000L
+                                    + (round.getRoundId() == 1 ? 120_000L : 0));
                             conditionService.onRoundStarted(ctx, 1);
                         }
                     }

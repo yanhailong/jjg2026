@@ -104,8 +104,8 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
             ctx.setLastSaveTime(0);
         }
         if (!triggered.isEmpty()) {
-            log.info("触发新手引导组 playerId={},condition={},param={},groups={}",
-                    ctx.playerId(), condition, param, triggered);
+            log.info("触发新手引导组 playerId={},condition={},param={},blankPage={},groups={}",
+                    ctx.playerId(), condition, param, ctx.isBlankPage(), triggered);
             if (notify) {
                 notifyTriggeredGroups(ctx, triggered);
             }
@@ -325,24 +325,34 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
         return new SkipGuideGroupResult(res, triggeredGroups);
     }
 
-    /** 发送已经完成状态计算的引导组触发通知。 */
+    /** 下发前重查当前页面，避免延迟通知使用页面切换前的触发结果。 */
     public void notifyTriggeredGroups(SimPlayerContext ctx, List<Integer> guideGroupIds) {
         if (ctx == null || ctx.getPlayerController() == null
                 || guideGroupIds == null || guideGroupIds.isEmpty()) {
             return;
         }
+        List<Integer> pending = pendingOpenGuideGroupIds(ctx);
+        List<Integer> available = guideGroupIds.stream().filter(pending::contains).toList();
+        if (available.isEmpty()) {
+            log.info("暂不下发新手引导触发通知 playerId={},blankPage={},groups={}",
+                    ctx.playerId(), ctx.isBlankPage(), guideGroupIds);
+            return;
+        }
         NotifyGuideTrigger message = new NotifyGuideTrigger(Code.SUCCESS);
-        message.guideGroupIds = guideGroupIds;
+        message.guideGroupIds = available;
         ctx.send(message);
+        log.info("下发新手引导触发通知 playerId={},blankPage={},groups={}",
+                ctx.playerId(), ctx.isBlankPage(), available);
     }
 
-    /** 只返回当前配置仍开启的待进行引导组，避免已关闭的历史触发状态继续下发。 */
+    /** 已触发的引导在恢复时仍须满足当前页面要求。 */
     public List<Integer> pendingOpenGuideGroupIds(SimPlayerContext ctx) {
         if (ctx == null || ctx.getSimBaseData() == null) {
             return Collections.emptyList();
         }
         List<Integer> pending = ctx.getSimBaseData().pendingGuideGroupIds().stream()
                 .filter(configService::containsGroup)
+                .filter(groupId -> currentPageAllowsGuide(ctx, groupId))
                 .toList();
         return pending.isEmpty() ? Collections.emptyList() : pending;
     }
@@ -357,12 +367,26 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
         }
         List<Integer> pending = ctx.getSimBaseData().pendingGuideGroupIds().stream()
                 .filter(configService::containsGroup)
+                .filter(groupId -> currentPageAllowsGuide(ctx, groupId))
                 .filter(groupId -> {
                     String configuredPath = configService.pathNameOfGroup(groupId);
                     return configuredPath.isBlank() || pathName.equals(configuredPath);
                 })
                 .toList();
         return pending.isEmpty() ? Collections.emptyList() : pending;
+    }
+
+    /** 重新回到大厅空白页面时，恢复此前已经触发但尚未完成的条件11引导。 */
+    public List<Integer> pendingBlankPageGuideGroupIds(SimPlayerContext ctx) {
+        return pendingOpenGuideGroupIds(ctx, SimConstant.GuidePath.SIM_HALL).stream()
+                .filter(groupId -> configService.conditionsOfGroup(groupId)
+                        .containsKey(SimConstant.GuideCondition.BLANK_PAGE))
+                .toList();
+    }
+
+    private boolean currentPageAllowsGuide(SimPlayerContext ctx, int groupId) {
+        return !configService.conditionsOfGroup(groupId).containsKey(SimConstant.GuideCondition.BLANK_PAGE)
+                || ctx.isBlankPage();
     }
 
     /**

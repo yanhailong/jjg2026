@@ -262,8 +262,8 @@ public class SimManager {
                     ctx, SimConstant.GuidePath.SIM_HALL);
             res.completedGuideIds = ctx.getSimBaseData().completedGuideIds();
             res.guide = ctx.getSimBaseData().isGuide();
-            log.info("进入模拟经营大厅检查等级引导 playerId={},playerLevel={},newGroups={},pendingGroups={}",
-                    playerController.playerId(), playerLevel, levelTriggeredGroups, res.guideGroupIds);
+            log.info("进入模拟经营大厅检查等级引导 playerId={},playerLevel={},blankPage={},newGroups={},pendingGroups={}",
+                    playerController.playerId(), playerLevel, ctx.isBlankPage(), levelTriggeredGroups, res.guideGroupIds);
             log.info("进入模拟经营大厅检查场景累计等级引导 playerId={},allLevel={},newGroups={}",
                     playerController.playerId(), allLevel, sceneLevelTriggeredGroups);
             log.info("进入模拟经营大厅检查新号引导 playerId={},guideCompleted={},newGroups={},pendingGroups={}",
@@ -504,9 +504,10 @@ public class SimManager {
                                             return;
                                         }
                                         guideService.notifyTriggeredGroups(currentContext, groupSnapshot);
-                                        log.info("延迟发送新手引导组通知 playerId={},delayMs={},groups={}",
+                                        log.info("延迟检查新手引导组通知 playerId={},delayMs={},blankPage={},groups={}",
                                                 playerId,
                                                 SimConstant.GuideTiming.GROUP_FINISH_NOTIFY_DELAY_MILLIS,
+                                                currentContext.isBlankPage(),
                                                 groupSnapshot);
                                     }
                                 }.setHandlerParamWithSelf("sim guide group finish delayed notify")),
