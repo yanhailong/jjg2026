@@ -26,6 +26,7 @@ import com.jjg.game.sim.pb.res.ResCasinoUpgradeCondition;
 import com.jjg.game.sim.pb.res.ResSimCasinoInfo;
 import com.jjg.game.sim.pb.res.ResSwitchCasino;
 import com.jjg.game.sim.pb.res.ResUnlockCasino;
+import com.jjg.game.sim.pb.struct.BuildLevelMaxInfo;
 import com.jjg.game.sim.pb.struct.CasinoUpgradeCondition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -439,6 +440,10 @@ public class SimCasinoService implements SimTaskStateReporter {
                 casino.getCasinoId(), oldAllLevel, newAllLevel).stream()
                 .filter(info -> casino.findBuilding(info.buildingId) != null)
                 .toList();
+        for (BuildLevelMaxInfo info : notify.buildLevelMaxInfos) {
+            info.oldMax = info.oldMax > 1 ? info.oldMax - 1 : info.oldMax;
+            info.newMax = info.newMax > 1 ? info.newMax - 1 : info.newMax;
+        }
         ctx.send(notify);
     }
 
