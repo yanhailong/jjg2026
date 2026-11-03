@@ -22,6 +22,7 @@ import com.jjg.game.core.task.pb.Task;
 import com.jjg.game.core.task.pb.TaskCondition;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
+import com.jjg.game.sampledata.bean.ChapterLevelCfg;
 import com.jjg.game.sampledata.bean.MedalBuffCfg;
 import com.jjg.game.sampledata.bean.TaskCfg;
 import com.jjg.game.sim.constant.SimConstant;
@@ -1229,9 +1230,19 @@ public class SimTaskService implements IRedDotService {
         c.setProgress(node.getStatus() == TaskConstant.TaskStatus.STATUS_IN_PROGRESS
                 ? (progressOverride == null ? currentProgress(ctx, player, node, cfg) : progressOverride)
                 : completedProgress(node, def));
+        // 关卡任务对外显示关卡序号，判定和存档仍使用配置 ID。
+        if (c.getConfigId() == PlayerStatService.CHAPTER_LEVEL) {
+            c.setConfigParam(chapterLevelNumber(c.getConfigParam()));
+            c.setProgress(chapterLevelNumber(c.getProgress()));
+        }
         c.setFinish(node.getStatus() != TaskConstant.TaskStatus.STATUS_IN_PROGRESS);
         task.getConditions().add(c);
         return task;
+    }
+
+    private long chapterLevelNumber(long levelId) {
+        ChapterLevelCfg levelCfg = GameDataManager.getChapterLevelCfg((int) levelId);
+        return levelCfg == null ? 0 : levelCfg.getLevelnumId();
     }
 
     private static long completedProgress(TaskDetail node, SimTaskConfigService.TaskConditionDef def) {
