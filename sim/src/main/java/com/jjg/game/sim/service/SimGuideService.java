@@ -136,6 +136,7 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
                         && ctx.getPlayer().getLevel() >= param;
                 case SimConstant.GuideCondition.ITEM_NOT_ENOUGH,
                      SimConstant.GuideCondition.ITEM_GAINED,
+                     SimConstant.GuideCondition.ENTER_MINI_GAME,
                      SimConstant.GuideCondition.CLIENT_EVENT -> condition == eventCondition && param == eventParam;
                 case SimConstant.GuideCondition.FUNCTION_UNLOCKED -> ctx.getPlayer() != null
                         && gameFunctionService.getOpenedFuncIdList(ctx.getPlayer()).contains(param);

@@ -399,6 +399,8 @@ public interface SimConstant {
         int ITEM_GAINED = 6;
         int FUNCTION_UNLOCKED = 7;
         int GUIDE_GROUP_FINISHED = 8;
+        /** 进入小游戏：1=找老千，2=赌神搓牌，3=欢乐捉鱼，4=飞驰快送。 */
+        int ENTER_MINI_GAME = 9;
         /**
          * 客户端进入指定功能节点时主动上报的引导事件。
          */

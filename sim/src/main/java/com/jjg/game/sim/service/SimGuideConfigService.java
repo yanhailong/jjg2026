@@ -304,6 +304,7 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
                 || condition == SimConstant.GuideCondition.ITEM_GAINED
                 || condition == SimConstant.GuideCondition.FUNCTION_UNLOCKED
                 || condition == SimConstant.GuideCondition.GUIDE_GROUP_FINISHED
+                || condition == SimConstant.GuideCondition.ENTER_MINI_GAME
                 || condition == SimConstant.GuideCondition.CLIENT_EVENT
                 || condition == SimConstant.GuideCondition.BLANK_PAGE;
     }

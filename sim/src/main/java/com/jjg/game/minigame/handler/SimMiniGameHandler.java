@@ -54,8 +54,10 @@ import com.jjg.game.minigame.service.SimMiniGameService;
 import com.jjg.game.minigame.service.GodGamblersService;
 import com.jjg.game.minigame.service.HappyHappyFishService;
 import com.jjg.game.minigame.service.SpeedyDeliveryService;
+import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
+import com.jjg.game.sim.service.SimGuideService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,6 +79,8 @@ public class SimMiniGameHandler {
     private HappyHappyFishService happyHappyFishService;
     @Autowired
     private SpeedyDeliveryService speedyDeliveryService;
+    @Autowired
+    private SimGuideService guideService;
 
     /** 获取关卡列表及一键通关开放状态。 */
     @Command(MiniGameConstant.MsgBean.REQ_ENTER_CHEAT_HUNT_GAME)
@@ -87,7 +91,11 @@ public class SimMiniGameHandler {
             playerController.send(new ResEnterCheaterHuntGame(Code.NOT_FOUND));
             return;
         }
-        ctx.send(simMiniGameService.enter(ctx));
+        ResEnterCheaterHuntGame res = simMiniGameService.enter(ctx);
+        ctx.send(res);
+        if (res.code == Code.SUCCESS) {
+            guideService.trigger(ctx, SimConstant.GuideCondition.ENTER_MINI_GAME, 1, true);
+        }
     }
 
     /** 获取当前关卡并开始新局，由服务检查已有单局。 */
@@ -159,7 +167,11 @@ public class SimMiniGameHandler {
             playerController.send(new ResEnterGodGamblersGame(Code.NOT_FOUND));
             return;
         }
-        ctx.send(godGamblersService.enter(ctx));
+        ResEnterGodGamblersGame res = godGamblersService.enter(ctx);
+        ctx.send(res);
+        if (res.code == Code.SUCCESS) {
+            guideService.trigger(ctx, SimConstant.GuideCondition.ENTER_MINI_GAME, 2, true);
+        }
     }
 
     /** 开始单局，由服务处理扣费及对手牌生成。 */
@@ -217,7 +229,11 @@ public class SimMiniGameHandler {
             playerController.send(new ResEnterHappyHappyFishGame(Code.NOT_FOUND));
             return;
         }
-        ctx.send(happyHappyFishService.enter(ctx));
+        ResEnterHappyHappyFishGame res = happyHappyFishService.enter(ctx);
+        ctx.send(res);
+        if (res.code == Code.SUCCESS) {
+            guideService.trigger(ctx, SimConstant.GuideCondition.ENTER_MINI_GAME, 3, true);
+        }
     }
 
     @Command(MiniGameConstant.MsgBean.REQ_START_HAPPY_HAPPY_FISH_GAME)
@@ -267,7 +283,11 @@ public class SimMiniGameHandler {
             playerController.send(new ResEnterSpeedyDeliveryGame(Code.NOT_FOUND));
             return;
         }
-        ctx.send(speedyDeliveryService.enter(ctx));
+        ResEnterSpeedyDeliveryGame res = speedyDeliveryService.enter(ctx);
+        ctx.send(res);
+        if (res.code == Code.SUCCESS) {
+            guideService.trigger(ctx, SimConstant.GuideCondition.ENTER_MINI_GAME, 4, true);
+        }
     }
 
     @Command(MiniGameConstant.MsgBean.REQ_START_SPEEDY_DELIVERY_GAME)
