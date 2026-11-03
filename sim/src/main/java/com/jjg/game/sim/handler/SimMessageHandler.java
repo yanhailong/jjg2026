@@ -262,6 +262,23 @@ public class SimMessageHandler implements GmListener {
     }
 
     /**
+     * 上报客户端空白页面状态
+     */
+    @Command(SimConstant.MsgBean.REQ_SIM_BLANK_PAGE)
+    public void reqSimBlankPage(PlayerController playerController, ReqSimBlankPage req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        ResSimBlankPage res = new ResSimBlankPage(ctx == null ? Code.NOT_FOUND : Code.SUCCESS);
+        if (ctx != null) {
+            ctx.setBlankPage(req.blankPage);
+        }
+        res.blankPage = req.blankPage;
+        playerController.send(res);
+        if (ctx != null) {
+            guideService.triggerBlankPage(ctx, true);
+        }
+    }
+
+    /**
      * 完成新手引导
      */
     @Command(SimConstant.MsgBean.REQ_FINISH_GUIDE)

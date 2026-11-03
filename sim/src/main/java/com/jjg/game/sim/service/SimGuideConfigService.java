@@ -25,7 +25,7 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
     private static final Logger log = LoggerFactory.getLogger(SimGuideConfigService.class);
 
     private volatile Map<TriggerKey, List<Integer>> triggerGroups = Collections.emptyMap();
-    private volatile Map<Integer, Integer> groupConditions = Collections.emptyMap();
+    private volatile Map<Integer, Map<Integer, Integer>> groupConditions = Collections.emptyMap();
     private volatile Map<Integer, String> groupPathNames = Collections.emptyMap();
     private volatile Map<Integer, Integer> guideGroups = Collections.emptyMap();
     private volatile Map<Integer, List<Integer>> groupGuideIds = Collections.emptyMap();
@@ -54,7 +54,7 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
             return;
         }
         Map<TriggerKey, Set<Integer>> groups = new HashMap<>();
-        Map<Integer, Integer> conditions = new HashMap<>();
+        Map<Integer, Map<Integer, Integer>> conditions = new HashMap<>();
         Map<Integer, String> pathNames = new HashMap<>();
         Map<Integer, Integer> guides = new HashMap<>();
         Map<Integer, List<Integer>> guidesByGroup = new HashMap<>();
@@ -67,17 +67,14 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
             if (!cfg.getIsOpen()) {
                 continue;
             }
-            if (cfg.getGuideGroupId() <= 0 || !validCondition(cfg.getCondition())) {
+            Map<Integer, Integer> configuredConditions = normalizeConditions(cfg.getCondition());
+            if (cfg.getGuideGroupId() <= 0 || configuredConditions.isEmpty()) {
                 continue;
             }
-            int param = conditionNeedsParam(cfg.getCondition()) ? cfg.getParam() : 0;
-            if (conditionNeedsParam(cfg.getCondition()) && param <= 0) {
-                continue;
-            }
-            Integer oldCondition = conditions.putIfAbsent(cfg.getGuideGroupId(), cfg.getCondition());
-            if (oldCondition != null && oldCondition != cfg.getCondition()) {
-                log.warn("同一引导组配置了不同触发类型 groupId={},old={},new={},guideId={}",
-                        cfg.getGuideGroupId(), oldCondition, cfg.getCondition(), cfg.getId());
+            Map<Integer, Integer> oldConditions = conditions.putIfAbsent(cfg.getGuideGroupId(), configuredConditions);
+            if (oldConditions != null && !oldConditions.equals(configuredConditions)) {
+                log.warn("同一引导组配置了不同触发条件 groupId={},old={},new={},guideId={}",
+                        cfg.getGuideGroupId(), oldConditions, configuredConditions, cfg.getId());
                 continue;
             }
             String pathName = normalizePathName(cfg.getPathName());
@@ -87,8 +84,9 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
                         cfg.getGuideGroupId(), oldPathName, pathName, cfg.getId());
                 continue;
             }
-            groups.computeIfAbsent(new TriggerKey(cfg.getCondition(), param), ignored -> new LinkedHashSet<>())
-                    .add(cfg.getGuideGroupId());
+            configuredConditions.forEach((condition, param) ->
+                    groups.computeIfAbsent(new TriggerKey(condition, param), ignored -> new LinkedHashSet<>())
+                            .add(cfg.getGuideGroupId()));
 
             List<Integer> configuredGuideIds = cfg.getGuideIdList();
             List<Integer> normalizedGuideIds = new ArrayList<>();
@@ -145,7 +143,7 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
     }
 
     public List<Integer> groupsFor(int condition, int param) {
-        int normalized = condition == SimConstant.GuideCondition.NEW_PLAYER ? 0 : param;
+        int normalized = conditionNeedsParam(condition) ? param : 0;
         return triggerGroups.getOrDefault(new TriggerKey(condition, normalized), Collections.emptyList());
     }
 
@@ -163,8 +161,9 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
         return params.isEmpty() ? Collections.emptyList() : params;
     }
 
-    public int conditionOfGroup(int guideGroupId) {
-        return groupConditions.getOrDefault(guideGroupId, 0);
+    /** 同组配置的全部条件必须同时满足。 */
+    public Map<Integer, Integer> conditionsOfGroup(int guideGroupId) {
+        return groupConditions.getOrDefault(guideGroupId, Collections.emptyMap());
     }
 
     /**
@@ -278,6 +277,24 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
         return Collections.unmodifiableList(result);
     }
 
+    private Map<Integer, Integer> normalizeConditions(Map<Integer, Integer> configuredConditions) {
+        if (configuredConditions == null || configuredConditions.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Integer, Integer> normalized = new HashMap<>();
+        for (Map.Entry<Integer, Integer> entry : configuredConditions.entrySet()) {
+            Integer condition = entry.getKey();
+            Integer param = entry.getValue();
+            if (condition == null || param == null || !validCondition(condition)
+                    || conditionNeedsParam(condition) && param <= 0) {
+                log.warn("无效的新手引导条件，整组不建立触发索引 conditions={}", configuredConditions);
+                return Collections.emptyMap();
+            }
+            normalized.put(condition, conditionNeedsParam(condition) ? param : 0);
+        }
+        return Collections.unmodifiableMap(normalized);
+    }
+
     private boolean validCondition(int condition) {
         return condition == SimConstant.GuideCondition.NEW_PLAYER
                 || condition == SimConstant.GuideCondition.TASK_REWARD_CLAIMED
@@ -287,11 +304,13 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
                 || condition == SimConstant.GuideCondition.ITEM_GAINED
                 || condition == SimConstant.GuideCondition.FUNCTION_UNLOCKED
                 || condition == SimConstant.GuideCondition.GUIDE_GROUP_FINISHED
-                || condition == SimConstant.GuideCondition.CLIENT_EVENT;
+                || condition == SimConstant.GuideCondition.CLIENT_EVENT
+                || condition == SimConstant.GuideCondition.BLANK_PAGE;
     }
 
     private boolean conditionNeedsParam(int condition) {
-        return condition != SimConstant.GuideCondition.NEW_PLAYER;
+        return condition != SimConstant.GuideCondition.NEW_PLAYER
+                && condition != SimConstant.GuideCondition.BLANK_PAGE;
     }
 
     private String normalizePathName(String pathName) {

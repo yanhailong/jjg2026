@@ -353,6 +353,10 @@ public interface SimConstant {
         //领取建筑累计的游客奖励
         int REQ_CLAIM_BUILDING_GUEST_REWARDS = BASE_MSG_PREFIX | 0xB6;
         int RES_CLAIM_BUILDING_GUEST_REWARDS = BASE_MSG_PREFIX | 0xB7;
+
+        //上报客户端空白页面状态
+        int REQ_SIM_BLANK_PAGE = BASE_MSG_PREFIX | 0xB8;
+        int RES_SIM_BLANK_PAGE = BASE_MSG_PREFIX | 0xB9;
     }
 
     interface SpecialGuest {
@@ -383,7 +387,7 @@ public interface SimConstant {
     }
 
     interface GuideCondition {
-        // 当前 Guide.xlsx 约定：1=创建新号、2=领取任务奖励、3=场景累计等级、4=玩家等级、5=道具不足、6=获得道具、7=功能解锁、8=引导组完成、10=客户端事件。
+        // Guide.xlsx.Condition 为条件类型到参数的 Map，组内按 AND 判断；11=当前客户端空白页面。
         int NEW_PLAYER = 1;
         /**
          * 领取模拟经营任务奖励，参数为任务ID；只有奖励领取成功后才触发。
@@ -399,6 +403,9 @@ public interface SimConstant {
          * 客户端进入指定功能节点时主动上报的引导事件。
          */
         int CLIENT_EVENT = 10;
+
+        /** 当前 SimPlayerContext.blankPage 为 true，参数忽略。 */
+        int BLANK_PAGE = 11;
 
     }
 

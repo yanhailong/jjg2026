@@ -4,6 +4,7 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.listener.ItemAddListener;
 import com.jjg.game.core.listener.ItemNotEnoughListener;
+import com.jjg.game.core.service.GameFunctionService;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.data.SimBaseData;
 import com.jjg.game.sim.data.SimPlayerContext;
@@ -33,6 +34,8 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
 
     @Autowired
     private SimGuideConfigService configService;
+    @Autowired
+    private GameFunctionService gameFunctionService;
     @Autowired
     private SimPlayerContextRegistry contextRegistry;
     @Autowired
@@ -78,6 +81,12 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
         List<Integer> triggered = new ArrayList<>(groups.size());
         List<Integer> deferred = new ArrayList<>(groups.size());
         for (int groupId : groups) {
+            if (base.hasTriggeredGuideGroup(groupId) || base.hasCompletedGuideGroup(groupId)) {
+                continue;
+            }
+            if (!conditionsSatisfied(ctx, groupId, condition, param)) {
+                continue;
+            }
             String requiredPathName = configService.pathNameOfGroup(groupId);
             boolean pathMatched = currentPathName == null
                     ? pathMatches(ctx, requiredPathName)
@@ -91,10 +100,9 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
                 deferred.add(groupId);
             }
         }
-        if (triggered.isEmpty() && deferred.isEmpty()) {
-            return Collections.emptyList();
+        if (!triggered.isEmpty() || !deferred.isEmpty()) {
+            ctx.setLastSaveTime(0);
         }
-        ctx.setLastSaveTime(0);
         if (!triggered.isEmpty()) {
             log.info("触发新手引导组 playerId={},condition={},param={},groups={}",
                     ctx.playerId(), condition, param, triggered);
@@ -109,6 +117,40 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
         return triggered.isEmpty()
                 ? Collections.emptyList()
                 : Collections.unmodifiableList(triggered);
+    }
+
+    /** 每次按当前玩家数据及本次事件判断全部条件，不缓存满足进度。 */
+    private boolean conditionsSatisfied(SimPlayerContext ctx, int groupId, int eventCondition, int eventParam) {
+        Map<Integer, Integer> conditions = configService.conditionsOfGroup(groupId);
+        if (conditions.isEmpty()) return false;
+        SimBaseData base = ctx.getSimBaseData();
+        for (Map.Entry<Integer, Integer> entry : conditions.entrySet()) {
+            int condition = entry.getKey();
+            int param = entry.getValue();
+            boolean satisfied = switch (condition) {
+                case SimConstant.GuideCondition.NEW_PLAYER -> !base.isGuide();
+                case SimConstant.GuideCondition.TASK_REWARD_CLAIMED -> ctx.getSimTaskData() != null
+                        && ctx.getSimTaskData().getRewardedTaskIds().contains(param);
+                case SimConstant.GuideCondition.SCENE_TOTAL_LEVEL -> base.getAllLevel() >= param;
+                case SimConstant.GuideCondition.PLAYER_LEVEL -> ctx.getPlayer() != null
+                        && ctx.getPlayer().getLevel() >= param;
+                case SimConstant.GuideCondition.ITEM_NOT_ENOUGH,
+                     SimConstant.GuideCondition.ITEM_GAINED,
+                     SimConstant.GuideCondition.CLIENT_EVENT -> condition == eventCondition && param == eventParam;
+                case SimConstant.GuideCondition.FUNCTION_UNLOCKED -> ctx.getPlayer() != null
+                        && gameFunctionService.getOpenedFuncIdList(ctx.getPlayer()).contains(param);
+                case SimConstant.GuideCondition.GUIDE_GROUP_FINISHED -> base.hasCompletedGuideGroup(param);
+                case SimConstant.GuideCondition.BLANK_PAGE -> ctx.isBlankPage();
+                default -> false;
+            };
+            if (!satisfied) return false;
+        }
+        return true;
+    }
+
+    /** 页面状态上报后，按当前 blankPage 重查所有包含条件11的引导组。 */
+    public List<Integer> triggerBlankPage(SimPlayerContext ctx, boolean notify) {
+        return trigger(ctx, SimConstant.GuideCondition.BLANK_PAGE, 0, notify);
     }
 
     /**
@@ -157,7 +199,7 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
         return Collections.unmodifiableList(triggered);
     }
 
-    /** 玩家进入指定 PathName 后，激活此前条件已经满足的引导组。 */
+    /** 玩家进入指定 PathName 后，重查等待中的引导组，全部条件当前满足才激活。 */
     public List<Integer> triggerDeferredForPath(SimPlayerContext ctx, String pathName, boolean notify) {
         if (ctx == null || ctx.getSimBaseData() == null || pathName == null || pathName.isBlank()) {
             return Collections.emptyList();
@@ -169,6 +211,9 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
             if (!configService.containsGroup(groupId) || base.hasCompletedGuideGroup(groupId)) {
                 base.discardScenePendingGuideGroup(groupId);
                 stateChanged = true;
+                continue;
+            }
+            if (!conditionsSatisfied(ctx, groupId, 0, 0)) {
                 continue;
             }
             if (pathName.equals(configService.pathNameOfGroup(groupId))
@@ -464,7 +509,7 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
         SimBaseData base = ctx.getSimBaseData();
         boolean firstCompleted = base.completeGuideGroup(guideGroupId);
         // 兼容旧逻辑：完成“创建新号”引导组后，开放游客生成和建筑产出。
-        if (configService.conditionOfGroup(guideGroupId) == SimConstant.GuideCondition.NEW_PLAYER) {
+        if (configService.conditionsOfGroup(guideGroupId).containsKey(SimConstant.GuideCondition.NEW_PLAYER)) {
             base.setGuide(true);
         }
         if (firstCompleted) {

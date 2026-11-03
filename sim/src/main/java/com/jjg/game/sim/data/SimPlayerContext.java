@@ -131,6 +131,9 @@ public class SimPlayerContext {
     private SpeedyDeliveryData speedyDeliveryData;
     private SpeedyDeliveryRound speedyDeliveryRound;
 
+    //标记客户端是不是空白页面
+    private boolean blankPage;
+
     public SpeedyDeliveryData getSpeedyDeliveryData() {
         return speedyDeliveryData;
     }
@@ -636,5 +639,13 @@ public class SimPlayerContext {
 
     public void setSimChapterData(SimChapterData simChapterData) {
         this.simChapterData = simChapterData;
+    }
+
+    public boolean isBlankPage() {
+        return blankPage;
+    }
+
+    public void setBlankPage(boolean blankPage) {
+        this.blankPage = blankPage;
     }
 }

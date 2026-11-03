@@ -20,7 +20,7 @@ public class GuideCfg extends BaseCfgBean {
   public static final String SHEET_NAME = "Guide";
 
   /** 触发条件类型 */
-  protected int Condition;
+  protected Map<Integer,Integer> Condition;
   /** 引导组编号 */
   protected int GuideGroupId;
   /** 引导列表ID */
@@ -31,11 +31,9 @@ public class GuideCfg extends BaseCfgBean {
   protected List<Integer> SkipGuideId;
   /** 是否开启 */
   protected boolean isOpen;
-  /** 条件参数 */
-  protected int param;
 
   /** 返回触发条件类型 */
-  public int getCondition() {
+  public Map<Integer,Integer> getCondition() {
     return Condition;
   }
 
@@ -62,11 +60,6 @@ public class GuideCfg extends BaseCfgBean {
   /** 返回是否开启 */
   public boolean getIsOpen() {
     return isOpen;
-  }
-
-  /** 返回条件参数 */
-  public int getParam() {
-    return param;
   }
 
   @Override

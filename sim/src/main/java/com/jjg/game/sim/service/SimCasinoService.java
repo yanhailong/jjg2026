@@ -434,9 +434,11 @@ public class SimCasinoService implements SimTaskStateReporter {
         //新解锁的功能
         notify.newFunctions = configCacheService.getAllLevelUnlockFunctions(ctx.getSimBaseData().getAllLevel());
 
-        //建筑等级上限提升
+        //已解锁建筑等级上限提升
         notify.buildLevelMaxInfos = configCacheService.getBuildingLevelMaxInfos(
-                casino.getCasinoId(), oldAllLevel, newAllLevel);
+                casino.getCasinoId(), oldAllLevel, newAllLevel).stream()
+                .filter(info -> casino.findBuilding(info.buildingId) != null)
+                .toList();
         ctx.send(notify);
     }
 
