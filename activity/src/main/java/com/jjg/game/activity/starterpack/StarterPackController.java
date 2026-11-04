@@ -86,7 +86,7 @@ public class StarterPackController extends BaseActivityController implements Ord
 
     @Override
     public AbstractResponse joinActivity(Player player, ActivityData activityData, int detailId, int times) {
-        // 购买资格只由已付款订单写入。
+        // 购买资格由充值回调写入。
         return new ResClaimStarterPackRewards(Code.ERROR_REQ);
     }
 
@@ -101,22 +101,51 @@ public class StarterPackController extends BaseActivityController implements Ord
         try {
             BaseCfgBean bean = getOrderGenerateBean(player, req.productId);
             if (!(bean instanceof StarterPackCfg cfg)) {
+                log.warn("新手礼包下单失败，活动或详情配置不存在、玩家无法参与或配置类型不匹配 playerId:{} productId:{} cfgType:{}",
+                        player == null ? null : player.getId(), req.productId, bean == null ? null : bean.getClass().getSimpleName());
                 return result;
             }
             long activityId = Long.parseLong(req.productId.split("_")[0]);
             ActivityData activityData = activityManager.getActivityData().get(activityId);
             if (!validConfig(activityData, cfg)) {
+                log.error("新手礼包下单失败，活动参数或奖励配置无效 playerId:{} activityId:{} detailId:{} bigDecimalParam:{} reward1:{} reward2:{} reward3:{}",
+                        player.getId(), activityId, cfg.getId(), activityData.getBigDecimalParam(),
+                        cfg.getReward1(), cfg.getReward2(), cfg.getReward3());
                 result.code = Code.SAMPLE_ERROR;
                 return result;
             }
             if (!readPlayerData(player.getId(), activityData).isEmpty()) {
+                log.warn("新手礼包下单失败，礼包已购买 playerId:{} activityId:{} detailId:{}", player.getId(), activityId, cfg.getId());
                 result.code = Code.REPEAT_OP;
                 return result;
             }
             ShopRechargeListCfg shop = getShopCfg(activityData);
-            if (shop == null || shop.getType() != RechargeCfgType.MONEY.getType()
-                    || shop.getPrice() == null || shop.getPrice().signum() <= 0
+            if(shop == null){
+                log.error("新手礼包下单失败，关联充值商品配置不存在 playerId:{} activityId:{} productId:{}",
+                        player.getId(), activityId, req.productId);
+                result.code = Code.SAMPLE_ERROR;
+                return result;
+            }
+            if(shop.getType() != RechargeCfgType.MONEY.getType()){
+                RechargeCfgType type = RechargeCfgType.valueOf(shop.getType());
+                if (!validNonMoneyShop(shop, type)) {
+                    log.error("新手礼包下单失败，非货币商品类型或兑换消耗配置无效 playerId:{} activityId:{} shopId:{} type:{} redeem:{}",
+                            player.getId(), activityId, shop.getId(), shop.getType(), shop.getRedeem());
+                    result.code = Code.SAMPLE_ERROR;
+                    return result;
+                }
+                result.data = new PreGenerateOrderData();
+                result.data.setType(type);
+                result.data.setPayType(req.payType);
+                result.data.setProductId(req.productId);
+                result.code = Code.SUCCESS;
+                return result;
+            }
+
+            if (shop.getPrice() == null || shop.getPrice().signum() <= 0
                     || StringUtils.isBlank(player.getChannel() == ChannelType.APPLE ? shop.getIosShopId() : shop.getGoogleShopId())) {
+                log.error("新手礼包下单失败，充值价格或渠道商品ID无效 playerId:{} activityId:{} shopId:{} price:{} channel:{} googleShopId:{} iosShopId:{}",
+                        player.getId(), activityId, shop.getId(), shop.getPrice(), player.getChannel(), shop.getGoogleShopId(), shop.getIosShopId());
                 result.code = Code.SAMPLE_ERROR;
                 return result;
             }
@@ -127,6 +156,7 @@ public class StarterPackController extends BaseActivityController implements Ord
             result.data = data;
             result.code = Code.SUCCESS;
         } catch (NumberFormatException e) {
+            log.warn("新手礼包下单失败，商品ID格式错误 playerId:{} productId:{}", player == null ? null : player.getId(), req.productId, e);
             result.code = Code.PARAM_ERROR;
         } catch (Exception e) {
             log.error("新手礼包下单失败 playerId:{} productId:{}", player.getId(), req.productId, e);
@@ -136,47 +166,150 @@ public class StarterPackController extends BaseActivityController implements Ord
     }
 
     @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        if (player == null || preGenerateOrderData == null) {
+            log.warn("新手礼包非货币购买失败，玩家或预下单数据为空 playerId:{}", player == null ? null : player.getId());
+            return false;
+        }
+        try {
+            BaseCfgBean bean = getOrderGenerateBean(player, preGenerateOrderData.getProductId());
+            if (!(bean instanceof StarterPackCfg cfg)) {
+                log.warn("新手礼包非货币购买失败，活动或详情配置无效或玩家无法参与 playerId:{} productId:{}",
+                        player.getId(), preGenerateOrderData.getProductId());
+                return false;
+            }
+            long activityId = Long.parseLong(preGenerateOrderData.getProductId().split("_")[0]);
+            ActivityData activityData = activityManager.getActivityData().get(activityId);
+            ShopRechargeListCfg shop = getShopCfg(activityData);
+            if (!validNonMoneyShop(shop, preGenerateOrderData.getType())) {
+                log.warn("新手礼包非货币购买失败，商品类型不匹配或兑换消耗配置无效 playerId:{} productId:{} requestType:{} shopId:{} shopType:{} redeem:{}",
+                        player.getId(), preGenerateOrderData.getProductId(), preGenerateOrderData.getType(),
+                        shop == null ? null : shop.getId(), shop == null ? null : shop.getType(), shop == null ? null : shop.getRedeem());
+                return false;
+            }
+            Map<Integer, Long> cost = preGenerateOrderData.getType() == RechargeCfgType.ITEM_EXCHANGE ? shop.getRedeem() : Map.of();
+            return receivePurchase(player, activityData, cfg.getId(), null, cost);
+        } catch (Exception e) {
+            log.error("新手礼包非货币购买失败 playerId:{} productId:{} type:{}",
+                    player.getId(), preGenerateOrderData.getProductId(), preGenerateOrderData.getType(), e);
+            return false;
+        }
+    }
+
+    @Override
     public boolean onReceivedRecharge(Player player, Order order) {
-        if (player == null || order.getPlayerId() != player.getId() || order.getRechargeType() != getRechargeType()
-                || StringUtils.isBlank(order.getId()) || order.getOrderStatus() != OrderStatus.PROCESSING) {
+        if (player == null) {
+            log.warn("新手礼包支付处理失败，玩家为空 orderId:{}", order == null ? null : order.getId());
+            return false;
+        }
+        if (order.getPlayerId() != player.getId()) {
+            log.warn("新手礼包支付处理失败，订单玩家不匹配 playerId:{} orderPlayerId:{} orderId:{}",
+                    player.getId(), order.getPlayerId(), order.getId());
+            return false;
+        }
+        if (order.getRechargeType() != getRechargeType()) {
+            log.warn("新手礼包支付处理失败，充值类型不匹配 playerId:{} orderId:{} rechargeType:{} expectedRechargeType:{}",
+                    player.getId(), order.getId(), order.getRechargeType(), getRechargeType());
+            return false;
+        }
+        if (StringUtils.isBlank(order.getId())) {
+            log.warn("新手礼包支付处理失败，订单ID为空 playerId:{} productId:{}", player.getId(), order.getProductId());
+            return false;
+        }
+        if (order.getOrderStatus() != OrderStatus.PROCESSING) {
+            log.warn("新手礼包支付处理失败，订单状态无效 playerId:{} orderId:{} status:{} expectedStatus:{}",
+                    player.getId(), order.getId(), order.getOrderStatus(), OrderStatus.PROCESSING);
             return false;
         }
         try {
             String[] parts = StringUtils.split(order.getProductId(), "_");
             if (parts == null || parts.length != 2) {
+                log.warn("新手礼包支付处理失败，订单商品ID格式错误 playerId:{} orderId:{} productId:{}",
+                        player.getId(), order.getId(), order.getProductId());
                 return false;
             }
             long activityId = Long.parseLong(parts[0]);
             int detailId = Integer.parseInt(parts[1]);
             ActivityData activityData = activityManager.getActivityData().get(activityId);
             if (activityData == null || activityData.getType() != ActivityType.STARTER_PACK) {
-                return false;
-            }
-            Map<Integer, StarterPackPlayerData> playerData = readPlayerData(player.getId(), activityData);
-            StarterPackPlayerData previous = playerData.get(detailId);
-            if (previous != null) {
-                return order.getId().equals(previous.getOrderId());
-            }
-            StarterPackCfg cfg = getDetailCfgBean(activityData).get(detailId);
-            if (!playerData.isEmpty() || !validConfig(activityData, cfg)) {
+                log.warn("新手礼包支付处理失败，活动不存在或活动类型不匹配 playerId:{} orderId:{} activityId:{} activityType:{}",
+                        player.getId(), order.getId(), activityId, activityData == null ? null : activityData.getType());
                 return false;
             }
             // 已付款订单不重新检查当前功能开关、时间和参与条件。
-            playerData.put(detailId, new StarterPackPlayerData(activityId, activityData.getRound(), order.getId()));
-            if (!playerActivityDao.savePlayerActivityData(player.getId(), ActivityType.STARTER_PACK, activityId, playerData)) {
-                return false;
-            }
-            try {
-                activityManager.sendToPlayer(player.getId(), buildResponse(player, activityData));
-                updateRodDot(player.getId(), activityData, false);
-            } catch (Exception e) {
-                log.error("新手礼包支付成功后通知失败 playerId:{} orderId:{}", player.getId(), order.getId(), e);
-            }
-            return true;
+            return receivePurchase(player, activityData, detailId, order.getId(), Map.of());
         } catch (Exception e) {
             log.error("新手礼包支付处理失败 playerId:{} orderId:{}", player.getId(), order.getId(), e);
             return false;
         }
+    }
+
+    private boolean validNonMoneyShop(ShopRechargeListCfg shop, RechargeCfgType type) {
+        return shop != null && type != null && type != RechargeCfgType.MONEY && shop.getType() == type.getType()
+                && (type != RechargeCfgType.ITEM_EXCHANGE || CollectionUtil.isNotEmpty(shop.getRedeem())
+                && shop.getRedeem().entrySet().stream().allMatch(item -> item.getKey() > 0 && item.getValue() > 0));
+    }
+
+    private boolean receivePurchase(Player player, ActivityData activityData, int detailId, String orderId, Map<Integer, Long> cost) {
+        long activityId = activityData.getId();
+        Map<Integer, StarterPackPlayerData> playerData = readPlayerData(player.getId(), activityData);
+        StarterPackPlayerData previous = playerData.get(detailId);
+        if (previous != null) {
+            if (orderId == null) {
+                return true;
+            }
+            boolean sameOrder = orderId.equals(previous.getOrderId());
+            if (!sameOrder) {
+                log.warn("新手礼包购买处理失败，礼包已通过其他订单购买 playerId:{} orderId:{} activityId:{} detailId:{} purchasedOrderId:{}",
+                        player.getId(), orderId, activityId, detailId, previous.getOrderId());
+            }
+            return sameOrder;
+        }
+        StarterPackCfg cfg = getDetailCfgBean(activityData).get(detailId);
+        if (!playerData.isEmpty()) {
+            log.warn("新手礼包购买处理失败，已有其他礼包购买记录 playerId:{} orderId:{} activityId:{} detailId:{} purchasedDetailIds:{}",
+                    player.getId(), orderId, activityId, detailId, playerData.keySet());
+            return false;
+        }
+        if (!validConfig(activityData, cfg)) {
+            log.error("新手礼包购买处理失败，活动参数或奖励配置无效 playerId:{} orderId:{} activityId:{} detailId:{} bigDecimalParam:{} reward1:{} reward2:{} reward3:{}",
+                    player.getId(), orderId, activityId, detailId, activityData.getBigDecimalParam(),
+                    cfg == null ? null : cfg.getReward1(), cfg == null ? null : cfg.getReward2(), cfg == null ? null : cfg.getReward3());
+            return false;
+        }
+        playerData.put(detailId, new StarterPackPlayerData(activityId, activityData.getRound(), orderId));
+        if (!cost.isEmpty()) {
+            CommonResult<ItemOperationResult> removed = playerPackService.removeItems(player, cost, AddType.ITEM_EXCHANGE);
+            if (!removed.success()) {
+                log.warn("新手礼包兑换失败，扣除道具失败 playerId:{} activityId:{} detailId:{} cost:{} code:{}",
+                        player.getId(), activityId, detailId, cost, removed.code);
+                return false;
+            }
+        }
+        boolean saved = false;
+        try {
+            saved = playerActivityDao.savePlayerActivityData(player.getId(), ActivityType.STARTER_PACK, activityId, playerData);
+        } finally {
+            if (!saved && !cost.isEmpty()) {
+                CommonResult<ItemOperationResult> refunded = playerPackService.addItems(player.getId(), cost, AddType.FAIL_ROLLBACK);
+                if (!refunded.success()) {
+                    log.error("新手礼包兑换失败后退还道具失败 playerId:{} activityId:{} detailId:{} cost:{} code:{}",
+                            player.getId(), activityId, detailId, cost, refunded.code);
+                }
+            }
+        }
+        if (!saved) {
+            log.error("新手礼包购买处理失败，购买状态保存失败 playerId:{} orderId:{} activityId:{} detailId:{}",
+                    player.getId(), orderId, activityId, detailId);
+            return false;
+        }
+        try {
+            activityManager.sendToPlayer(player.getId(), buildResponse(player, activityData));
+            updateRodDot(player.getId(), activityData, false);
+        } catch (Exception e) {
+            log.error("新手礼包购买成功后通知失败 playerId:{} orderId:{}", player.getId(), orderId, e);
+        }
+        return true;
     }
 
     @Override

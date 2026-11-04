@@ -476,10 +476,14 @@ public interface SimConstant {
     }
 
     interface BonusSource {
+        //藏品
         int COLLECTION = 1;
+        //雇员
         int EMPLOYEE = 2;
+        //成就
         int ACHIEVEMENT = 3;
-        int BUFF = 4;
+        //皮肤buff
+        int SKIN_BUFF = 4;
     }
 
     interface Common {

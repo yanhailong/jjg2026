@@ -691,10 +691,10 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                 info.propValueAddList = new ArrayList<>();
                 info.propValueAddList.add(new KVLongInfo(SimConstant.BonusSource.EMPLOYEE, employeePercent));
                 if (skinBonus != null && skinBonus.fixed() != 0) {
-                    info.fixedValueAddList.add(new KVLongInfo(SimConstant.BonusSource.BUFF, skinBonus.fixed()));
+                    info.fixedValueAddList.add(new KVLongInfo(SimConstant.BonusSource.SKIN_BUFF, skinBonus.fixed()));
                 }
                 if (skinBonus != null && skinBonus.percent() != 0) {
-                    info.propValueAddList.add(new KVLongInfo(SimConstant.BonusSource.BUFF, skinBonus.percent()));
+                    info.propValueAddList.add(new KVLongInfo(SimConstant.BonusSource.SKIN_BUFF, skinBonus.percent()));
                 }
                 bonusInfos.add(info);
             }
@@ -1084,7 +1084,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         List<ItemInfo> items = new ArrayList<>(rewards.size());
         for (Map.Entry<BuildingOutputType, Long> en : rewards.entrySet()) {
             ItemInfo item = new ItemInfo();
-            item.itemId = en.getKey().getCode();
+            item.itemId = en.getKey().getItemId();
             item.count = en.getValue();
             items.add(item);
         }
