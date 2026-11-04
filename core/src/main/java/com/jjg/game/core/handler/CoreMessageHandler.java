@@ -640,7 +640,8 @@ public class CoreMessageHandler {
                 }
             } else {
                 preOrderResult.data.setPayType(req.payType);
-                preOrderResult.data.setProductId(req.productId);
+                preOrderResult.data.setProductId(StringUtils.isNotEmpty(preOrderResult.data.getOrderProductId())
+                        ? preOrderResult.data.getOrderProductId() : req.productId);
                 preOrderResult.data.setDesc(req.desc);
                 boolean success = matchedGenerate.onReceivedRecharge(playerController.getPlayer(), preOrderResult.data);
                 if (!success) {

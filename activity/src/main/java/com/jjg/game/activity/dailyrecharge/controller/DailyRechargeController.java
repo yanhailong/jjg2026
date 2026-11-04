@@ -355,4 +355,9 @@ public class DailyRechargeController extends BaseActivityController implements O
         }
         return res;
     }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        return false;
+    }
 }

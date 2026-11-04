@@ -67,4 +67,9 @@ public class BackendRechargeManager implements OrderGenerate {
         }
         return dealBackendRecharge(player, order);
     }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        return false;
+    }
 }

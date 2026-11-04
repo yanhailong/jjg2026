@@ -1,12 +1,14 @@
 package com.jjg.game.season.service;
 
 import com.jjg.game.core.constant.Code;
+import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Order;
 import com.jjg.game.core.data.OrderStatus;
 import com.jjg.game.core.data.Player;
 import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.core.listener.OrderGenerate;
+import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
@@ -17,12 +19,15 @@ import com.jjg.game.season.data.SeasonSmallDrawData;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /** 小额抽奖支付适配；客户端productId为SmallDraw.id，可信订单绑定具体赛季。 */
 @Service
 public class SeasonSmallDrawOrderService implements OrderGenerate {
     private final SimPlayerContextRegistry contexts;
     private final SeasonSmallDrawService drawService;
+    @Autowired
+    private PlayerPackService playerPackService;
 
     public SeasonSmallDrawOrderService(SimPlayerContextRegistry contexts,
                                        SeasonSmallDrawService drawService) {
@@ -51,6 +56,13 @@ public class SeasonSmallDrawOrderService implements OrderGenerate {
             return new CommonResult<>(Code.NOT_ENOUGH);
         }
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(draw.config().getPricePerUse());
+        if (shop != null && shop.getType() != RechargeCfgType.MONEY.getType()) {
+            CommonResult<PreGenerateOrderData> result = nonMoneyOrderDetailInfo(shop);
+            if (result.success()) {
+                result.data.setOrderProductId(productId);
+            }
+            return result;
+        }
         if (shop == null || shop.getPrice() == null || shop.getPrice().signum() <= 0) {
             return new CommonResult<>(Code.SAMPLE_ERROR);
         }
@@ -73,5 +85,17 @@ public class SeasonSmallDrawOrderService implements OrderGenerate {
         }
         SimPlayerContext ctx = contexts.getContext(player.getId());
         return ctx != null && drawService.receive(ctx, order);
+    }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        SimPlayerContext ctx = contexts.getContext(player.getId());
+        if (ctx == null) {
+            return false;
+        }
+        var draw = drawService.current(ctx);
+        return draw != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
+                GameDataManager.getShopRechargeListCfg(draw.config().getPricePerUse()), AddType.SIM_SEASON_SMALL_DRAW,
+                () -> drawService.receivePurchase(ctx, preGenerateOrderData.getProductId()));
     }
 }

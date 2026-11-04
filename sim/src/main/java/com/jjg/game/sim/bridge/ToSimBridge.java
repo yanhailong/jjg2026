@@ -4,6 +4,7 @@ import com.jjg.game.common.rpc.IGameRpc;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Item;
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.season.data.SeasonFreeSpinResult;
 import com.jjg.game.season.pb.res.ResSeasonMatch;
 import com.jjg.game.season.pb.res.ResSeasonTrialProgress;
@@ -253,5 +254,7 @@ public interface ToSimBridge extends IGameRpc {
         ActivePassPurchase prepareActivePassOrder(long playerId, int passId, int track);
 
         boolean receiveActivePassOrder(long playerId, String orderId);
+
+        boolean completeActivePassPurchase(long playerId, PreGenerateOrderData data);
     }
 }

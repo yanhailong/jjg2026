@@ -485,4 +485,9 @@ public class PlayerLevelPackManager implements GameEventListener, OrderGenerate,
         redDotDetailInfo.setCount(getRedDotCount(playerId));
         return List.of(redDotDetailInfo);
     }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        return false;
+    }
 }

@@ -314,16 +314,23 @@ public class GoldTreasureController extends BaseActivityController implements Or
 
     @Override
     public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        RechargeCfgType type = preGenerateOrderData.getType();
+        if (type == null || type == RechargeCfgType.MONEY) {
+            return false;
+        }
         int detailId = Integer.parseInt(preGenerateOrderData.getProductId());
         ActivityData activityData = activityManager.getOpenActivityData(player, ActivityType.GOLD_TREASURE);
+        if (!checkPlayerCanJoinActivity(player, activityData)) {
+            return false;
+        }
         GoldTreasureCfg cfg = getDetailCfgBean(activityData).get(detailId);
         if (cfg == null) {
             log.warn("充值后处理失败，未找到GoldTreasureCfg配置 playerId:{} detailId:{}", player.getId(), detailId);
             return false;
         }
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(cfg.getPayId());
-        if (shop == null) {
-            log.warn("充值后处理失败，未找到ShopRechargeListCfg配置 playerId:{} detailId:{}", player.getId(), detailId);
+        if (shop == null || shop.getType() != type.getType()) {
+            log.warn("非付费购买失败，商品配置不存在或购买类型不匹配 playerId:{} detailId:{} type:{}", player.getId(), detailId, type);
             return false;
         }
         return receivePayment(player, activityData, cfg, null, preGenerateOrderData.getProductId());

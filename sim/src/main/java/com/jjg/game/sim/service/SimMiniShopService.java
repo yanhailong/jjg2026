@@ -140,6 +140,9 @@ public class SimMiniShopService implements OrderGenerate {
         }
 
         ShopRechargeListCfg recharge = GameDataManager.getShopRechargeListCfg(shopMiniCfg.getShopRechargeListId());
+        if (recharge != null && recharge.getType() != RechargeCfgType.MONEY.getType()) {
+            return nonMoneyOrderDetailInfo(recharge);
+        }
         if (recharge == null || recharge.getPrice() == null) {
             log.warn("迷你商店下单失败，充值商品配置或价格为空 playerId={},productId={},shopCfgId={},price={}",
                     player.getId(), req.productId, shopMiniCfg.getShopRechargeListId(),
@@ -162,18 +165,32 @@ public class SimMiniShopService implements OrderGenerate {
         if (order.getRechargeType() != getRechargeType() || order.getPlayerId() != player.getId()) {
             return false;
         }
-        ShopMiniCfg shopMiniCfg = GameDataManager.getShopMiniCfg(Integer.parseInt(order.getProductId()));
+        return receivePurchase(player, order.getProductId(), order.getId());
+    }
+
+    private boolean receivePurchase(Player player, String productId, String orderId) {
+        ShopMiniCfg shopMiniCfg = GameDataManager.getShopMiniCfg(Integer.parseInt(productId));
         if (shopMiniCfg == null) {
-            log.warn("获取商品配置失败 playerId={},orderId={},producetId={}", player.getId(), order.getProductId(), order.getProductId());
+            log.warn("获取商品配置失败 playerId={},productId={}", player.getId(), productId);
             return false;
         }
         // 等级只在下单时校验，已付款订单不因玩家升级而拒绝发货。
-        playerPackService.addItems(player.getId(), shopMiniCfg.getGoods(), AddType.SHOP_RECHARGE, order.getId()).success();
+        if (!playerPackService.addItems(player.getId(), shopMiniCfg.getGoods(), AddType.SHOP_RECHARGE, orderId).success()) {
+            return false;
+        }
         ResBuyMiniShop res = new ResBuyMiniShop(Code.SUCCESS);
-        res.productId = order.getProductId();
+        res.productId = productId;
         res.items = ItemUtils.buildItemInfo(shopMiniCfg.getGoods());
 
         clusterSystem.sendToPlayer(res, player.getId());
         return true;
+    }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        ShopMiniCfg cfg = GameDataManager.getShopMiniCfg(Integer.parseInt(preGenerateOrderData.getProductId()));
+        return cfg != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
+                GameDataManager.getShopRechargeListCfg(cfg.getShopRechargeListId()), AddType.SIM_MINI_SHOP,
+                () -> receivePurchase(player, preGenerateOrderData.getProductId(), null));
     }
 }

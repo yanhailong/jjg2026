@@ -225,7 +225,40 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         return true;
     }
 
-    /** 客户端主动请求，一次成功抽奖消耗一次已付款机会。 */
+    /** 非充值购买增加一次抽奖机会，不创建订单或去重记录。 */
+    public boolean receivePurchase(SimPlayerContext ctx, String productId) {
+        DrawDefinition draw = current(ctx);
+        SeasonPlayerData season = ctx.getSeasonPlayerData();
+        SeasonSmallDrawData state = season.getSmallDraw();
+        if (draw == null || state == null || !orderToken(season, draw.id()).equals(productId)
+                || state.getPurchaseChances() <= 0
+                || draw.remainingRewardCount(state.getObtainedRewards()) <= state.drawChances()) {
+            return false;
+        }
+        int previousChances = state.getPurchaseChances();
+        int previousCount = state.getNonMoneyPurchaseCount();
+        state.setPurchaseChances(previousChances - 1);
+        state.setNonMoneyPurchaseCount(previousCount + 1);
+        try {
+            autoSaveService.saveAndWait(season);
+        } catch (RuntimeException e) {
+            state.setPurchaseChances(previousChances);
+            state.setNonMoneyPurchaseCount(previousCount);
+            log.error("小额抽奖非充值购买保存失败 playerId={},productId={}", ctx.playerId(), productId, e);
+            return false;
+        }
+        try {
+            redDotService.refresh(ctx);
+            ResSeasonSmallDrawInfo notification = new ResSeasonSmallDrawInfo(Code.SUCCESS);
+            notification.info = assemble(ctx, draw);
+            sender.sendTo(ctx.playerId(), notification);
+        } catch (Exception e) {
+            log.error("小额抽奖非充值购买通知失败 playerId={},productId={}", ctx.playerId(), productId, e);
+        }
+        return true;
+    }
+
+    /** 客户端主动请求，一次成功抽奖消耗一次已购买机会。 */
     public ResSeasonSmallDraw draw(SimPlayerContext ctx) {
         DrawDefinition draw = current(ctx);
         ResSeasonSmallDraw response = new ResSeasonSmallDraw(Code.NOT_FOUND);

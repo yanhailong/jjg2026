@@ -406,4 +406,9 @@ public class ShopService implements OrderGenerate {
         //获取商品
         return handleShopOrder(player, order, order.getMoney(), order.getRegionCode(), order.getChannelProductId());
     }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        return false;
+    }
 }

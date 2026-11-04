@@ -1,7 +1,6 @@
 package com.jjg.game.activity.common.controller;
 
 import cn.hutool.core.collection.CollectionUtil;
-import com.alibaba.fastjson.JSONObject;
 import com.jjg.game.activity.activitylog.ActivityLogger;
 import com.jjg.game.activity.common.dao.PlayerActivityDao;
 import com.jjg.game.activity.common.data.ActivityData;
@@ -523,35 +522,39 @@ public abstract class BaseActivityController {
      * @param dealType 处理类型1加入活动 2购买礼包
      */
     public final boolean dealActivityRecharge(Player player, Order order, int dealType) {
-        log.info("充值事件 参加活动 playerId:{}  order;{}", player.getId(), JSONObject.toJSONString(order));
-        String[] idCfg = StringUtils.split(order.getProductId(), "_");
+        return dealActivityPurchase(player, order.getProductId(), dealType);
+    }
+
+    protected final boolean dealActivityPurchase(Player player, String productId, int dealType) {
+        log.info("购买活动 playerId:{} productId:{}", player.getId(), productId);
+        String[] idCfg = StringUtils.split(productId, "_");
         if (idCfg.length != 2) {
-            log.error("活动充值回调 productId错误 playerId:{} order:{}", player.getId(), JSONObject.toJSONString(order));
+            log.error("活动购买productId错误 playerId:{} productId:{}", player.getId(), productId);
             return false;
         }
         long activityId = Long.parseLong(idCfg[0]);
         int detailId = Integer.parseInt(idCfg[1]);
         ActivityData data = activityManager.getActivityData().get(activityId);
         if (data == null || !data.getValue().contains(detailId) || !checkPlayerCanJoinActivity(player, data)) {
-            log.error("充值事件 不能参加活动 playerId:{} order:{}", player.getId(), JSONObject.toJSONString(order));
+            log.error("不能购买活动 playerId:{} productId:{}", player.getId(), productId);
             return false;
         }
         if (dealType == 1) {
             AbstractResponse res = joinActivity(player, data, detailId, 1);
             if (res == null || res.code != Code.SUCCESS) {
-                log.error("充值事件参加活动失败 playerId:{} order:{} code:{}", player.getId(), JSONObject.toJSONString(order), res == null ? Code.FAIL : res.code);
+                log.error("购买活动失败 playerId:{} productId:{} code:{}", player.getId(), productId, res == null ? Code.FAIL : res.code);
                 return false;
             }
-            log.info("充值事件 参加活动成功 playerId:{}  order;{}", player.getId(), JSONObject.toJSONString(order));
+            log.info("购买活动成功 playerId:{} productId:{}", player.getId(), productId);
             activityManager.sendToPlayer(player.getId(), res);
         } else if (dealType == 2) {
             AbstractResponse res = buyActivityGiftForRecharge(player, data, detailId);
             if (res == null || res.code != Code.SUCCESS) {
-                log.error("充值事件购买活动礼包失败 playerId:{} order:{} code:{}",
-                        player.getId(), JSONObject.toJSONString(order), res == null ? Code.FAIL : res.code);
+                log.error("购买活动礼包失败 playerId:{} productId:{} code:{}",
+                        player.getId(), productId, res == null ? Code.FAIL : res.code);
                 return false;
             }
-            log.info("充值事件 购买活动礼包成功 playerId:{}  order;{}", player.getId(), JSONObject.toJSONString(order));
+            log.info("购买活动礼包成功 playerId:{} productId:{}", player.getId(), productId);
             activityManager.sendToPlayer(player.getId(), res);
         } else {
             log.error("不支持的活动充值处理类型 dealType = {}", dealType);

@@ -489,4 +489,9 @@ public class PiggyBankController extends BaseActivityController implements Order
         }
         return dealActivityRecharge(player, order, 1);
     }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        return false;
+    }
 }

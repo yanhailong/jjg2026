@@ -774,4 +774,9 @@ public class MiningService implements OrderGenerate, StandalonePloyGame {
                 throw new MiningException(Code.SAMPLE_ERROR, "UNSUPPORTED_NON_BAG_REWARD_" + id);
         });
     }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        return false;
+    }
 }

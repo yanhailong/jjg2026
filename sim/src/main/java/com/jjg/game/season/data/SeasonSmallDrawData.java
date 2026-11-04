@@ -14,9 +14,10 @@ public class SeasonSmallDrawData {
     private Map<Integer, Integer> selectedOptions = new HashMap<>();
     private Set<Integer> obtainedRewards = new HashSet<>();
     private Set<String> receivedOrders = new HashSet<>();
+    private int nonMoneyPurchaseCount;
 
-    /** 已付款未抽奖次数；每个到账订单对应一次机会，每个已获得格子消耗一次机会。 */
-    public int drawChances() { return Math.max(0, receivedOrders.size() - obtainedRewards.size()); }
+    /** 已购买未抽奖次数；非充值购买只累计次数，不保存订单记录。 */
+    public int drawChances() { return Math.max(0, receivedOrders.size() + nonMoneyPurchaseCount - obtainedRewards.size()); }
 
     public int getDrawId() { return drawId; }
     public void setDrawId(int drawId) { this.drawId = drawId; }
@@ -32,4 +33,6 @@ public class SeasonSmallDrawData {
     public void setObtainedRewards(Set<Integer> obtainedRewards) { this.obtainedRewards = obtainedRewards; }
     public Set<String> getReceivedOrders() { return receivedOrders; }
     public void setReceivedOrders(Set<String> receivedOrders) { this.receivedOrders = receivedOrders; }
+    public int getNonMoneyPurchaseCount() { return nonMoneyPurchaseCount; }
+    public void setNonMoneyPurchaseCount(int nonMoneyPurchaseCount) { this.nonMoneyPurchaseCount = nonMoneyPurchaseCount; }
 }

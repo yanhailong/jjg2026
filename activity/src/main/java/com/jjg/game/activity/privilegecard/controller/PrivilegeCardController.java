@@ -377,4 +377,9 @@ public class PrivilegeCardController extends BaseActivityController implements O
         }
         return dealActivityRecharge(player, order, 1);
     }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        return false;
+    }
 }

@@ -9,7 +9,7 @@ import java.util.List;
 @ProtobufMessage
 @ProtoDesc("在线收益信息")
 public class OnlineRewardInfo {
-    @ProtoDesc("每小时收益，与OfflineReward.rewards一致，itemId = 1.金币 2.能量 3.服务能力 4.游戏上限 5.知名度 6.曝光度 12.场景经验")
+    @ProtoDesc("每小时收益道具")
     public List<ItemInfo> hourlyRewards;
     @ProtoDesc("视频今日已使用次数")
     public int adUsedCount;

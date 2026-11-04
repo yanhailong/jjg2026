@@ -68,8 +68,8 @@ public class SimNoAdsService implements OrderGenerate, SimNoAdsListener {
         res.items = ItemUtils.buildItemInfo(simConfigCacheService.getNoAdsRewardsMap());
         res.discountEndTime = noAdsDiscountEndTime(player);
         res.discountPercent = String.valueOf(SampleDataUtils.getIntGlobalData(SimConstant.Global.NO_ADS_PROP_NUM));
-        res.discountPrice = discount.getPrice().toPlainString();
-        res.originalPrice = original.getPrice().toPlainString();
+        res.discountPrice = discount.getPrice() == null ? null : discount.getPrice().toPlainString();
+        res.originalPrice = original.getPrice() == null ? null : original.getPrice().toPlainString();
         ShopRechargeListCfg current = System.currentTimeMillis() < res.discountEndTime ? discount : original;
         res.rechargeInfo = SampleDataUtils.transRechargeCfgToRechargeInfo(current.getId(), player.getChannel());
         return res;
@@ -101,6 +101,13 @@ public class SimNoAdsService implements OrderGenerate, SimNoAdsListener {
         if (shop == null) {
             return new CommonResult<>(Code.SAMPLE_ERROR);
         }
+        if (shop.getType() != RechargeCfgType.MONEY.getType()) {
+            CommonResult<PreGenerateOrderData> result = nonMoneyOrderDetailInfo(shop);
+            if (result.success()) {
+                result.data.setOrderProductId(String.valueOf(shop.getId()));
+            }
+            return result;
+        }
         PreGenerateOrderData data = new PreGenerateOrderData();
         data.setType(RechargeCfgType.MONEY);
         data.setPrice(shop.getPrice());
@@ -115,6 +122,10 @@ public class SimNoAdsService implements OrderGenerate, SimNoAdsListener {
                 || order.getOrderStatus() != OrderStatus.PROCESSING) {
             return false;
         }
+        return receivePurchase(player, order.getId());
+    }
+
+    private boolean receivePurchase(Player player, String orderId) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(player.getId());
         if (ctx == null) {
             return false;
@@ -123,24 +134,30 @@ public class SimNoAdsService implements OrderGenerate, SimNoAdsListener {
         if (base.isNoads()) {
             return true;
         }
+        boolean giftsAdded = false;
         try {
             String deliveredOrder = base.getNoAdsOrderId();
-            if (deliveredOrder != null && !deliveredOrder.equals(order.getId())) {
+            if (deliveredOrder != null && !deliveredOrder.equals(orderId)) {
                 return false;
             }
             if (deliveredOrder == null) {
                 if (!playerPackService.addItems(player.getId(), simConfigCacheService.getNoAdsRewardsMap(),
-                        AddType.SIM_NO_ADS_REWARDS, order.getId()).success()) {
+                        AddType.SIM_NO_ADS_REWARDS, orderId).success()) {
                     return false;
                 }
-                base.setNoAdsOrderId(order.getId());
+                giftsAdded = true;
+                base.setNoAdsOrderId(orderId);
             }
             base.setNoads(true);
             // 赠品记录和权益一并落库；失败保留发货记录，重试时不重复发奖。
             autoSaveService.saveAndWait(base);
         } catch (Exception e) {
             base.setNoads(false);
-            log.error("免广告礼包交付失败 playerId={},orderId={}", player.getId(), order.getId(), e);
+            if (orderId == null && giftsAdded && !playerPackService.removeItems(player,
+                    simConfigCacheService.getNoAdsRewardsMap(), AddType.FAIL_ROLLBACK).success()) {
+                log.error("免广告礼包非充值购买失败后收回赠品失败 playerId={}", player.getId());
+            }
+            log.error("免广告礼包交付失败 playerId={},orderId={}", player.getId(), orderId, e);
             return false;
         }
         try {
@@ -148,10 +165,10 @@ public class SimNoAdsService implements OrderGenerate, SimNoAdsListener {
             notify.closeFunctionIdList = List.of(EFunctionType.NO_ADS.getFunctionId());
             clusterSystem.sendToPlayer(notify, player.getId());
             ResNoAds res = noAds(ctx);
-            res.orderId = order.getId();
+            res.orderId = orderId;
             clusterSystem.sendToPlayer(res, player.getId());
         } catch (Exception e) {
-            log.error("免广告礼包购买成功后推送失败 playerId={},orderId={}", player.getId(), order.getId(), e);
+            log.error("免广告礼包购买成功后推送失败 playerId={},orderId={}", player.getId(), orderId, e);
         }
         return true;
     }
@@ -162,11 +179,18 @@ public class SimNoAdsService implements OrderGenerate, SimNoAdsListener {
 
     private ShopRechargeListCfg noAdsShop(int shopId, Player player) {
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(shopId);
-        if (shop == null || shop.getType() != RechargeCfgType.MONEY.getType()
-                || shop.getPrice() == null || shop.getPrice().signum() <= 0
-                || StringUtils.isBlank(player.getChannel() == ChannelType.APPLE ? shop.getIosShopId() : shop.getGoogleShopId())) {
+        if (shop == null || shop.getType() == RechargeCfgType.MONEY.getType()
+                && (shop.getPrice() == null || shop.getPrice().signum() <= 0
+                || StringUtils.isBlank(player.getChannel() == ChannelType.APPLE ? shop.getIosShopId() : shop.getGoogleShopId()))) {
             return null;
         }
         return shop;
+    }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        return completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
+                GameDataManager.getShopRechargeListCfg(Integer.parseInt(preGenerateOrderData.getProductId())),
+                AddType.SIM_NO_ADS_REWARDS, () -> receivePurchase(player, null));
     }
 }

@@ -9,6 +9,7 @@ import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.OrderService;
+import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sim.data.ActivePassPurchase;
 import com.jjg.game.sim.data.SimPlayerContext;
@@ -16,6 +17,7 @@ import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import static com.jjg.game.sim.constant.SimConstant.ActivePass.BASIC;
 import static com.jjg.game.sim.constant.SimConstant.ActivePass.PREMIUM;
@@ -33,6 +35,8 @@ public class ActivePassOrderService implements OrderGenerate {
     private final SimPlayerContextRegistry contexts;
     private final OrderService orders;
     private final CorePlayerService playerService;
+    @Autowired
+    private PlayerPackService playerPackService;
 
     public ActivePassOrderService(ActivePassService service, ActivePassConfigService config, ActivePassRouter router,
                                   SimPlayerContextRegistry contexts, OrderService orders, CorePlayerService playerService) {
@@ -66,6 +70,13 @@ public class ActivePassOrderService implements OrderGenerate {
         }
         req.productId = result.productId;
 
+        var period = config.index().period(target[0]);
+        int shopId = target[1] == BASIC ? period.config().getShopRechargeListID() : period.config().getShopRechargeList1ID();
+        var shop = GameDataManager.getShopRechargeListCfg(shopId);
+        if (shop.getType() != RechargeCfgType.MONEY.getType()) {
+            return nonMoneyOrderDetailInfo(shop);
+        }
+
         int tmpCode = tmpOrderHandle(playerService, player, 1004, AddType.SIM_ACTIVE_PASS, target[1] == BASIC ? 0 : 1);
         if (tmpCode != Code.SUCCESS) {
             log.warn("活跃通行证临时钻石购买失败 playerId={},productId={},round={},code={}",
@@ -89,11 +100,14 @@ public class ActivePassOrderService implements OrderGenerate {
         var period = config.index().period(passId);
         int shopId = track == BASIC ? period.config().getShopRechargeListID() : period.config().getShopRechargeList1ID();
         var shop = GameDataManager.getShopRechargeListCfg(shopId);
-        if (shop == null || shop.getPrice() == null || shop.getPrice().signum() <= 0) {
+        if (shop == null || shop.getType() == RechargeCfgType.MONEY.getType()
+                && (shop.getPrice() == null || shop.getPrice().signum() <= 0)) {
             return new ActivePassPurchase(Code.FAIL);
         }
         // 创建期记录先于付款；即使跨期到账，也能在原期补发奖励。
-        service.saveReceipt(data);
+        if (shop.getType() == RechargeCfgType.MONEY.getType()) {
+            service.saveReceipt(data);
+        }
         return new ActivePassPurchase(Code.SUCCESS, passId + "_" + track, shop.getPrice());
     }
 
@@ -135,5 +149,30 @@ public class ActivePassOrderService implements OrderGenerate {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        int[] target = parse(preGenerateOrderData.getProductId());
+        if (target == null) {
+            return false;
+        }
+        return router.execute(player.getId(), null,
+                () -> receiveNonMoneyPurchase(contexts.getContext(player.getId()), preGenerateOrderData),
+                rpc -> rpc.completeActivePassPurchase(player.getId(), preGenerateOrderData));
+    }
+
+    public boolean receiveNonMoneyPurchase(SimPlayerContext ctx, PreGenerateOrderData data) {
+        int[] target = parse(data.getProductId());
+        if (ctx == null || target == null) {
+            return false;
+        }
+        var period = config.index().period(target[0]);
+        if (period == null) {
+            return false;
+        }
+        int shopId = target[1] == BASIC ? period.config().getShopRechargeListID() : period.config().getShopRechargeList1ID();
+        return completeNonMoneyPurchase(playerPackService, ctx.getPlayer(), data, GameDataManager.getShopRechargeListCfg(shopId),
+                AddType.SIM_ACTIVE_PASS, () -> service.unlock(ctx, target[0], target[1]));
     }
 }

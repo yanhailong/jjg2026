@@ -11,6 +11,7 @@ import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.CorePlayerService;
+import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
 import com.jjg.game.season.constant.SeasonConstant;
 import com.jjg.game.season.data.SeasonPlayerData;
@@ -19,6 +20,7 @@ import com.jjg.game.sim.manager.SimPlayerContextRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * 通行证订单适配器。预下单 productId 使用 passId_track，创建订单时转换为带赛季范围的业务标识。
@@ -32,6 +34,8 @@ public class SeasonPassOrderService implements OrderGenerate {
     private final SeasonPassConfigService passConfig;
     private final SeasonPassService passService;
     private final CorePlayerService playerService;
+    @Autowired
+    private PlayerPackService playerPackService;
 
     public SeasonPassOrderService(SimPlayerContextRegistry contextRegistry,
                                   SeasonLifecycleService lifecycleService,
@@ -80,6 +84,13 @@ public class SeasonPassOrderService implements OrderGenerate {
         if (shop == null) {
             log.warn("通行证下单失败，未找到充值商品配置 playerId={},productId={},passId={},track={}",
                     player.getId(), req.productId, pass.id(), target.track());
+            return result;
+        }
+        if (shop.getType() != RechargeCfgType.MONEY.getType()) {
+            result = nonMoneyOrderDetailInfo(shop);
+            if (result.success()) {
+                result.data.setOrderProductId(passService.orderToken(data, pass, target.track()));
+            }
             return result;
         }
         String channelProductId = SeasonPassService.channelProductId(player, shop);
@@ -171,5 +182,21 @@ public class SeasonPassOrderService implements OrderGenerate {
     }
 
     private record PurchaseTarget(int passId, int track) {
+    }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        SimPlayerContext ctx = contextRegistry.getContext(player.getId());
+        if (ctx == null) {
+            return false;
+        }
+        lifecycleService.ensureCurrent(ctx, System.currentTimeMillis());
+        SeasonPassService.PurchaseToken token = passService.parseOrderToken(preGenerateOrderData.getProductId());
+        if (token == null || !token.seasonKey().equals(ctx.getSeasonPlayerData().getSeasonKey())) {
+            return false;
+        }
+        SeasonPassConfigService.PassDefinition pass = passConfig.activePass(ctx.getSeasonPlayerData().getSeasonId(), token.passId());
+        return pass != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
+                passConfig.shop(pass, token.track()), AddType.SIM_SEASON_PASS, () -> passService.unlock(ctx, token));
     }
 }

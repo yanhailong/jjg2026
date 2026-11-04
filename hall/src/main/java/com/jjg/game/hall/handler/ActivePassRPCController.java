@@ -1,5 +1,6 @@
 package com.jjg.game.hall.handler;
 
+import com.jjg.game.core.data.PreGenerateOrderData;
 import com.jjg.game.sim.data.ActivePassPurchase;
 import com.jjg.game.sim.pb.res.ResActivePass;
 import com.jjg.game.sim.service.ActivePassOrderService;
@@ -56,5 +57,10 @@ public class ActivePassRPCController implements ToSimBridge.ActivePassBridge {
     @Override @RpcCallSetting(processorModKey = "#arg0")
     public boolean receiveActivePassOrder(long playerId, String orderId) {
         return orders.receive(context(playerId), orderId);
+    }
+
+    @Override @RpcCallSetting(processorModKey = "#arg0")
+    public boolean completeActivePassPurchase(long playerId, PreGenerateOrderData data) {
+        return orders.receiveNonMoneyPurchase(context(playerId), data);
     }
 }

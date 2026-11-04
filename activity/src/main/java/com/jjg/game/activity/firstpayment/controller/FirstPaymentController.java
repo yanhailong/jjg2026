@@ -287,4 +287,9 @@ public class FirstPaymentController extends BaseActivityController implements Or
         }
         return dealActivityRecharge(player, order, 1);
     }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        return false;
+    }
 }

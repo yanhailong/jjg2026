@@ -1,7 +1,6 @@
 package com.jjg.game.activity.buyOneGetSeven;
 
 import cn.hutool.core.collection.CollectionUtil;
-import com.alibaba.fastjson.JSONObject;
 import com.jjg.game.activity.buyOneGetSeven.data.BuyOneGetSevenPlayerData;
 import com.jjg.game.activity.buyOneGetSeven.message.BuyOneGetSevenDetailInfo;
 import com.jjg.game.activity.buyOneGetSeven.message.ResBuyOneGetSeven;
@@ -308,6 +307,9 @@ public class BuyOneGetSevenController extends BaseActivityController
                     player.getId(), req.productId, activityData.getId());
             return result;
         }
+        if (shopCfg.getType() != RechargeCfgType.MONEY.getType()) {
+            return nonMoneyOrderDetailInfo(shopCfg);
+        }
         if (shopCfg.getPrice() == null) {
             log.warn("买一送七下单失败，充值商品价格为空 playerId={},productId={},activityId={}",
                     player.getId(), req.productId, activityData.getId());
@@ -345,16 +347,20 @@ public class BuyOneGetSevenController extends BaseActivityController
         if (order.getRechargeType() != getRechargeType()) {
             return true;
         }
+        return receivePurchase(player);
+    }
+
+    private boolean receivePurchase(Player player) {
         ActivityData activityData = activityManager.getOpenActivityData(player, ActivityType.BUY_ONE_GET_SEVEN);
         Map<Integer, BuyOneGetSevenCfg> cfgMap = getDetailCfgBean(activityData);
         if (!validConfig(activityData, cfgMap) || !activityManager.playerCanJoinActivity(activityData, player)) {
-            log.error("买一送七充值回调活动无效 playerId:{} order:{}", player.getId(), JSONObject.toJSONString(order));
+            log.error("买一送七购买活动无效 playerId:{}", player.getId());
             return false;
         }
         AbstractResponse res = joinActivity(player, activityData, activityData.getValue().getFirst(), 1);
         if (res == null || res.code != Code.SUCCESS) {
-            log.error("买一送七充值处理失败 playerId:{} order:{} code:{}",
-                    player.getId(), JSONObject.toJSONString(order), res == null ? Code.FAIL : res.code);
+            log.error("买一送七购买处理失败 playerId:{} code:{}",
+                    player.getId(), res == null ? Code.FAIL : res.code);
             return false;
         }
         activityManager.sendToPlayer(player.getId(), res);
@@ -550,6 +556,13 @@ public class BuyOneGetSevenController extends BaseActivityController
 
     private String getChannelProductId(Player player, ShopRechargeListCfg shopCfg) {
         return player.getChannel() == ChannelType.APPLE ? shopCfg.getIosShopId() : shopCfg.getGoogleShopId();
+    }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        ActivityData activityData = activityManager.getOpenActivityData(player, ActivityType.BUY_ONE_GET_SEVEN);
+        return activityData != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
+                getShopCfg(activityData), AddType.ACTIVITY_BUY_ONE_GET_SEVEN_BUY, () -> receivePurchase(player));
     }
 }
 

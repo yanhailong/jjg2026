@@ -1,7 +1,6 @@
 package com.jjg.game.activity.growthfund.controller;
 
 import cn.hutool.core.collection.CollectionUtil;
-import com.alibaba.fastjson.JSONObject;
 import com.jjg.game.activity.common.controller.BaseActivityController;
 import com.jjg.game.activity.common.data.ActivityData;
 import com.jjg.game.activity.common.data.ActivityTargetType;
@@ -130,7 +129,6 @@ public class GrowthFundController extends BaseActivityController implements Orde
         }
 
         ShopRechargeListCfg shopRechargeListCfg = getShopCfg(activityData);
-
         info.isBuy = true;
         activityLogger.sendGrowthFundBuyLog(player, activityData, shopRechargeListCfg == null ? null : shopRechargeListCfg.getPrice(),
                 rewards, addItems == null ? null : addItems.data);
@@ -452,6 +450,9 @@ public class GrowthFundController extends BaseActivityController implements Orde
             return result;
         }
         ShopRechargeListCfg shopRechargeListCfg = getShopCfg(activityData);
+        if (shopRechargeListCfg != null && shopRechargeListCfg.getType() != RechargeCfgType.MONEY.getType()) {
+            return nonMoneyOrderDetailInfo(shopRechargeListCfg);
+        }
         if (shopRechargeListCfg == null || shopRechargeListCfg.getPrice() == null) {
             log.warn("成长基金下单失败，充值商品配置或价格为空 playerId={},productId={},activityId={},shopCfgId={},price={}",
                     player.getId(), req.productId, activityId,
@@ -486,21 +487,24 @@ public class GrowthFundController extends BaseActivityController implements Orde
         if (order.getRechargeType() != RechargeType.GROWTH_FUND) {
             return true;
         }
+        return receivePurchase(player, order.getProductId());
+    }
+
+    private boolean receivePurchase(Player player, String productId) {
         Map<Long, ActivityData> map = activityManager.getActivityTypeData().get(ActivityType.GROWTH_FUND);
         if (CollectionUtil.isEmpty(map)) {
-            log.error("充值事件 所有活动数据为空 playerId:{} order;{}", player.getId(), JSONObject.toJSONString(order));
+            log.error("成长基金活动数据为空 playerId:{} productId:{}", player.getId(), productId);
             return false;
         }
-        ActivityData data = map.get(Long.parseLong(order.getProductId()));
+        ActivityData data = map.get(Long.parseLong(productId));
         if (data == null) {
-            log.error("充值事件 没有活动数据 playerId:{} order;{}", player.getId(), JSONObject.toJSONString(order));
+            log.error("成长基金活动不存在 playerId:{} productId:{}", player.getId(), productId);
             return false;
         }
-        log.info("充值事件 参加活动 playerId:{}  order;{}", player.getId(), JSONObject.toJSONString(order));
         AbstractResponse res = joinActivity(player, data, 1, 1);
         if (res == null || res.code != Code.SUCCESS) {
-            log.error("成长基金充值处理失败 playerId:{} order:{} code:{}",
-                    player.getId(), JSONObject.toJSONString(order), res == null ? Code.FAIL : res.code);
+            log.error("成长基金购买处理失败 playerId:{} productId:{} code:{}",
+                    player.getId(), productId, res == null ? Code.FAIL : res.code);
             return false;
         }
         // 红点刷新不影响充值主成功链路
@@ -511,5 +515,13 @@ public class GrowthFundController extends BaseActivityController implements Orde
         }
         activityManager.sendToPlayer(player.getId(), res);
         return true;
+    }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        ActivityData activityData = activityManager.getActivityData().get(Long.parseLong(preGenerateOrderData.getProductId()));
+        return activityData != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
+                getShopCfg(activityData), AddType.ACTIVITY_GROWTH_FUND_BUY,
+                () -> receivePurchase(player, preGenerateOrderData.getProductId()));
     }
 }

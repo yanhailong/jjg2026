@@ -481,7 +481,7 @@ public class ActivityLogger extends BaseLogger {
     public void sendGrowthFundBuyLog(Player player, ActivityData activityData, BigDecimal cost, Map<Integer, Long> rewards, ItemOperationResult result) {
         try {
             JSONObject json = buildBaseInfo(activityData, 0);
-            json.put("cost", cost.toPlainString());
+            json.put("cost", cost == null ? null : cost.toPlainString());
             if (rewards != null) {
                 json.put("rewards", objectMapper.writeValueAsString(rewards));
             }

@@ -319,6 +319,9 @@ public class ScratchCardsController extends BaseActivityController implements Or
                 return result;
             }
             ShopRechargeListCfg shopRechargeListCfg = GameDataManager.getShopRechargeListCfg(cfg.getChannelCommodity());
+            if (shopRechargeListCfg != null && shopRechargeListCfg.getType() != RechargeCfgType.MONEY.getType()) {
+                return nonMoneyOrderDetailInfo(shopRechargeListCfg);
+            }
             if (shopRechargeListCfg == null || shopRechargeListCfg.getPrice() == null) {
                 log.warn("刮刮卡下单失败，充值商品配置或价格为空 playerId={},productId={},shopCfgId={},price={}",
                         player.getId(), req.productId, cfg.getChannelCommodity(),
@@ -453,5 +456,16 @@ public class ScratchCardsController extends BaseActivityController implements Or
 
     private void addBuyCount(String countFeature, int giftId) {
         countDao.incrementWithoutExpireRefresh(countFeature, String.valueOf(giftId), BigDecimal.ONE, BUY_COUNT_EXPIRE_SECONDS);
+    }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        BaseCfgBean bean = getOrderGenerateBean(player, preGenerateOrderData.getProductId());
+        if (!(bean instanceof ScratchCardsCfg cfg)) {
+            return false;
+        }
+        return completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
+                GameDataManager.getShopRechargeListCfg(cfg.getChannelCommodity()), AddType.ACTIVITY_SCRATCH_CARDS_BUY_GIFT,
+                () -> dealActivityPurchase(player, preGenerateOrderData.getProductId(), 2));
     }
 }

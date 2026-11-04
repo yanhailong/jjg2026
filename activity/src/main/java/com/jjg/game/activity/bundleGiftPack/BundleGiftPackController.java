@@ -234,6 +234,11 @@ public class BundleGiftPackController extends BaseActivityController implements 
             }
         }
 
+        req.productId = target.isAllGift()
+                ? String.valueOf(target.activityId()) : target.activityId() + "_" + target.giftId();
+        if (shopCfg.getType() != RechargeCfgType.MONEY.getType()) {
+            return nonMoneyOrderDetailInfo(shopCfg);
+        }
         int tmpCode = tmpOrderHandle(corePlayerService, player, 1002, AddType.ACTIVITY_BUNDLE_GIFT_PACK, target.isAllGift() ? 3 : ((giftId % 1000) - 1));
         if (tmpCode != Code.SUCCESS) {
             result.code = tmpCode;
@@ -242,8 +247,6 @@ public class BundleGiftPackController extends BaseActivityController implements 
             return result;
         }
 
-        req.productId = target.isAllGift()
-                ? String.valueOf(target.activityId()) : target.activityId() + "_" + target.giftId();
         result.code = Code.SUCCESS;
 
         PreGenerateOrderData preGenerateOrderData = new PreGenerateOrderData();
@@ -263,31 +266,33 @@ public class BundleGiftPackController extends BaseActivityController implements 
         if (order.getRechargeType() != getRechargeType()) {
             return true;
         }
-        PurchaseTarget target = parseOrderTarget(order.getProductId());
+        return receivePurchase(player, order.getProductId());
+    }
+
+    private boolean receivePurchase(Player player, String productId) {
+        PurchaseTarget target = parseOrderTarget(productId);
         if (target == null) {
-            log.error("集合礼包订单商品ID错误 playerId:{} orderId:{} productId:{}",
-                    player.getId(), order.getId(), order.getProductId());
+            log.error("集合礼包商品ID错误 playerId:{} productId:{}", player.getId(), productId);
             return false;
         }
         ActivityData activityData = activityManager.getActivityData().get(target.activityId());
         if (!isBundleActivity(player, activityData)) {
-            log.error("集合礼包活动不可购买 playerId:{} orderId:{} activityId:{}",
-                    player.getId(), order.getId(), target.activityId());
+            log.error("集合礼包活动不可购买 playerId:{} activityId:{}", player.getId(), target.activityId());
             return false;
         }
 
         AbstractResponse result = buyActivityGiftForRecharge(player, activityData, target.giftId());
         if (result == null || result.code != Code.SUCCESS) {
-            log.error("集合礼包充值处理失败 playerId:{} orderId:{} activityId:{} giftId:{} code:{}",
-                    player.getId(), order.getId(), target.activityId(), target.giftId(),
+            log.error("集合礼包购买处理失败 playerId:{} activityId:{} giftId:{} code:{}",
+                    player.getId(), target.activityId(), target.giftId(),
                     result == null ? Code.FAIL : result.code);
             return false;
         }
         try {
             activityManager.sendToPlayer(player.getId(), getPlayerActivityInfoByType(player, ActivityType.BUNDLE_GIFT_PACK));
         } catch (Exception e) {
-            log.error("集合礼包购买成功后通知玩家失败 playerId:{} orderId:{} activityId:{}",
-                    player.getId(), order.getId(), target.activityId(), e);
+            log.error("集合礼包购买成功后通知玩家失败 playerId:{} activityId:{}",
+                    player.getId(), target.activityId(), e);
         }
         return true;
     }
@@ -419,8 +424,8 @@ public class BundleGiftPackController extends BaseActivityController implements 
     }
 
     private boolean isValidShopCfg(Player player, ShopRechargeListCfg shopCfg) {
-        return shopCfg != null && shopCfg.getPrice() != null
-                && StringUtils.isNotBlank(getChannelProductId(player, shopCfg));
+        return shopCfg != null && (shopCfg.getType() != RechargeCfgType.MONEY.getType()
+                || shopCfg.getPrice() != null && StringUtils.isNotBlank(getChannelProductId(player, shopCfg)));
     }
 
     private String getChannelProductId(Player player, ShopRechargeListCfg shopCfg) {
@@ -471,5 +476,20 @@ public class BundleGiftPackController extends BaseActivityController implements 
 
     private static boolean isAllGift(int giftId) {
         return giftId == ALL_GIFT_ID;
+    }
+
+    @Override
+    public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
+        PurchaseTarget target = parseOrderTarget(preGenerateOrderData.getProductId());
+        if (target == null) {
+            return false;
+        }
+        ActivityData activityData = activityManager.getActivityData().get(target.activityId());
+        if (!isBundleActivity(player, activityData)) {
+            return false;
+        }
+        return completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
+                getPurchaseShopCfg(activityData, getDetailCfgBean(activityData), target), AddType.ACTIVITY_BUNDLE_GIFT_PACK,
+                () -> receivePurchase(player, preGenerateOrderData.getProductId()));
     }
 }
