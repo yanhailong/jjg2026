@@ -55,12 +55,12 @@ public class SimMiniGameService {
         this.conditionService = conditionService;
     }
 
-    /** 登录结算当天赠送，离线日期不累计补发。 */
+    /** 登录检查当天道具补足，离线日期不累计补发。 */
     public void onLogin(SimPlayerContext ctx) {
         grantDaily(ctx, data(ctx), System.currentTimeMillis());
     }
 
-    /** 零点事件在玩家队列内调用，只给仍在线的玩家发放当日道具。 */
+    /** 零点事件在玩家队列内调用，只检查仍在线玩家的当日道具补足。 */
     public void onDaily(SimPlayerContext ctx, long now) {
         if (ctx.getPlayerController() != null && ctx.getPlayerController().isOnline()) {
             grantDaily(ctx, data(ctx), now);
@@ -314,7 +314,7 @@ public class SimMiniGameService {
         return data;
     }
 
-    /** 当天首次登录/在线跨日发放，成功后才更新持久化标记，不增加每日缓存。 */
+    /** 每日首次处理时补足道具；已充足也记录当天，补足失败则保留重试机会。 */
     private int grantDaily(SimPlayerContext ctx, CheaterHuntData data, long now) {
         //事件入队时刻可能早于已处理的登录/请求，不让旧事件回退发放日期。
         if (data.getLastDailyGrantTime() >= now || TimeHelper.inSameDay(data.getLastDailyGrantTime(), now)) {
@@ -324,10 +324,10 @@ public class SimMiniGameService {
         if (cfg == null) {
             return Code.SAMPLE_ERROR;
         }
-        CommonResult<ItemOperationResult> result = playerPackService.addItems(
-                ctx.playerId(), cfg.getDailyFreeItemCount(), AddType.SIM_CHEATER_HUNT, true);
+        CommonResult<ItemOperationResult> result = MiniGameDailyItems.replenish(
+                ctx, cfg.getDailyFreeItemCount(), AddType.SIM_CHEATER_HUNT, playerPackService);
         if (!result.success()) {
-            log.warn("找老千每日赠送失败 playerId={},levelId={},code={}", ctx.playerId(), cfg.getId(), result.code);
+            log.warn("找老千每日补足失败 playerId={},levelId={},code={}", ctx.playerId(), cfg.getId(), result.code);
             return result.code;
         }
         data.setLastDailyGrantTime(now);

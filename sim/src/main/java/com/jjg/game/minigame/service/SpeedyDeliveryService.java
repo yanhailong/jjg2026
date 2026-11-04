@@ -327,6 +327,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         return ctx.getSimChapterData().getLevelId() >= cfg.getIntValue();
     }
 
+    /** 每日首次处理时补足道具；已充足也记录当天，补足失败则保留重试机会。 */
     private int grantDaily(SimPlayerContext ctx, MinigameSpeedyDeliveryCfg cfg, long now) {
         if (cfg == null) {
             return Code.SAMPLE_ERROR;
@@ -343,13 +344,11 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         if (data.getLastDailyGrantTime() >= now || TimeHelper.inSameDay(data.getLastDailyGrantTime(), now)) {
             return Code.SUCCESS;
         }
-        if (!cfg.getGrantCount().isEmpty()) {
-            CommonResult<ItemOperationResult> result = playerPackService.addItems(
-                    ctx.playerId(), cfg.getGrantCount(), AddType.SIM_SPEEDY_DELIVERY, true);
-            if (!result.success()) {
-                log.warn("飞驰快送每日赠送失败 playerId={},code={}", ctx.playerId(), result.code);
-                return result.code;
-            }
+        CommonResult<ItemOperationResult> result = MiniGameDailyItems.replenish(
+                ctx, cfg.getGrantCount(), AddType.SIM_SPEEDY_DELIVERY, playerPackService);
+        if (!result.success()) {
+            log.warn("飞驰快送每日补足失败 playerId={},code={}", ctx.playerId(), result.code);
+            return result.code;
         }
         data.setLastDailyGrantTime(now);
         autoSaveService.enqueueSave(data);

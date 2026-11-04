@@ -4,7 +4,7 @@ import com.jjg.game.sim.data.AbstractData;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-/** 仅持久化每日赠送日期，单局不落库。 */
+/** 仅持久化每日补足处理日期，库存已充足也记录，单局不落库。 */
 @Document
 public class HappyHappyFishData extends AbstractData {
     @Id

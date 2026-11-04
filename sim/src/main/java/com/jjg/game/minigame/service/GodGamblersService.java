@@ -60,7 +60,7 @@ public class GodGamblersService {
     }
 
     /**
-     * 登录补发当天赠送，离线日期不累计。
+     * 登录检查当天道具补足，离线日期不累计。
      */
     public void onLogin(SimPlayerContext ctx) {
         grantDaily(ctx, System.currentTimeMillis());
@@ -375,7 +375,7 @@ public class GodGamblersService {
     }
 
     /**
-     * 每个自然日最多赠送一次；失败不记录日期，后续登录或进入可重试。
+     * 每日首次处理时补足道具；已充足也记录当天，补足失败则保留重试机会。
      */
     private int grantDaily(SimPlayerContext ctx, long now) {
         GodGamblersData data = ctx.getGodGamblersData();
@@ -396,12 +396,11 @@ public class GodGamblersService {
             log.warn("赌神每日赠送配置错误 playerId={},configId={}", ctx.playerId(), MiniGameConstant.GOD_GAMBLERS_CONFIG_ID);
             return Code.SAMPLE_ERROR;
         }
-        if (!cfg.getItemGift().isEmpty()) {
-            CommonResult<ItemOperationResult> result = playerPackService.addItems(ctx.playerId(), cfg.getItemGift(), AddType.SIM_GOD_GAMBLERS, true);
-            if (!result.success()) {
-                log.warn("赌神每日赠送失败 playerId={},code={}", ctx.playerId(), result.code);
-                return result.code;
-            }
+        CommonResult<ItemOperationResult> result = MiniGameDailyItems.replenish(
+                ctx, cfg.getItemGift(), AddType.SIM_GOD_GAMBLERS, playerPackService);
+        if (!result.success()) {
+            log.warn("赌神每日补足失败 playerId={},code={}", ctx.playerId(), result.code);
+            return result.code;
         }
         data.setLastDailyGrantTime(now);
         autoSaveService.enqueueSave(data);

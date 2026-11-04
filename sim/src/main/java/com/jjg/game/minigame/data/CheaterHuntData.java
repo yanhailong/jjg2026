@@ -5,7 +5,7 @@ import com.jjg.game.sim.data.AbstractData;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-/** 找老千小游戏的玩家进度、每日赠送标记和对局序号。 */
+/** 找老千小游戏的玩家进度、每日补足处理标记和对局序号。 */
 @Document
 public class CheaterHuntData extends AbstractData {
     //玩家ID，同时作为文档主键
@@ -15,7 +15,7 @@ public class CheaterHuntData extends AbstractData {
     private int levelId = MiniGameConstant.FIRST_CHEATER_HUNT_LEVEL_ID;
     //按关卡顺序已通关的最高关卡配置ID；0表示尚未通关，解锁不会推进
     private int maxPassedLevelId;
-    //上次每日道具赠送时间，毫秒时间戳；0表示尚未赠送
+    //上次每日道具补足处理完成时间，库存已充足也记录；0表示尚未处理
     private long lastDailyGrantTime;
     //玩家对局递增序号，用于区分新旧对局
     private long roundSequence;

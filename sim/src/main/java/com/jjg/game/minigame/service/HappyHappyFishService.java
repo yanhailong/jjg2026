@@ -300,7 +300,7 @@ public class HappyHappyFishService {
         return ctx.getSimChapterData().getLevelId() >= cfg.getIntValue();
     }
 
-    /** 一天只赠送一次，失败不推进日期，离线日期不累计补发。 */
+    /** 每日首次处理时补足道具；已充足也记录当天，补足失败则保留重试机会。 */
     private int grantDaily(SimPlayerContext ctx, long now) {
         HappyHappyFishData data = ctx.getHappyHappyFishData();
         if (data == null) {
@@ -318,13 +318,11 @@ public class HappyHappyFishService {
         if (cfg == null || !validItems(cfg.getGrantCount())) {
             return Code.SAMPLE_ERROR;
         }
-        if (!cfg.getGrantCount().isEmpty()) {
-            CommonResult<ItemOperationResult> result = playerPackService.addItems(
-                    ctx.playerId(), cfg.getGrantCount(), AddType.SIM_HAPPY_HAPPY_FISH, true);
-            if (!result.success()) {
-                log.warn("欢乐捉鱼每日赠送失败 playerId={},code={}", ctx.playerId(), result.code);
-                return result.code;
-            }
+        CommonResult<ItemOperationResult> result = MiniGameDailyItems.replenish(
+                ctx, cfg.getGrantCount(), AddType.SIM_HAPPY_HAPPY_FISH, playerPackService);
+        if (!result.success()) {
+            log.warn("欢乐捉鱼每日补足失败 playerId={},code={}", ctx.playerId(), result.code);
+            return result.code;
         }
         data.setLastDailyGrantTime(now);
         autoSaveService.enqueueSave(data);
