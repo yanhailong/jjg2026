@@ -112,8 +112,9 @@ public class SimOnlineRewardService implements SimSpecialItemBalanceListener {
 
         int hours = watchAd ? res.info.adRewardHours : res.info.diamondRewardHours;
         Map<BuildingOutputType, Long> rewards = new EnumMap<>(BuildingOutputType.class);
-        for (ItemInfo item : res.info.hourlyRewards) {
-            rewards.put(BuildingOutputType.fromCode(item.itemId), Math.multiplyExact(item.count, hours));
+        for (Map.Entry<BuildingOutputType, Long> entry : buildingService
+                .computeDurationOutput(ctx, ctx.getCurrentCasino(), 60).entrySet()) {
+            rewards.put(entry.getKey(), Math.multiplyExact(entry.getValue(), hours));
         }
         rewards.values().removeIf(countValue -> countValue <= 0);
         if (rewards.isEmpty()) {
@@ -189,36 +190,10 @@ public class SimOnlineRewardService implements SimSpecialItemBalanceListener {
         }
         Map<Integer, Long> rewards = new HashMap<>();
         for (ItemInfo item : buildingService.computeRewardItems(ctx, 1)) {
-            if (type == 0 || item.itemId == type) {
-                int newItemId = transItemId(item.itemId);
-                if (newItemId > 0) {
-                    rewards.put(newItemId, item.count);
-                }
+            if (item.itemId > 0 && (type == 0 || item.itemId == type)) {
+                rewards.put(item.itemId, item.count);
             }
         }
         return rewards;
-    }
-
-    private int transItemId(int originId) {
-        switch (originId) {
-            case 1 -> {
-                return ItemUtils.getGoldItemId();
-            }
-            case 2 -> {
-                return SimConstant.Item.ID_POWER;
-            }
-            case 5 -> {
-                return SimConstant.Item.ID_AWARENESS;
-            }
-            case 6 -> {
-                return SimConstant.Item.ID_EXPOD;
-            }
-            case 12 -> {
-                return SimConstant.Item.CASINO_EXP;
-            }
-            default -> {
-                return 0;
-            }
-        }
     }
 }

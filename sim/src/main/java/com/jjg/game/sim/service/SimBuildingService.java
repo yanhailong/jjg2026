@@ -1060,7 +1060,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         SimConditionEventFactory.emitOwnershipCounts(sink, ActionConditionEvent.Type.BUILDING_COUNT, 0, countByLevel);
     }
 
-    private Map<BuildingOutputType, Long> computeDurationOutput(SimPlayerContext ctx, SimCasinoData casino, int minutes) {
+    Map<BuildingOutputType, Long> computeDurationOutput(SimPlayerContext ctx, SimCasinoData casino, int minutes) {
         return multiply(computePerMinuteOutput(ctx, casino), minutes);
     }
 
@@ -1072,7 +1072,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
     }
 
     /**
-     * 收益协议统一使用 BuildingOutputType 编号，与 OfflineReward.rewards 一致。
+     * 收益协议统一使用产出对应的道具 ID，与 OfflineReward.rewards 一致。
      */
     public List<ItemInfo> buildRewardInfos(Map<BuildingOutputType, Long> rewards) {
         List<ItemInfo> items = new ArrayList<>(rewards.size());
