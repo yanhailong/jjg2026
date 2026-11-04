@@ -1181,7 +1181,9 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
             }
             if (data.getUnlockedAreaIds().contains(area.getId())
                     && area.getSkinId() != null && !area.getSkinId().isEmpty()) {
-                data.getUnlockedSkinIds().add(area.getSkinId().getFirst());
+                int defaultSkinId = area.getSkinId().getFirst();
+                data.getUnlockedSkinIds().add(defaultSkinId);
+                data.getUsingSkinIds().putIfAbsent(area.getId(), defaultSkinId);
             }
         }
     }
