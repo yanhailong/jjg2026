@@ -724,13 +724,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                 if (buff == null) {
                     continue;
                 }
-                BuildingOutputType type = switch (buff.getTypeId()) {
-                    case 1 -> BuildingOutputType.GOLD;
-                    case 3 -> BuildingOutputType.SERVICE;
-                    case 4 -> BuildingOutputType.EXPOSURE;
-                    case 5 -> BuildingOutputType.AWARENESS;
-                    default -> null;
-                };
+                BuildingOutputType type = BuildingOutputType.fromCode(buff.getTypeId());
                 if (type == null) {
                     continue;
                 }

@@ -27,7 +27,7 @@ public class MinigameSpeedyDeliveryCfg extends BaseCfgBean {
   protected int CrashTimeLoss;
   /** 单局时长（s） */
   protected int Duration;
-  /** 每日赠送道具数量 */
+  /** 每日系统重置道具数量 */
   protected Map<Integer,Long> GrantCount;
   /** 玩家基础速度（px/s） */
   protected int MoveSpeed;
@@ -58,7 +58,7 @@ public class MinigameSpeedyDeliveryCfg extends BaseCfgBean {
     return Duration;
   }
 
-  /** 返回每日赠送道具数量 */
+  /** 返回每日系统重置道具数量 */
   public Map<Integer,Long> getGrantCount() {
     return GrantCount;
   }

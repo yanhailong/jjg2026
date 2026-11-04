@@ -25,7 +25,7 @@ public class MinigameHappyHappyFishCfg extends BaseCfgBean {
   protected int Duration;
   /** 沙漏道具增加游戏时长(s) */
   protected int ExtraTime;
-  /** 每日赠送开局道具数量 */
+  /** 每日系统重置道具数量 */
   protected Map<Integer,Long> GrantCount;
   /** 同屏最大鱼数量 */
   protected int MaxCount;
@@ -53,7 +53,7 @@ public class MinigameHappyHappyFishCfg extends BaseCfgBean {
     return ExtraTime;
   }
 
-  /** 返回每日赠送开局道具数量 */
+  /** 返回每日系统重置道具数量 */
   public Map<Integer,Long> getGrantCount() {
     return GrantCount;
   }

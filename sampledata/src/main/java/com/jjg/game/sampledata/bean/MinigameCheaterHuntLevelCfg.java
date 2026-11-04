@@ -27,7 +27,7 @@ public class MinigameCheaterHuntLevelCfg extends BaseCfgBean {
   protected int CostItemCount;
   /** 消耗道具id_数量 */
   protected Map<Integer,Long> CostItemID;
-  /** 每日系统赠送道具数量 */
+  /** 每日系统重置道具数量 */
   protected Map<Integer,Long> DailyFreeItemCount;
   /** 作弊点抽取个数 */
   protected int DrawCount;
@@ -64,7 +64,7 @@ public class MinigameCheaterHuntLevelCfg extends BaseCfgBean {
     return CostItemID;
   }
 
-  /** 返回每日系统赠送道具数量 */
+  /** 返回每日系统重置道具数量 */
   public Map<Integer,Long> getDailyFreeItemCount() {
     return DailyFreeItemCount;
   }

@@ -21,7 +21,7 @@ public class MinigameGodofGamblersRubbingCfg extends BaseCfgBean {
 
   /** 再次搓牌消耗道具 */
   protected Map<Integer,Long> ItemCost;
-  /** 每日赠送道具数量 */
+  /** 每日系统重置道具数量 */
   protected Map<Integer,Long> ItemGift;
   /** 名称多语言 */
   protected int Name;
@@ -35,7 +35,7 @@ public class MinigameGodofGamblersRubbingCfg extends BaseCfgBean {
     return ItemCost;
   }
 
-  /** 返回每日赠送道具数量 */
+  /** 返回每日系统重置道具数量 */
   public Map<Integer,Long> getItemGift() {
     return ItemGift;
   }

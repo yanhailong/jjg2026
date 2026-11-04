@@ -65,6 +65,9 @@ public class SimBuildingSkinService {
                     CommonResult<Map<Integer, Long>> condition = checkUnlockCondition(ctx, building, skin.getUnlockCondition());
                     res.code = condition.code;
                     if (res.code != Code.SUCCESS) {
+                        log.warn("解锁建筑皮肤失败,解锁条件校验未通过 playerId={},buildingId={},areaId={},skinId={},condition={},needItemId={},buildingLevel={},casinoLevel={},code={}",
+                                ctx.playerId(), buildingId, areaId, skinId, skin.getUnlockCondition(),
+                                skin.getNeedItemId(), building.getLevel(), ctx.getCurrentCasino().getCasinoLevel(), res.code);
                         return res;
                     }
                     cost = condition.data;
@@ -72,12 +75,16 @@ public class SimBuildingSkinService {
                 //新 Buff 不追溯影响此前已经累积的整分钟产出。
                 if (!buildings.trySettleOnlineOutput(ctx)) {
                     res.code = Code.FAIL;
+                    log.warn("解锁建筑皮肤失败,在线产出结算失败 playerId={},buildingId={},areaId={},skinId={},code={}",
+                            ctx.playerId(), buildingId, areaId, skinId, res.code);
                     return res;
                 }
                 if (!cost.isEmpty()) {
                     var removed = packs.removeItems(ctx.getPlayer(), cost, AddType.SIM_BUILDING_SKIN_UNLOCK, null);
                     if (!removed.success()) {
                         res.code = removed.code;
+                        log.warn("解锁建筑皮肤失败,扣除材料失败 playerId={},buildingId={},areaId={},skinId={},cost={},code={}",
+                                ctx.playerId(), buildingId, areaId, skinId, cost, res.code);
                         return res;
                     }
                 }
@@ -98,8 +105,14 @@ public class SimBuildingSkinService {
         try {
             BuildingUpgradeAreaCfg area = findSkinArea(ctx, buildingId, areaId, skinId);
             BuildingData building = area == null ? null : ctx.getCurrentCasino().findBuilding(buildingId);
-            if (building == null || !building.getUnlockedSkinIds().contains(skinId)) {
+            if (building == null) {
                 res.code = Code.PARAM_ERROR;
+                return res;
+            }
+            if (!building.getUnlockedSkinIds().contains(skinId)) {
+                res.code = Code.PARAM_ERROR;
+                log.warn("使用建筑皮肤失败,皮肤未解锁 playerId={},buildingId={},areaId={},skinId={},unlockedSkinIds={},code={}",
+                        ctx.playerId(), buildingId, areaId, skinId, building.getUnlockedSkinIds(), res.code);
                 return res;
             }
             building.getUsingSkinIds().put(area.getId(), skinId);
@@ -118,14 +131,37 @@ public class SimBuildingSkinService {
         BuildingData building = casino == null ? null : casino.findBuilding(buildingId);
         BuildingUpgradeAreaCfg area = configCache.getBuildingUpgradeAreaCfgs(buildingId).stream()
                 .filter(cfg -> cfg.getAreaId() == areaId).findFirst().orElse(null);
-        if (building == null || area == null || area.getBuildingId() != buildingId
-                || (area.getCasinId() > 0 && area.getCasinId() != casino.getCasinoId())
-                || area.getSkinId() == null || !area.getSkinId().contains(skinId)
+        if (building == null || area == null) {
+            log.warn("建筑皮肤校验失败,建筑或区域不存在 playerId={},buildingId={},areaId={},skinId={},"
+                            + "casinoId={},buildingExists={},areaExists={}",
+                    ctx.playerId(), buildingId, areaId, skinId, casino == null ? 0 : casino.getCasinoId(),
+                    building != null, area != null);
+            return null;
+        }
+        if (area.getBuildingId() != buildingId
+                || (area.getCasinId() > 0 && area.getCasinId() != casino.getCasinoId())) {
+            log.warn("建筑皮肤校验失败,区域配置归属不匹配 playerId={},buildingId={},areaId={},skinId={},"
+                            + "casinoId={},configBuildingId={},configCasinoId={}",
+                    ctx.playerId(), buildingId, areaId, skinId, casino.getCasinoId(), area.getBuildingId(), area.getCasinId());
+            return null;
+        }
+        if (area.getSkinId() == null || !area.getSkinId().contains(skinId)
                 || GameDataManager.getBuildingSkinCfg(skinId) == null) {
+            log.warn("建筑皮肤校验失败,皮肤配置不存在或不属于该区域 playerId={},buildingId={},areaId={},skinId={},"
+                            + "areaSkinIds={},skinConfigExists={}",
+                    ctx.playerId(), buildingId, areaId, skinId, area.getSkinId(),
+                    GameDataManager.getBuildingSkinCfg(skinId) != null);
             return null;
         }
         buildings.initializeBuildingAreas(casino);
-        return building.getUnlockedAreaIds().contains(area.getId()) ? area : null;
+        if (!building.getUnlockedAreaIds().contains(area.getId())) {
+            log.warn("建筑皮肤校验失败,区域未解锁 playerId={},buildingId={},areaId={},skinId={},buildingLevel={},"
+                            + "areaConfigId={},requiredEquipmentIds={},unlockedEquipmentIds={},unlockedAreaIds={}",
+                    ctx.playerId(), buildingId, areaId, skinId, building.getLevel(), area.getId(), area.getUnlockEquipment(),
+                    configCache.getBuildingAreaUnlockIds(buildingId, building.getLevel()), building.getUnlockedAreaIds());
+            return null;
+        }
+        return area;
     }
 
     private CommonResult<Map<Integer, Long>> checkUnlockCondition(
