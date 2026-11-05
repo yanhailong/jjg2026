@@ -90,7 +90,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         return SimPlayerTickListener.super.order();
     }
 
-    /** 领取当前场景指定建筑的游客奖励；入账失败保留缓存，成功后先清空再推进统计。 */
+    /** 领取当前场景指定建筑的游客奖励；入账失败保留缓存，成功后扣除领取快照再推进统计。 */
     public ResClaimBuildingGuestRewards claimGuestRewards(SimPlayerContext ctx, int buildingId) {
         ResClaimBuildingGuestRewards res = new ResClaimBuildingGuestRewards(Code.SUCCESS);
         res.buildingId = buildingId;
@@ -104,7 +104,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
             res.code = Code.NOT_FOUND;
             return res;
         }
-        Map<Integer, Long> rewards = building.getGuestRewards();
+        Map<Integer, Long> rewards = new HashMap<>(building.getGuestRewards());
         if (rewards.isEmpty()) {
             res.rewards = Collections.emptyList();
             return res;
@@ -117,7 +117,8 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                     ctx.playerId(), buildingId, res.code);
             return res;
         }
-        building.setGuestRewards(new HashMap<>());
+        rewards.forEach((itemId, count) -> building.getGuestRewards().computeIfPresent(itemId,
+                (id, current) -> current > count ? current - count : null));
         ctx.setLastSaveTime(0);
         res.rewards = ItemUtils.buildItemInfo(rewards);
         SimBaseData base = ctx.getSimBaseData();
@@ -516,7 +517,7 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
     }
 
     /**
-     * 在线产出: 每分钟自动结算一次, 保留不足 1 分钟的余量时间
+     * 在线产出: 每分钟累计到各建筑待领取奖励, 不产出经验, 保留不足 1 分钟的余量时间
      */
     private void output(SimPlayerContext ctx, long now) {
         try {
@@ -534,20 +535,25 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                 return;
             }
             long settledOutputTime = casino.getLastOutputTime() + fullMinutes * TimeHelper.ONE_MINUTE_OF_MILLIS;
-            Map<BuildingOutputType, Long> perMinute = computePerMinuteOutput(ctx, casino);
-            if (!perMinute.isEmpty()) {
-                Map<BuildingOutputType, Long> total = multiply(perMinute, fullMinutes);
+            Map<BuildingOutputType, Long> total = new EnumMap<>(BuildingOutputType.class);
+            Map<BuildingData, Map<Integer, Long>> rewardsByBuilding = new HashMap<>();
+            if (casino.getBuildingData() != null && !casino.getBuildingData().isEmpty()) {
+                SimEmployeeAttributeService.Snapshot attributes = employeeAttributeService.snapshot(ctx);
+                for (BuildingData building : casino.getBuildingData().values()) {
+                    Map<BuildingOutputType, Long> rewards = multiply(buildingActualPerMinute(ctx, building, attributes), fullMinutes);
+                    rewards.remove(BuildingOutputType.CASINO_LEVEL_EXP);
+                    rewards.forEach((type, count) -> total.merge(type, count, Long::sum));
+                    rewardsByBuilding.put(building, toItemMap(rewards));
+                }
+            }
+            if (!total.isEmpty()) {
                 Map<Integer, Long> items = toItemMap(total);
                 if (!items.isEmpty()) {
-                    CommonResult<ItemOperationResult> addResult = playerPackService.addItems(ctx.playerId(), items, AddType.SIM_BUILD_MINUTE_REWARDS, null, false);
-                    if (addResult == null || !addResult.success()) {
-                        log.warn("在线产出入账失败 playerId={},code={}", ctx.playerId(), addResult == null ? Code.FAIL : addResult.code);
-                        return;
-                    }
+                    rewardsByBuilding.forEach((building, rewards) -> rewards.forEach((itemId, count) ->
+                            building.getGuestRewards().merge(itemId, count, Long::sum)));
                 }
-                //先提交结算时间，避免后续统计或通知异常导致同一时间段重复发奖
+                //先提交结算时间，避免后续统计或通知异常导致同一时间段重复累计
                 casino.setLastOutputTime(settledOutputTime);
-                simCasinoService.addCasinoExp(ctx, total.getOrDefault(BuildingOutputType.CASINO_LEVEL_EXP, 0L));
                 //经营信息: 累加每分钟自产金币收益
                 long minuteGold = total.getOrDefault(BuildingOutputType.GOLD, 0L);
                 if (minuteGold > 0) {
