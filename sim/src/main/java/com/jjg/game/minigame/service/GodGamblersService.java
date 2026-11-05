@@ -19,9 +19,11 @@ import com.jjg.game.minigame.data.GodGamblersRound;
 import com.jjg.game.minigame.pb.res.*;
 import com.jjg.game.minigame.pb.struct.GodGamblersInfo;
 import com.jjg.game.sampledata.GameDataManager;
+import com.jjg.game.sampledata.bean.GlobalConfigCfg;
 import com.jjg.game.sampledata.bean.MinigameGodofGamblersRubbingCfg;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.service.SimAutoSaveService;
+import com.jjg.game.sim.service.SimChapterService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -47,15 +49,17 @@ public class GodGamblersService {
     private final SimAutoSaveService autoSaveService;
     private final PlayerPackService playerPackService;
     private final SnowflakeManager snowflakeManager;
+    private final SimChapterService chapterService;
     private final MiniGameConditionService conditionService;
 
     public GodGamblersService(GodGamblersDao dao, SimAutoSaveService autoSaveService,
                               PlayerPackService playerPackService, SnowflakeManager snowflakeManager,
-                              MiniGameConditionService conditionService) {
+                              SimChapterService chapterService, MiniGameConditionService conditionService) {
         this.dao = dao;
         this.autoSaveService = autoSaveService;
         this.playerPackService = playerPackService;
         this.snowflakeManager = snowflakeManager;
+        this.chapterService = chapterService;
         this.conditionService = conditionService;
     }
 
@@ -89,6 +93,7 @@ public class GodGamblersService {
         res.costItems = ItemUtils.buildItemInfo(cfg.getItemCost());
         res.ownedItems = ownedItems(ctx, cfg);
         res.maxRubCount = cfg.getRubCount();
+        res.openOneClickPass = openOneClickPass(ctx);
         return res;
     }
 
@@ -175,7 +180,17 @@ public class GodGamblersService {
      * 一键比拼复用开局及结算，只扣一次费用；失败时可携局号走确定比拼重试发奖。
      */
     public ResGodGamblersQuickBattle quickBattle(SimPlayerContext ctx) {
-        ResGodGamblersQuickBattle res = new ResGodGamblersQuickBattle(startRound(ctx));
+        ResGodGamblersQuickBattle res = new ResGodGamblersQuickBattle(Code.SUCCESS);
+        if (!openOneClickPass(ctx)) {
+            GlobalConfigCfg unlockCfg = GameDataManager.getGlobalConfigCfg(MiniGameConstant.GOD_GAMBLERS_QUICK_CLEAR_CHAPTER_GLOBAL_ID);
+            log.warn("赌神一键比拼未开放 playerId={},globalId={},passedLevelId={},requiredLevelId={}",
+                    ctx.playerId(), MiniGameConstant.GOD_GAMBLERS_QUICK_CLEAR_CHAPTER_GLOBAL_ID,
+                    ctx.getSimChapterData() == null ? null : ctx.getSimChapterData().getLevelId(),
+                    unlockCfg == null ? null : unlockCfg.getIntValue());
+            res.code = Code.NOT_UNLOCKED;
+        } else {
+            res.code = startRound(ctx);
+        }
         GodGamblersRound round = ctx.getGodGamblersRound();
         if (res.code == Code.SUCCESS) {
             round.setRubCount(1);
@@ -304,6 +319,22 @@ public class GodGamblersService {
         }
         round.setState(RoundState.CLEARED);
         return Code.SUCCESS;
+    }
+
+    private boolean openOneClickPass(SimPlayerContext ctx) {
+        GlobalConfigCfg cfg = GameDataManager.getGlobalConfigCfg(MiniGameConstant.GOD_GAMBLERS_QUICK_CLEAR_CHAPTER_GLOBAL_ID);
+        if (cfg == null || cfg.getIntValue() <= 0) {
+            return false;
+        }
+        if (ctx.getSimChapterData() == null) {
+            int code = chapterService.getResChapterInfo(ctx).code;
+            if (code != Code.SUCCESS) {
+                log.warn("赌神一键比拼加载章节进度失败 playerId={},globalId={},requiredLevelId={},code={}",
+                        ctx.playerId(), MiniGameConstant.GOD_GAMBLERS_QUICK_CLEAR_CHAPTER_GLOBAL_ID, cfg.getIntValue(), code);
+                return false;
+            }
+        }
+        return ctx.getSimChapterData().getLevelId() >= cfg.getIntValue();
     }
 
     /**

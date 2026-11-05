@@ -18,6 +18,8 @@ public class ResEnterGodGamblersGame extends AbstractResponse {
     public List<ItemInfo> ownedItems;
     @ProtoDesc("每局最多获取自己牌次数，含首次")
     public int maxRubCount;
+    @ProtoDesc("是否已开放一键比拼")
+    public boolean openOneClickPass;
 
     public ResEnterGodGamblersGame(int code) {
         super(code);

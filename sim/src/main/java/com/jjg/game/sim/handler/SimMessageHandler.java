@@ -266,6 +266,7 @@ public class SimMessageHandler implements GmListener {
      */
     @Command(SimConstant.MsgBean.REQ_SIM_BLANK_PAGE)
     public void reqSimBlankPage(PlayerController playerController, ReqSimBlankPage req) {
+        log.warn("记录空白页 playerId={},blank={}", playerController.playerId(), req.blankPage);
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         boolean wasBlankPage = ctx != null && ctx.isBlankPage();
         ResSimBlankPage res = new ResSimBlankPage(ctx == null ? Code.NOT_FOUND : Code.SUCCESS);
@@ -377,7 +378,9 @@ public class SimMessageHandler implements GmListener {
         }
     }
 
-    /** 在当前游戏节点延迟发送引导触发通知，保持业务响应先于通知。 */
+    /**
+     * 在当前游戏节点延迟发送引导触发通知，保持业务响应先于通知。
+     */
     private void notifyGuideTriggersDelayedOnCurrentNode(PlayerController playerController,
                                                          List<Integer> guideGroupIds) {
         if (guideGroupIds == null || guideGroupIds.isEmpty()) {

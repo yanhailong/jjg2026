@@ -11,6 +11,8 @@ public interface MiniGameConstant {
      * 开放一键通关所需已通关章节关卡的global配置。
      */
     int QUICK_CLEAR_CHAPTER_GLOBAL_ID = 357;
+    /** 赌神搓牌一键比拼的章节门槛。 */
+    int GOD_GAMBLERS_QUICK_CLEAR_CHAPTER_GLOBAL_ID = 358;
     /** 赌神搓牌只有一条配置。 */
     int GOD_GAMBLERS_CONFIG_ID = 1001;
     /** 欢乐捉鱼一键通关的章节门槛、结算积分及沙漏配置ID。 */
