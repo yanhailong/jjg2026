@@ -9,6 +9,6 @@ import com.jjg.game.sim.constant.SimConstant;
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_GAME, cmd = SimConstant.MsgBean.REQ_TOKEN_SHOP)
 @ProtoDesc("请求代币商店商品列表")
 public class ReqTokenShop extends AbstractMessage {
-    @ProtoDesc("商店类型：1=当前赛季商店，3=联盟商店，4=钻石商店")
+    @ProtoDesc("商店类型：1=当前赛季商店（兼容小于3的类型值），其他按TokenShop.type返回")
     public int type;
 }

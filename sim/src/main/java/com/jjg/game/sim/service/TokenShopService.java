@@ -1,5 +1,6 @@
 package com.jjg.game.sim.service;
 
+import com.jjg.game.alliance.dao.AlliancePlayerDao;
 import com.jjg.game.alliance.service.AllianceAssetService;
 import com.jjg.game.alliance.service.AllianceCacheService;
 import com.jjg.game.common.utils.TimeHelper;
@@ -8,6 +9,8 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
+import com.jjg.game.core.pb.KVInfo;
+import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.service.ServerOpenTimeService;
 import com.jjg.game.core.service.ShopService;
@@ -17,6 +20,7 @@ import com.jjg.game.season.model.SeasonPhase;
 import com.jjg.game.season.service.SeasonLifecycleService;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.data.SimPlayerContext;
+import com.jjg.game.sim.data.TokenShopData;
 import com.jjg.game.sim.data.TokenShopPurchaseData;
 import com.jjg.game.sim.pb.res.ResTokenShop;
 import com.jjg.game.sim.pb.res.ResTokenShopExchange;
@@ -44,11 +48,16 @@ public class TokenShopService {
     private final SimTaskService tasks;
     private final ShopService shops;
     private final ServerOpenTimeService serverOpenTimeService;
+    private final AlliancePlayerDao alliancePlayerDao;
+    private final CorePlayerService playerService;
+    private final SimConfigCacheService configCache;
 
     public TokenShopService(TokenShopConfigService configs, SeasonLifecycleService seasons,
                             PlayerPackService packs, AllianceCacheService alliances,
                             AllianceAssetService allianceAssets, SimAutoSaveService saves,
-                            SimTaskService tasks, ShopService shops, ServerOpenTimeService serverOpenTimeService) {
+                            SimTaskService tasks, ShopService shops, ServerOpenTimeService serverOpenTimeService,
+                            AlliancePlayerDao alliancePlayerDao, CorePlayerService playerService,
+                            SimConfigCacheService configCache) {
         this.configs = configs;
         this.seasons = seasons;
         this.packs = packs;
@@ -58,6 +67,9 @@ public class TokenShopService {
         this.tasks = tasks;
         this.shops = shops;
         this.serverOpenTimeService = serverOpenTimeService;
+        this.alliancePlayerDao = alliancePlayerDao;
+        this.playerService = playerService;
+        this.configCache = configCache;
     }
 
     public ResTokenShop list(SimPlayerContext ctx, int type) {
@@ -66,17 +78,26 @@ public class TokenShopService {
 
     ResTokenShop list(SimPlayerContext ctx, int type, long now) {
         ResTokenShop res = new ResTokenShop(Code.SUCCESS);
-        res.type = type;
+        res.type = type < 3 ? 1 : type;
         res.goods = List.of();
-        if (type != 1 && type != 3 && type != 4) {
+        Map<Integer, TokenShopData> shopDataMap = configCache.getTokenShopDataMap();
+        int currentSeasonType = seasonType(ctx, now);
+        int seasonShopType = currentSeasonType == 0 ? 1 : currentSeasonType;
+        res.typeList = shopDataMap.values().stream()
+                .filter(data -> data.getType() >= 3 || data.getType() == seasonShopType)
+                .map(data -> new KVInfo(data.getType() < 3 ? 1 : data.getType(), data.getLangId())).toList();
+        int configType = type < 3 ? currentSeasonType : type;
+        //新手赛季没有商品，商店信息沿用进阶赛季。
+        TokenShopData shopData = shopDataMap.get(configType == 0 ? 1 : configType);
+        if (shopData == null) {
+            log.warn("代币商店类型未配置 playerId={},type={},configType={},configuredTypes={}",
+                    ctx.playerId(), type, configType, shopDataMap.keySet());
             res.code = Code.PARAM_ERROR;
             return res;
         }
-        if (type == 3 && !hasAlliance(ctx)) {
-            res.code = Code.NOT_FOUND;
-            return res;
-        }
-        int configType = type == 1 ? seasonType(ctx, now) : type;
+        res.costItemId = shopData.getItemId();
+        res.hasItemCount = itemCount(ctx, shopData.getItemId());
+
         long today = TimeHelper.getLocalDateTime(now).toLocalDate().toEpochDay();
         List<TokenShopGoodsInfo> goods = new ArrayList<>();
         for (TokenShopConfigService.Goods product : configs.goodsOfType(configType)) {
@@ -86,6 +107,25 @@ public class TokenShopService {
         }
         res.goods = goods;
         return res;
+    }
+
+    private long itemCount(SimPlayerContext ctx, int itemId) {
+        if (itemId == SimConstant.Item.ID_SEASON_COIN) {
+            return ctx.getSeasonPlayerData().getSeasonCoin();
+        }
+        if (itemId == SimConstant.Item.ID_ALLIANCE_CONTRIBUTION) {
+            return alliancePlayerDao.getOrEmpty(ctx.playerId()).getContribution();
+        }
+        if (itemId == ItemUtils.getDiamondItemId()) {
+            return playerService.get(ctx.playerId()).getDiamond();
+        }
+        if (itemId == ItemUtils.getGoldItemId()) {
+            return playerService.get(ctx.playerId()).getGold();
+        }
+        if (itemId == ItemUtils.getShellItemId()) {
+            return playerService.get(ctx.playerId()).getShell();
+        }
+        return packs.getItemCount(ctx.playerId(), itemId);
     }
 
     public ResTokenShopExchange exchange(SimPlayerContext ctx, int goodsId, int count) {

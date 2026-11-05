@@ -47,7 +47,7 @@ public class TokenShopConfigService implements ConfigExcelChangeListener {
         Map<Integer, List<Goods>> byType = new HashMap<>();
         for (TokenShopCfg cfg : GameDataManager.getTokenShopCfgList()) {
             try {
-                if (cfg.getType() < 1 || cfg.getType() > 4 || cfg.getResetTime() < 0
+                if (cfg.getType() < 1 || cfg.getResetTime() < 0
                         || cfg.getResetDaily() < 0 || cfg.getGoods() == null || cfg.getGoods().isEmpty()) {
                     throw new IllegalArgumentException("商品类型、重置或限购配置错误，或奖励为空");
                 }

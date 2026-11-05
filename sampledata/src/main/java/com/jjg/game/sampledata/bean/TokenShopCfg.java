@@ -37,6 +37,8 @@ public class TokenShopCfg extends BaseCfgBean {
   protected int ResetTime;
   /** 开始时间 */
   protected String StartTime;
+  /** 商店名称多语言 */
+  protected int Storename;
   /** 购买价格 */
   protected Map<Integer,Long> cost;
   /** 客服端资源 */
@@ -89,6 +91,11 @@ public class TokenShopCfg extends BaseCfgBean {
   /** 返回开始时间 */
   public String getStartTime() {
     return StartTime;
+  }
+
+  /** 返回商店名称多语言 */
+  public int getStorename() {
+    return Storename;
   }
 
   /** 返回购买价格 */

@@ -23,6 +23,7 @@ import com.jjg.game.sim.constant.BuildingType;
 import com.jjg.game.sim.constant.ServerBuildingType;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.data.BuildingUnlockEquipmentData;
+import com.jjg.game.sim.data.TokenShopData;
 import com.jjg.game.sim.pb.struct.BuildLevelMaxInfo;
 import com.jjg.game.sim.pb.struct.RecruitPoolInfo;
 import com.jjg.game.social.data.SendGiftConfig;
@@ -165,6 +166,9 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     //迷你商店 needItemId -> id ->cfg
     private Map<Integer, Map<Integer, ShopMiniCfg>> tmpShopMiniCfgMap = null;
 
+    //代币商店 type -> 商店信息，热更新整体替换
+    private volatile Map<Integer, TokenShopData> tokenShopDataMap = Map.of();
+
     //免广告礼包：购买后附赠奖励
     private Map<Integer, Long> noAdsRewardsMap = Map.of();
     //免广告礼包：折扣后的价格,ShopRechargeList.id
@@ -225,6 +229,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         loadDropItemConfig();
 
         loadShopMiniConfig();
+        loadTokenShopConfig();
 
         loadChapterConfig();
     }
@@ -922,6 +927,20 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         this.tmpShopMiniCfgMap = tmpShopMiniCfgMap;
     }
 
+    private void loadTokenShopConfig() {
+        Map<Integer, TokenShopData> tmp = new HashMap<>();
+        for (TokenShopCfg cfg : GameDataManager.getTokenShopCfgList()) {
+            tmp.computeIfAbsent(cfg.getType(), type -> {
+                TokenShopData data = new TokenShopData();
+                data.setType(type);
+                data.setLangId(cfg.getStorename());
+                data.setItemId(cfg.getCost().keySet().iterator().next());
+                return data;
+            });
+        }
+        tokenShopDataMap = Map.copyOf(tmp);
+    }
+
     private void loadChapterConfig() {
         Map<Integer, Integer> tmpLevelToChapterIdMap = new HashMap<>();
         List<Integer> tmpAllChapterLevels = new ArrayList<>();
@@ -980,6 +999,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
         addInitSampleFileObserveWithCallBack(DropItemCfg.EXCEL_NAME, this::loadDropItemConfig);
         addInitSampleFileObserveWithCallBack(ShopMiniCfg.EXCEL_NAME, this::loadShopMiniConfig);
+        addInitSampleFileObserveWithCallBack(TokenShopCfg.EXCEL_NAME, this::loadTokenShopConfig);
 
         addInitSampleFileObserveWithCallBack(ChapterCfg.EXCEL_NAME, this::loadChapterConfig);
     }
@@ -992,11 +1012,16 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         });
         addChangeSampleFileObserveWithCallBack(BuildingUpgradeTableCfg.EXCEL_NAME, this::loadBuildingUpgradeConfig);
         addChangeSampleFileObserveWithCallBack(BuildingUpgradeAreaCfg.EXCEL_NAME, this::loadBuildingUpgradeAreaConfig);
+        addChangeSampleFileObserveWithCallBack(TokenShopCfg.EXCEL_NAME, this::loadTokenShopConfig);
     }
 
     // ---------------------------------------------------------------------
     // getters
     // ---------------------------------------------------------------------
+
+    public Map<Integer, TokenShopData> getTokenShopDataMap() {
+        return tokenShopDataMap;
+    }
 
     public Map<Integer, Map<Integer, VisitorLevelCfg>> getVisitorLevelCfgMap() {
         return visitorLevelCfgMap;
