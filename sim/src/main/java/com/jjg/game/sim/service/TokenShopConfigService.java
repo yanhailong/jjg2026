@@ -2,8 +2,10 @@ package com.jjg.game.sim.service;
 
 import com.jjg.game.common.utils.TimeHelper;
 import com.jjg.game.core.listener.ConfigExcelChangeListener;
+import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.TokenShopCfg;
+import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,15 @@ public class TokenShopConfigService implements ConfigExcelChangeListener {
         return snapshot.byType().getOrDefault(type, List.of());
     }
 
+    /** 仅道具兑换允许在 Redeem 为空时使用令牌商店价格。 */
+    static Map<Integer, Long> exchangeCost(TokenShopCfg cfg, ShopRechargeListCfg shop) {
+        if (shop.getType() != RechargeCfgType.ITEM_EXCHANGE.getType()) {
+            return Map.of();
+        }
+        Map<Integer, Long> redeem = shop.getRedeem();
+        return redeem == null || redeem.isEmpty() ? cfg.getCost() : redeem;
+    }
+
     private void load() {
         Map<Integer, Goods> byId = new HashMap<>();
         Map<Integer, List<Goods>> byType = new HashMap<>();
@@ -52,7 +63,20 @@ public class TokenShopConfigService implements ConfigExcelChangeListener {
                     throw new IllegalArgumentException("商品类型、重置或限购配置错误，或奖励为空");
                 }
                 validateItems(cfg.getGoods());
-                validateItems(cfg.getCost());
+                ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(cfg.getRechargeid());
+                if (shop == null || shop.getType() < RechargeCfgType.MONEY.getType()
+                        || shop.getType() > RechargeCfgType.FREE.getType()) {
+                    throw new IllegalArgumentException("支付配置不存在或类型无效: " + cfg.getRechargeid());
+                }
+                if (shop.getType() == RechargeCfgType.MONEY.getType()
+                        && (shop.getPrice() == null || shop.getPrice().signum() <= 0)) {
+                    throw new IllegalArgumentException("现金价格必须大于0: " + cfg.getRechargeid());
+                }
+                Map<Integer, Long> cost = exchangeCost(cfg, shop);
+                if (shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType() && (cost == null || cost.isEmpty())) {
+                    throw new IllegalArgumentException("道具兑换消耗为空: " + cfg.getRechargeid());
+                }
+                validateItems(cost);
                 long start = timestamp(cfg.getStartTime());
                 long end = timestamp(cfg.getEndTime());
                 if (start != 0 && end != 0 && start >= end) {
@@ -62,7 +86,7 @@ public class TokenShopConfigService implements ConfigExcelChangeListener {
                 byId.put(cfg.getId(), goods);
                 byType.computeIfAbsent(cfg.getType(), key -> new ArrayList<>()).add(goods);
             } catch (RuntimeException e) {
-                log.error("代币商店商品配置无效，跳过商品 goodsId={}", cfg.getId(), e);
+                log.error("代币商店商品配置无效，跳过商品 goodsId={},rechargeId={}", cfg.getId(), cfg.getRechargeid(), e);
             }
         }
         byType.replaceAll((type, goods) -> goods.stream()
@@ -95,5 +119,6 @@ public class TokenShopConfigService implements ConfigExcelChangeListener {
     @Override
     public void changeSampleCallbackCollector() {
         addChangeSampleFileObserveWithCallBack(TokenShopCfg.EXCEL_NAME, this::load);
+        addChangeSampleFileObserveWithCallBack(ShopRechargeListCfg.EXCEL_NAME, this::load);
     }
 }

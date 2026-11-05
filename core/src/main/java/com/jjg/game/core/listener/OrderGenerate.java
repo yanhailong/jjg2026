@@ -70,10 +70,15 @@ public interface OrderGenerate extends IGameSysFuncInterface {
 
     /** 构建非充值购买数据，校验兑换消耗配置。 */
     default CommonResult<PreGenerateOrderData> nonMoneyOrderDetailInfo(ShopRechargeListCfg shop) {
+        return nonMoneyOrderDetailInfo(shop, shop.getRedeem());
+    }
+
+    /** 允许业务提供实际兑换消耗，不修改共享配置。 */
+    default CommonResult<PreGenerateOrderData> nonMoneyOrderDetailInfo(ShopRechargeListCfg shop, Map<Integer, Long> cost) {
         RechargeCfgType type = RechargeCfgType.valueOf(shop.getType());
         if (type == RechargeCfgType.MONEY || type == RechargeCfgType.ITEM_EXCHANGE
-                && (shop.getRedeem() == null || shop.getRedeem().isEmpty()
-                || shop.getRedeem().entrySet().stream().anyMatch(item -> item.getKey() <= 0 || item.getValue() <= 0))) {
+                && (cost == null || cost.isEmpty()
+                || cost.entrySet().stream().anyMatch(item -> item.getKey() <= 0 || item.getValue() <= 0))) {
             return new CommonResult<>(Code.SAMPLE_ERROR);
         }
         PreGenerateOrderData data = new PreGenerateOrderData();
@@ -84,12 +89,24 @@ public interface OrderGenerate extends IGameSysFuncInterface {
     /** 扣除兑换消耗并执行业务交付；交付失败时返还已扣道具。 */
     default boolean completeNonMoneyPurchase(PlayerPackService packs, Player player, PreGenerateOrderData data,
                                              ShopRechargeListCfg shop, AddType addType, BooleanSupplier receive) {
+        if (shop != null && shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                && (shop.getRedeem() == null || shop.getRedeem().isEmpty())) {
+            return false;
+        }
+        return completeNonMoneyPurchase(packs, player, data, shop,
+                shop == null ? null : shop.getRedeem(), addType, receive);
+    }
+
+    /** 实际背包消耗由业务解析，扣费及失败返还仍走公共流程。 */
+    default boolean completeNonMoneyPurchase(PlayerPackService packs, Player player, PreGenerateOrderData data,
+                                             ShopRechargeListCfg shop, Map<Integer, Long> exchangeCost,
+                                             AddType addType, BooleanSupplier receive) {
         RechargeCfgType type = data.getType();
         if (shop == null || type == null || type == RechargeCfgType.MONEY || shop.getType() != type.getType()) {
             return false;
         }
-        Map<Integer, Long> cost = type == RechargeCfgType.ITEM_EXCHANGE ? shop.getRedeem() : Map.of();
-        if (type == RechargeCfgType.ITEM_EXCHANGE && (cost == null || cost.isEmpty()
+        Map<Integer, Long> cost = type == RechargeCfgType.ITEM_EXCHANGE ? exchangeCost : Map.of();
+        if (type == RechargeCfgType.ITEM_EXCHANGE && (cost == null
                 || cost.entrySet().stream().anyMatch(item -> item.getKey() <= 0 || item.getValue() <= 0))) {
             return false;
         }

@@ -3,6 +3,7 @@ package com.jjg.game.sim.pb.struct;
 import com.jjg.game.common.pb.ItemInfo;
 import com.jjg.game.common.proto.ProtoDesc;
 import com.jjg.game.common.proto.ProtobufMessage;
+import com.jjg.game.core.pb.RechargeInfo;
 
 import java.util.List;
 
@@ -13,8 +14,6 @@ public class TokenShopGoodsInfo {
     public int goodsId;
     @ProtoDesc("每份获得的道具")
     public List<ItemInfo> goods;
-    @ProtoDesc("每份消耗的道具，已经是实际价格")
-    public List<ItemInfo> cost;
     @ProtoDesc("多语言ID")
     public int language;
     @ProtoDesc("客户端资源")
@@ -31,4 +30,6 @@ public class TokenShopGoodsInfo {
     public int purchased;
     @ProtoDesc("下次限购重置时间戳，毫秒；按开服日0点起算周期；0表示不重置或不限购")
     public long resetTime;
+    @ProtoDesc("付费信息")
+    public RechargeInfo rechargeInfo;
 }

@@ -5,6 +5,7 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.Item;
 import com.jjg.game.core.data.PreGenerateOrderData;
+import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.season.data.SeasonFreeSpinResult;
 import com.jjg.game.season.pb.res.ResSeasonMatch;
 import com.jjg.game.season.pb.res.ResSeasonTrialProgress;
@@ -12,7 +13,6 @@ import com.jjg.game.sim.data.*;
 import com.jjg.game.sim.pb.res.ResActivePass;
 import com.jjg.game.sim.pb.res.ResBuyMiniShop;
 import com.jjg.game.sim.pb.res.ResTokenShop;
-import com.jjg.game.sim.pb.res.ResTokenShopExchange;
 import com.jjg.game.sim.pb.res.ResSimTaskReward;
 import com.jjg.game.sim.pb.res.ResSlotsStatistics;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
@@ -27,7 +27,11 @@ import java.util.Map;
 public interface ToSimBridge extends IGameRpc {
     ResTokenShop tokenShop(long playerId, int type);
 
-    ResTokenShopExchange tokenShopExchange(long playerId, int goodsId, int count);
+    CommonResult<PreGenerateOrderData> prepareTokenShopOrder(long playerId, ReqGenerateOrder req);
+
+    boolean completeTokenShopPurchase(long playerId, PreGenerateOrderData data);
+
+    boolean receiveTokenShopOrder(long playerId, String orderId);
 
     /**
      * 在玩家所属 SIM 节点购买迷你商店商品。

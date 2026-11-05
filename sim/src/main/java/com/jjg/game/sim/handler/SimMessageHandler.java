@@ -124,14 +124,6 @@ public class SimMessageHandler implements GmListener {
         pc.send(res);
     }
 
-    @Command(SimConstant.MsgBean.REQ_TOKEN_SHOP_EXCHANGE)
-    public void reqTokenShopExchange(PlayerController pc, ReqTokenShopExchange req) {
-        ResTokenShopExchange res = executeTokenShop(pc, ctx -> tokenShopService.exchange(ctx, req.goodsId, req.count),
-                () -> toSimBridge.tokenShopExchange(pc.playerId(), req.goodsId, req.count), ResTokenShopExchange::new);
-        res.goodsId = req.goodsId;
-        pc.send(res);
-    }
-
     private <T extends AbstractResponse> T executeTokenShop(PlayerController pc, Function<SimPlayerContext, T> local,
                                                            Supplier<T> remote, IntFunction<T> error) {
         try {

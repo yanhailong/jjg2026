@@ -934,9 +934,16 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
                 TokenShopData data = new TokenShopData();
                 data.setType(type);
                 data.setLangId(cfg.getStorename());
-                data.setItemId(cfg.getCost().keySet().iterator().next());
                 return data;
             });
+            ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(cfg.getRechargeid());
+            TokenShopData data = tmp.get(cfg.getType());
+            if (shop != null && data.getItemId() == 0) {
+                Map<Integer, Long> cost = TokenShopConfigService.exchangeCost(cfg, shop);
+                if (cost != null && !cost.isEmpty()) {
+                    data.setItemId(cost.keySet().iterator().next());
+                }
+            }
         }
         tokenShopDataMap = Map.copyOf(tmp);
     }
@@ -1013,6 +1020,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         addChangeSampleFileObserveWithCallBack(BuildingUpgradeTableCfg.EXCEL_NAME, this::loadBuildingUpgradeConfig);
         addChangeSampleFileObserveWithCallBack(BuildingUpgradeAreaCfg.EXCEL_NAME, this::loadBuildingUpgradeAreaConfig);
         addChangeSampleFileObserveWithCallBack(TokenShopCfg.EXCEL_NAME, this::loadTokenShopConfig);
+        addChangeSampleFileObserveWithCallBack(ShopRechargeListCfg.EXCEL_NAME, this::loadTokenShopConfig);
     }
 
     // ---------------------------------------------------------------------
@@ -1040,14 +1048,18 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return visitorStarCfgMap;
     }
 
-    /** 获取当前等级所在区间的起始配置。 */
+    /**
+     * 获取当前等级所在区间的起始配置。
+     */
     public EmployeeLevelCfg getEmployeeLevelCfgByIdAndLevel(int employeeId, int level) {
         NavigableMap<Integer, EmployeeLevelCfg> levels = employeeLevelCfgMap.get(employeeId);
         Map.Entry<Integer, EmployeeLevelCfg> entry = levels == null ? null : levels.floorEntry(level);
         return entry == null ? null : entry.getValue();
     }
 
-    /** 当前等级升一级的费用；无配置或已达最高配置等级时返回 null，空费用表示免费升级。 */
+    /**
+     * 当前等级升一级的费用；无配置或已达最高配置等级时返回 null，空费用表示免费升级。
+     */
     public Map<Integer, Long> getEmployeeUpgradeCost(int employeeId, int level) {
         NavigableMap<Integer, EmployeeLevelCfg> levels = employeeLevelCfgMap.get(employeeId);
         if (levels == null || level >= levels.lastKey()) {
@@ -1093,7 +1105,9 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return entry == null ? null : entry.getValue();
     }
 
-    /** 按实际到达等级精确获取阶段奖励。 */
+    /**
+     * 按实际到达等级精确获取阶段奖励。
+     */
     public Map<Integer, Long> getBuildingUpgradeReward(int buildingId, int level) {
         if (buildingUpgradeCfgMap == null) {
             return Collections.emptyMap();
@@ -1614,8 +1628,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return tmpMap.get(employeeProfile);
     }
 
-    public List<EmployeeProfileCfg> getEmployeeProfileCfgByProfile(int employeeProfile){
-        if(this.employeeProfileProfessionCfgMap == null || this.employeeProfileProfessionCfgMap.isEmpty()){
+    public List<EmployeeProfileCfg> getEmployeeProfileCfgByProfile(int employeeProfile) {
+        if (this.employeeProfileProfessionCfgMap == null || this.employeeProfileProfessionCfgMap.isEmpty()) {
             return null;
         }
         return this.employeeProfileProfessionCfgMap.get(employeeProfile);

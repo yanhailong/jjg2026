@@ -44,7 +44,6 @@ import com.jjg.game.sim.pb.res.ResSimTaskReward;
 import com.jjg.game.sim.pb.res.ResSlotsStatistics;
 import com.jjg.game.sim.pb.res.ResBuyMiniShop;
 import com.jjg.game.sim.pb.res.ResTokenShop;
-import com.jjg.game.sim.pb.res.ResTokenShopExchange;
 import com.jjg.game.sim.pb.res.NotifyTogetherPlayInvite;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
 import com.jjg.game.sim.service.SimCoopTaskService;
@@ -55,6 +54,7 @@ import com.jjg.game.sim.service.SimPackService;
 import com.jjg.game.sim.service.SimSkillService;
 import com.jjg.game.sim.service.SimTaskService;
 import com.jjg.game.sim.service.SimMiniShopService;
+import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.sim.service.TokenShopService;
 import com.jjg.game.sim.service.SimNodeService;
 import com.jjg.game.sim.service.SimVisitService;
@@ -380,14 +380,20 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
 
     @Override
     @RpcCallSetting(processorModKey = "#arg0")
-    public ResTokenShopExchange tokenShopExchange(long playerId, int goodsId, int count) {
-        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
-        if (ctx == null) {
-            ResTokenShopExchange res = new ResTokenShopExchange(Code.NOT_FOUND);
-            res.goodsId = goodsId;
-            return res;
-        }
-        return tokenShopService.exchange(ctx, goodsId, count);
+    public CommonResult<PreGenerateOrderData> prepareTokenShopOrder(long playerId, ReqGenerateOrder req) {
+        return tokenShopService.prepare(playerId, req);
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public boolean completeTokenShopPurchase(long playerId, PreGenerateOrderData data) {
+        return tokenShopService.completePurchase(playerId, data);
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public boolean receiveTokenShopOrder(long playerId, String orderId) {
+        return tokenShopService.receiveOrder(playerId, orderId);
     }
 
     @Override

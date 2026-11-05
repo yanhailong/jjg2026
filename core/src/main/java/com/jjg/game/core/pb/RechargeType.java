@@ -101,6 +101,10 @@ public enum RechargeType {
      * 免广告礼包
      */
     NO_ADS(22),
+    /**
+     * 代币商店
+     */
+    TOKEN_SHOP(23),
     ;
     private final int type;
 

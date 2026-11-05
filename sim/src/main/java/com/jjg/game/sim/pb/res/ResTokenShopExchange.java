@@ -11,7 +11,7 @@ import com.jjg.game.sim.pb.struct.TokenShopGoodsInfo;
 import java.util.List;
 
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_GAME, cmd = SimConstant.MsgBean.RES_TOKEN_SHOP_EXCHANGE, resp = true)
-@ProtoDesc("代币商店兑换结果")
+@ProtoDesc("代币商店购买成功推送")
 public class ResTokenShopExchange extends AbstractResponse {
     @ProtoDesc("TokenShop商品ID")
     public int goodsId;

@@ -347,7 +347,6 @@ public interface SimConstant {
         //代币商店
         int REQ_TOKEN_SHOP = BASE_MSG_PREFIX | 0xB2;
         int RES_TOKEN_SHOP = BASE_MSG_PREFIX | 0xB3;
-        int REQ_TOKEN_SHOP_EXCHANGE = BASE_MSG_PREFIX | 0xB4;
         int RES_TOKEN_SHOP_EXCHANGE = BASE_MSG_PREFIX | 0xB5;
 
         //领取建筑累计的游客奖励

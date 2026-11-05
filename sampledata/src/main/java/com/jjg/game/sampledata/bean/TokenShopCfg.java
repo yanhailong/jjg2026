@@ -31,6 +31,8 @@ public class TokenShopCfg extends BaseCfgBean {
   protected int Order;
   /** 开放等级 */
   protected int PurchaseLevel;
+  /** Rechargeid */
+  protected int Rechargeid;
   /** 限购次数 */
   protected int ResetDaily;
   /** 商品重置时间/day */
@@ -76,6 +78,11 @@ public class TokenShopCfg extends BaseCfgBean {
   /** 返回开放等级 */
   public int getPurchaseLevel() {
     return PurchaseLevel;
+  }
+
+  /** 返回Rechargeid */
+  public int getRechargeid() {
+    return Rechargeid;
   }
 
   /** 返回限购次数 */
