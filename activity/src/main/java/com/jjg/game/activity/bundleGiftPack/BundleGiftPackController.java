@@ -237,7 +237,9 @@ public class BundleGiftPackController extends BaseActivityController implements 
         req.productId = target.isAllGift()
                 ? String.valueOf(target.activityId()) : target.activityId() + "_" + target.giftId();
         if (shopCfg.getType() != RechargeCfgType.MONEY.getType()) {
-            return nonMoneyOrderDetailInfo(shopCfg);
+            return shopCfg.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                    ? singleExchangeOrderDetailInfo(playerPackService, player, shopCfg, req.buyCount, AddType.ACTIVITY_BUNDLE_GIFT_PACK)
+                    : nonMoneyOrderDetailInfo(shopCfg);
         }
         int tmpCode = tmpOrderHandle(corePlayerService, player, 1002, AddType.ACTIVITY_BUNDLE_GIFT_PACK, target.isAllGift() ? 3 : ((giftId % 1000) - 1));
         if (tmpCode != Code.SUCCESS) {
@@ -488,8 +490,8 @@ public class BundleGiftPackController extends BaseActivityController implements 
         if (!isBundleActivity(player, activityData)) {
             return false;
         }
-        return completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
-                getPurchaseShopCfg(activityData, getDetailCfgBean(activityData), target), AddType.ACTIVITY_BUNDLE_GIFT_PACK,
+        return completeNonMoneyPurchase(preGenerateOrderData,
+                getPurchaseShopCfg(activityData, getDetailCfgBean(activityData), target),
                 () -> receivePurchase(player, preGenerateOrderData.getProductId()));
     }
 }

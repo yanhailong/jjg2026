@@ -308,7 +308,9 @@ public class BuyOneGetSevenController extends BaseActivityController
             return result;
         }
         if (shopCfg.getType() != RechargeCfgType.MONEY.getType()) {
-            return nonMoneyOrderDetailInfo(shopCfg);
+            return shopCfg.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                    ? singleExchangeOrderDetailInfo(playerPackService, player, shopCfg, req.buyCount, AddType.ACTIVITY_BUY_ONE_GET_SEVEN_BUY)
+                    : nonMoneyOrderDetailInfo(shopCfg);
         }
         if (shopCfg.getPrice() == null) {
             log.warn("买一送七下单失败，充值商品价格为空 playerId={},productId={},activityId={}",
@@ -363,8 +365,12 @@ public class BuyOneGetSevenController extends BaseActivityController
                     player.getId(), res == null ? Code.FAIL : res.code);
             return false;
         }
-        activityManager.sendToPlayer(player.getId(), res);
-        updateRodDot(player.getId(), activityData, false);
+        try {
+            activityManager.sendToPlayer(player.getId(), res);
+            updateRodDot(player.getId(), activityData, false);
+        } catch (Exception e) {
+            log.error("买一送七购买成功后通知失败 playerId={},activityId={}", player.getId(), activityData.getId(), e);
+        }
         return true;
     }
 
@@ -561,8 +567,9 @@ public class BuyOneGetSevenController extends BaseActivityController
     @Override
     public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
         ActivityData activityData = activityManager.getOpenActivityData(player, ActivityType.BUY_ONE_GET_SEVEN);
-        return activityData != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
-                getShopCfg(activityData), AddType.ACTIVITY_BUY_ONE_GET_SEVEN_BUY, () -> receivePurchase(player));
+        return activityData != null && completeNonMoneyPurchase(preGenerateOrderData,
+                getShopCfg(activityData),
+                () -> receivePurchase(player));
     }
 }
 

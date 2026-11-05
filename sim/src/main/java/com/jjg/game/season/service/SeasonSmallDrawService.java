@@ -225,20 +225,21 @@ public class SeasonSmallDrawService implements SimPlayerTickListener {
         return true;
     }
 
-    /** 非充值购买增加一次抽奖机会，不创建订单或去重记录。 */
-    public boolean receivePurchase(SimPlayerContext ctx, String productId) {
+    /** 非充值购买按份数增加抽奖机会，不创建订单或去重记录。 */
+    public boolean receivePurchase(SimPlayerContext ctx, String productId, int buyCount) {
         DrawDefinition draw = current(ctx);
         SeasonPlayerData season = ctx.getSeasonPlayerData();
         SeasonSmallDrawData state = season.getSmallDraw();
         if (draw == null || state == null || !orderToken(season, draw.id()).equals(productId)
-                || state.getPurchaseChances() <= 0
-                || draw.remainingRewardCount(state.getObtainedRewards()) <= state.drawChances()) {
+                || buyCount < 1 || buyCount > state.getPurchaseChances()
+                || buyCount > draw.remainingRewardCount(state.getObtainedRewards()) - state.drawChances()) {
             return false;
         }
         int previousChances = state.getPurchaseChances();
         int previousCount = state.getNonMoneyPurchaseCount();
-        state.setPurchaseChances(previousChances - 1);
-        state.setNonMoneyPurchaseCount(previousCount + 1);
+        int purchasedCount = Math.addExact(previousCount, buyCount);
+        state.setPurchaseChances(previousChances - buyCount);
+        state.setNonMoneyPurchaseCount(purchasedCount);
         try {
             autoSaveService.saveAndWait(season);
         } catch (RuntimeException e) {

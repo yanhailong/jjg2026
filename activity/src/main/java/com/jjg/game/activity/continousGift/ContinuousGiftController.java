@@ -165,7 +165,9 @@ public class ContinuousGiftController extends BaseActivityController implements 
             }
             String productId = activityData.getId() + "_" + activityData.getRound() + "_" + detailId;
             if (shop.getType() != RechargeCfgType.MONEY.getType()) {
-                result = nonMoneyOrderDetailInfo(shop);
+                result = shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                    ? singleExchangeOrderDetailInfo(playerPackService, player, shop, req.buyCount, AddType.ACTIVITY_CONTINUOUS_GIFT_REWARDS)
+                    : nonMoneyOrderDetailInfo(shop);
                 if (result.success()) {
                     result.data.setOrderProductId(productId);
                 }
@@ -602,8 +604,8 @@ public class ContinuousGiftController extends BaseActivityController implements 
         }
         int detailId = Integer.parseInt(parts[2]);
         ConsecutivePackCfg cfg = getDetailCfgBean(activityData).get(detailId);
-        return cfg != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
-                GameDataManager.getShopRechargeListCfg(cfg.getShopRechargeListID()), AddType.ACTIVITY_CONTINUOUS_GIFT_REWARDS,
+        return cfg != null && completeNonMoneyPurchase(preGenerateOrderData,
+                GameDataManager.getShopRechargeListCfg(cfg.getShopRechargeListID()),
                 () -> receiveCurrentPurchase(player, activityData, detailId, null));
     }
 

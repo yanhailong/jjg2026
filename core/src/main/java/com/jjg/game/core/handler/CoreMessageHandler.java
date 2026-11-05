@@ -575,6 +575,8 @@ public class CoreMessageHandler {
         ResGenerateOrder res = new ResGenerateOrder(Code.SUCCESS);
         OrderGenerate matchedGenerate = null;
         boolean orderCreated = false;
+        PreGenerateOrderData nonMoneyPurchase = null;
+        boolean purchaseCompleted = false;
         try {
             PayType payType = PayType.valueOf(req.payType);
             if (payType == null) {
@@ -639,11 +641,13 @@ public class CoreMessageHandler {
                     }
                 }
             } else {
+                nonMoneyPurchase = preOrderResult.data;
                 preOrderResult.data.setPayType(req.payType);
                 preOrderResult.data.setProductId(StringUtils.isNotEmpty(preOrderResult.data.getOrderProductId())
                         ? preOrderResult.data.getOrderProductId() : req.productId);
                 preOrderResult.data.setDesc(req.desc);
                 boolean success = matchedGenerate.onReceivedRecharge(playerController.getPlayer(), preOrderResult.data);
+                purchaseCompleted = success;
                 if (!success) {
                     res.code = Code.FAIL;
                     playerController.send(res);
@@ -659,6 +663,16 @@ public class CoreMessageHandler {
             }
             log.error("", e);
             res.code = Code.EXCEPTION;
+        } finally {
+            if (nonMoneyPurchase != null && !purchaseCompleted) {
+                try {
+                    matchedGenerate.refundNonMoneyPurchase(playerPackService, playerController.getPlayer(), nonMoneyPurchase);
+                } catch (Exception e) {
+                    log.error("非充值购买失败后返还消耗异常 playerId={},productId={},buyCount={},cost={}",
+                            playerController.playerId(), nonMoneyPurchase.getProductId(), nonMoneyPurchase.getBuyCount(),
+                            nonMoneyPurchase.getExchangeCost(), e);
+                }
+            }
         }
         playerController.send(res);
     }

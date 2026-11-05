@@ -102,7 +102,9 @@ public class SimNoAdsService implements OrderGenerate, SimNoAdsListener {
             return new CommonResult<>(Code.SAMPLE_ERROR);
         }
         if (shop.getType() != RechargeCfgType.MONEY.getType()) {
-            CommonResult<PreGenerateOrderData> result = nonMoneyOrderDetailInfo(shop);
+            CommonResult<PreGenerateOrderData> result = shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                    ? singleExchangeOrderDetailInfo(playerPackService, player, shop, req.buyCount, AddType.SIM_NO_ADS_REWARDS)
+                    : nonMoneyOrderDetailInfo(shop);
             if (result.success()) {
                 result.data.setOrderProductId(String.valueOf(shop.getId()));
             }
@@ -189,8 +191,8 @@ public class SimNoAdsService implements OrderGenerate, SimNoAdsListener {
 
     @Override
     public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
-        return completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
+        return completeNonMoneyPurchase(preGenerateOrderData,
                 GameDataManager.getShopRechargeListCfg(Integer.parseInt(preGenerateOrderData.getProductId())),
-                AddType.SIM_NO_ADS_REWARDS, () -> receivePurchase(player, null));
+                () -> receivePurchase(player, null));
     }
 }

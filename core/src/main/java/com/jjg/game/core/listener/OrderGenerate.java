@@ -12,6 +12,7 @@ import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.CorePlayerService;
 import com.jjg.game.core.service.PlayerPackService;
+import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.GlobalConfigCfg;
 import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
@@ -78,7 +79,8 @@ public interface OrderGenerate extends IGameSysFuncInterface {
         RechargeCfgType type = RechargeCfgType.valueOf(shop.getType());
         if (type == RechargeCfgType.MONEY || type == RechargeCfgType.ITEM_EXCHANGE
                 && (cost == null || cost.isEmpty()
-                || cost.entrySet().stream().anyMatch(item -> item.getKey() <= 0 || item.getValue() <= 0))) {
+                || cost.entrySet().stream().anyMatch(item -> item.getKey() == null || item.getKey() <= 0
+                || item.getValue() == null || item.getValue() <= 0))) {
             return new CommonResult<>(Code.SAMPLE_ERROR);
         }
         PreGenerateOrderData data = new PreGenerateOrderData();
@@ -86,45 +88,75 @@ public interface OrderGenerate extends IGameSysFuncInterface {
         return new CommonResult<>(Code.SUCCESS, data);
     }
 
-    /** 扣除兑换消耗并执行业务交付；交付失败时返还已扣道具。 */
-    default boolean completeNonMoneyPurchase(PlayerPackService packs, Player player, PreGenerateOrderData data,
-                                             ShopRechargeListCfg shop, AddType addType, BooleanSupplier receive) {
-        if (shop != null && shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
-                && (shop.getRedeem() == null || shop.getRedeem().isEmpty())) {
-            return false;
+    /** 一次性权益只允许兑换一份。 */
+    default CommonResult<PreGenerateOrderData> singleExchangeOrderDetailInfo(PlayerPackService packs, Player player,
+                                                                           ShopRechargeListCfg shop, int buyCount, AddType addType) {
+        if (buyCount > 1) {
+            LoggerFactory.getLogger(getClass()).warn("一次性权益不允许多份兑换 playerId={},shopId={},buyCount={}",
+                    player.getId(), shop.getId(), buyCount);
+            return new CommonResult<>(Code.PARAM_ERROR);
         }
-        return completeNonMoneyPurchase(packs, player, data, shop,
-                shop == null ? null : shop.getRedeem(), addType, receive);
+        return exchangeOrderDetailInfo(packs, player, shop, buyCount, addType);
     }
 
-    /** 实际背包消耗由业务解析，扣费及失败返还仍走公共流程。 */
-    default boolean completeNonMoneyPurchase(PlayerPackService packs, Player player, PreGenerateOrderData data,
-                                             ShopRechargeListCfg shop, Map<Integer, Long> exchangeCost,
-                                             AddType addType, BooleanSupplier receive) {
-        RechargeCfgType type = data.getType();
-        if (shop == null || type == null || type == RechargeCfgType.MONEY || shop.getType() != type.getType()) {
-            return false;
+    /** 预下单时扣除兑换消耗，扣费错误码直接返回客户端。 */
+    default CommonResult<PreGenerateOrderData> exchangeOrderDetailInfo(PlayerPackService packs, Player player,
+                                                                     ShopRechargeListCfg shop, int buyCount, AddType addType) {
+        CommonResult<PreGenerateOrderData> result = exchangeOrderDetailInfo(shop, shop.getRedeem(), buyCount);
+        if (!result.success()) {
+            LoggerFactory.getLogger(getClass()).warn("道具兑换消耗配置无效或数量溢出 playerId={},shopId={},buyCount={},cost={},code={}",
+                    player.getId(), shop.getId(), buyCount, shop.getRedeem(), result.code);
+            return result;
         }
-        Map<Integer, Long> cost = type == RechargeCfgType.ITEM_EXCHANGE ? exchangeCost : Map.of();
-        if (type == RechargeCfgType.ITEM_EXCHANGE && (cost == null
-                || cost.entrySet().stream().anyMatch(item -> item.getKey() <= 0 || item.getValue() <= 0))) {
-            return false;
+        int code = packs.removeItems(player, result.data.getExchangeCost(), addType).code;
+        if (code != Code.SUCCESS) {
+            LoggerFactory.getLogger(getClass()).warn("道具兑换扣费失败 playerId={},shopId={},buyCount={},cost={},code={}",
+                    player.getId(), shop.getId(), result.data.getBuyCount(), result.data.getExchangeCost(), code);
+            return new CommonResult<>(code);
         }
-        if (!cost.isEmpty() && !packs.removeItems(player, cost, addType).success()) {
-            return false;
+        return result;
+    }
+
+    /** 特殊货币由所属业务扣除；这里只计算本次兑换份数和消耗快照。 */
+    default CommonResult<PreGenerateOrderData> exchangeOrderDetailInfo(ShopRechargeListCfg shop, Map<Integer, Long> cost, int buyCount) {
+        CommonResult<PreGenerateOrderData> result = nonMoneyOrderDetailInfo(shop, cost);
+        if (!result.success() || shop.getType() != RechargeCfgType.ITEM_EXCHANGE.getType()) {
+            return new CommonResult<>(Code.SAMPLE_ERROR);
         }
-        boolean success = false;
         try {
-            success = receive.getAsBoolean();
-            return success;
-        } finally {
-            if (!success && !cost.isEmpty() && !packs.addItems(player.getId(), cost, AddType.FAIL_ROLLBACK).success()) {
-                LoggerFactory.getLogger(getClass()).error("非充值购买失败后退还道具失败 playerId={},productId={},cost={}",
-                        player.getId(), data.getProductId(), cost);
-            }
+            result.data.setBuyCount(Math.max(1, buyCount));
+            result.data.setExchangeCost(Map.copyOf(ItemUtils.multiplyItems(cost, result.data.getBuyCount())));
+            return result;
+        } catch (ArithmeticException e) {
+            LoggerFactory.getLogger(getClass()).warn("道具兑换消耗数量溢出 shopId={},buyCount={},cost={}", shop.getId(), buyCount, cost);
+            return new CommonResult<>(Code.PARAM_ERROR);
         }
     }
 
+    /** 交付只校验支付类型和预扣结果，不再次扣费；失败返还由通用下单入口收口。 */
+    default boolean completeNonMoneyPurchase(PreGenerateOrderData data, ShopRechargeListCfg shop, BooleanSupplier receive) {
+        RechargeCfgType type = data.getType();
+        if (shop == null || type == null || type == RechargeCfgType.MONEY || shop.getType() != type.getType()
+                || type == RechargeCfgType.ITEM_EXCHANGE && (data.getExchangeCost() == null || data.getExchangeCost().isEmpty())) {
+            LoggerFactory.getLogger(getClass()).warn("非充值交付校验失败，支付类型不匹配或缺少预扣消耗 productId={},type={},shopId={},shopType={},buyCount={},cost={}",
+                    data.getProductId(), type, shop == null ? null : shop.getId(), shop == null ? null : shop.getType(),
+                    data.getBuyCount(), data.getExchangeCost());
+            return false;
+        }
+        return receive.getAsBoolean();
+    }
+
+    default void refundNonMoneyPurchase(PlayerPackService packs, Player player, PreGenerateOrderData data) {
+        refundNonMoneyPurchase(packs, player, data, data.getExchangeCost());
+    }
+
+    /** 允许特殊业务只返还实际背包消耗，其他货币由所属领域返还。 */
+    default void refundNonMoneyPurchase(PlayerPackService packs, Player player, PreGenerateOrderData data, Map<Integer, Long> cost) {
+        if (cost != null && !cost.isEmpty() && !packs.addItems(player.getId(), cost, AddType.FAIL_ROLLBACK).success()) {
+            LoggerFactory.getLogger(getClass()).error("非充值购买失败后退还道具失败 playerId={},productId={},buyCount={},cost={}",
+                    player.getId(), data.getProductId(), data.getBuyCount(), cost);
+        }
+    }
 
     /**
      * 处理临时购买逻辑

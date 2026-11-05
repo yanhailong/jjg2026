@@ -74,7 +74,9 @@ public class ActivePassOrderService implements OrderGenerate {
         int shopId = target[1] == BASIC ? period.config().getShopRechargeListID() : period.config().getShopRechargeList1ID();
         var shop = GameDataManager.getShopRechargeListCfg(shopId);
         if (shop.getType() != RechargeCfgType.MONEY.getType()) {
-            return nonMoneyOrderDetailInfo(shop);
+            return shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                    ? singleExchangeOrderDetailInfo(playerPackService, player, shop, req.buyCount, AddType.SIM_ACTIVE_PASS)
+                    : nonMoneyOrderDetailInfo(shop);
         }
 
         int tmpCode = tmpOrderHandle(playerService, player, 1004, AddType.SIM_ACTIVE_PASS, target[1] == BASIC ? 0 : 1);
@@ -172,7 +174,8 @@ public class ActivePassOrderService implements OrderGenerate {
             return false;
         }
         int shopId = target[1] == BASIC ? period.config().getShopRechargeListID() : period.config().getShopRechargeList1ID();
-        return completeNonMoneyPurchase(playerPackService, ctx.getPlayer(), data, GameDataManager.getShopRechargeListCfg(shopId),
-                AddType.SIM_ACTIVE_PASS, () -> service.unlock(ctx, target[0], target[1]));
+        return completeNonMoneyPurchase(data,
+                GameDataManager.getShopRechargeListCfg(shopId),
+                () -> service.unlock(ctx, target[0], target[1]));
     }
 }

@@ -20,4 +20,6 @@ public class ReqGenerateOrder extends AbstractMessage {
     public String productId;
     @ProtoDesc("json格式备注")
     public String desc;
+    @ProtoDesc("购买个数")
+    public int buyCount;
 }

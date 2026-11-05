@@ -313,14 +313,15 @@ public class ScratchCardsController extends BaseActivityController implements Or
         BaseCfgBean cfgBean = getOrderGenerateBean(player, req.productId);
         if (cfgBean instanceof ScratchCardsCfg cfg && cfg.getType() == ActivityConstant.ScratchCards.GIFT_TYPE
                 && cfg.getChannelCommodity() > 0 && CollectionUtil.isNotEmpty(cfg.getGetItem())) {
-            if (cfg.getCount() <= 0 || countDao.getCount(getBuyCountFeature(player.getId()), String.valueOf(cfg.getId())).intValue() >= cfg.getCount()) {
-                log.warn("刮刮卡下单失败，购买次数配置无效或已达到限购次数 playerId={},productId={},cfgId={},countLimit={}",
-                        player.getId(), req.productId, cfg.getId(), cfg.getCount());
-                return result;
-            }
             ShopRechargeListCfg shopRechargeListCfg = GameDataManager.getShopRechargeListCfg(cfg.getChannelCommodity());
+            boolean exchange = shopRechargeListCfg != null && shopRechargeListCfg.getType() == RechargeCfgType.ITEM_EXCHANGE.getType();
+            if (!canBuyCount(player, cfg, exchange ? Math.max(1, req.buyCount) : 1)) {
+                return exchange ? new CommonResult<>(Code.DAILY_LIMIT) : result;
+            }
             if (shopRechargeListCfg != null && shopRechargeListCfg.getType() != RechargeCfgType.MONEY.getType()) {
-                return nonMoneyOrderDetailInfo(shopRechargeListCfg);
+                return exchange
+                        ? exchangeOrderDetailInfo(playerPackService, player, shopRechargeListCfg, req.buyCount, AddType.ACTIVITY_SCRATCH_CARDS_BUY_GIFT)
+                        : nonMoneyOrderDetailInfo(shopRechargeListCfg);
             }
             if (shopRechargeListCfg == null || shopRechargeListCfg.getPrice() == null) {
                 log.warn("刮刮卡下单失败，充值商品配置或价格为空 playerId={},productId={},shopCfgId={},price={}",
@@ -364,6 +365,10 @@ public class ScratchCardsController extends BaseActivityController implements Or
 
     @Override
     public AbstractResponse buyActivityGiftForRecharge(Player player, ActivityData activityData, int giftId) {
+        return buyGift(player, activityData, giftId, 1);
+    }
+
+    private AbstractResponse buyGift(Player player, ActivityData activityData, int giftId, int buyCount) {
         long activityId = activityData.getId();
         Map<Integer, ScratchCardsCfg> baseCfgBeanMap = getDetailCfgBean(activityData);
         ScratchCardsCfg cfg = baseCfgBeanMap.get(giftId);
@@ -371,19 +376,21 @@ public class ScratchCardsController extends BaseActivityController implements Or
             log.error("刮刮乐礼包配置错误 playerId:{} activityId:{} giftId:{}", player.getId(), activityId, giftId);
             return new ResActivityBuyGift(Code.PARAM_ERROR);
         }
+        Map<Integer, Long> rewards = ItemUtils.multiplyItems(cfg.getGetItem(), buyCount);
         CommonResult<ItemOperationResult> addItems =
-                playerPackService.addItems(player.getId(), cfg.getGetItem(), AddType.ACTIVITY_SCRATCH_CARDS_BUY_GIFT);
+                playerPackService.addItems(player.getId(), rewards, AddType.ACTIVITY_SCRATCH_CARDS_BUY_GIFT);
         if (!addItems.success()) {
             log.error("刮刮乐购买礼包自动领奖失败 playerId:{} activityId:{} giftId:{} code:{}", player.getId(), activityData.getId(), giftId, addItems.code);
             return new ResActivityBuyGift(addItems.code);
         }
         // 已支付订单正常履约，发奖成功后计入到账当天的购买次数。
-        addBuyCount(getBuyCountFeature(player.getId()), giftId);
+        countDao.incrementWithoutExpireRefresh(getBuyCountFeature(player.getId()), String.valueOf(giftId),
+                BigDecimal.valueOf(buyCount), BUY_COUNT_EXPIRE_SECONDS);
         ResActivityBuyGift res = new ResActivityBuyGift(Code.SUCCESS);
         res.activityId = activityData.getId();
-        res.itemInfos = ItemUtils.buildItemInfo(cfg.getGetItem());
+        res.itemInfos = ItemUtils.buildItemInfo(rewards);
         try {
-            activityLogger.sendActivityGift(player, activityData, addItems.data, cfg.getGetItem(), cfg.getCost(), giftId);
+            activityLogger.sendActivityGift(player, activityData, addItems.data, rewards, cfg.getCost(), giftId);
         } catch (Exception e) {
             log.error("记录刮刮乐礼包购买日志失败 playerId:{} activityId:{} giftId:{}", player.getId(), activityId, giftId, e);
         }
@@ -464,8 +471,38 @@ public class ScratchCardsController extends BaseActivityController implements Or
         if (!(bean instanceof ScratchCardsCfg cfg)) {
             return false;
         }
-        return completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
-                GameDataManager.getShopRechargeListCfg(cfg.getChannelCommodity()), AddType.ACTIVITY_SCRATCH_CARDS_BUY_GIFT,
-                () -> dealActivityPurchase(player, preGenerateOrderData.getProductId(), 2));
+        return completeNonMoneyPurchase(preGenerateOrderData,
+                GameDataManager.getShopRechargeListCfg(cfg.getChannelCommodity()),
+                () -> receiveNonMoneyPurchase(player, preGenerateOrderData, cfg));
+    }
+
+    private boolean canBuyCount(Player player, ScratchCardsCfg cfg, int buyCount) {
+        int purchased = countDao.getCount(getBuyCountFeature(player.getId()), String.valueOf(cfg.getId())).intValue();
+        if (cfg.getCount() <= 0 || buyCount > cfg.getCount() - purchased) {
+            log.warn("刮刮卡购买超过限购 playerId={},cfgId={},purchased={},buyCount={},limit={}",
+                    player.getId(), cfg.getId(), purchased, buyCount, cfg.getCount());
+            return false;
+        }
+        return true;
+    }
+
+    private boolean receiveNonMoneyPurchase(Player player, PreGenerateOrderData data, ScratchCardsCfg cfg) {
+        if (!canBuyCount(player, cfg, data.getBuyCount())) {
+            return false;
+        }
+        long activityId = Long.parseLong(data.getProductId().split("_")[0]);
+        ActivityData activity = activityManager.getActivityData().get(activityId);
+        AbstractResponse res = buyGift(player, activity, cfg.getId(), data.getBuyCount());
+        if (res.code != Code.SUCCESS) {
+            return false;
+        }
+        try {
+            activityManager.sendToPlayer(player.getId(), res);
+            updateRodDot(player.getId(), activity, false);
+        } catch (Exception e) {
+            log.error("刮刮卡购买成功通知失败 playerId={},activityId={},detailId={},buyCount={}",
+                    player.getId(), activityId, cfg.getId(), data.getBuyCount(), e);
+        }
+        return true;
     }
 }

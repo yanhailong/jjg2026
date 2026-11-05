@@ -91,8 +91,7 @@ public class GoldTreasureController extends BaseActivityController implements Or
             return res;
         }
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(cfg.getPayId());
-        if (CollectionUtil.isEmpty(cfg.getGetItem()) || shop == null
-                || shop.getType() == 2 && (shop.getRedeem() == null || shop.getRedeem().size() != 1)) {
+        if (CollectionUtil.isEmpty(cfg.getGetItem()) || shop == null) {
             res.code = Code.SAMPLE_ERROR;
             return res;
         }
@@ -100,6 +99,10 @@ public class GoldTreasureController extends BaseActivityController implements Or
         try {
             Map<Integer, PlayerActivityData> playerData = loadCurrentData(player, activityData);
             PlayerActivityData previous = playerData.get(detailId);
+            if (shop.getType() == 2 && !isPaid(previous) && (shop.getRedeem() == null || shop.getRedeem().size() != 1)) {
+                res.code = Code.SAMPLE_ERROR;
+                return res;
+            }
             if (isClaimed(previous)) {
                 res.code = Code.REPEAT_OP;
                 log.warn("该奖励已被领取 playerId={},detailId={}", playerId, detailId);
@@ -117,7 +120,7 @@ public class GoldTreasureController extends BaseActivityController implements Or
 
             CommonResult<ItemOperationResult> added;
             try {
-                if (shop.getType() == 2) {
+                if (shop.getType() == 2 && !isPaid(previous)) {
                     Map.Entry<Integer, Long> cost = shop.getRedeem().entrySet().iterator().next();
                     added = playerPackService.useItem(player, cost.getKey(), cost.getValue(), cfg.getGetItem(),
                             AddType.ACTIVITY_GOLD_TREASURE_REWARDS);
@@ -248,10 +251,9 @@ public class GoldTreasureController extends BaseActivityController implements Or
 
         RechargeCfgType rechargeCfgType = RechargeCfgType.valueOf(shop.getType());
         if (rechargeCfgType != RechargeCfgType.MONEY) {
-            result.code = Code.SUCCESS;
-            result.data = new PreGenerateOrderData();
-            result.data.setType(rechargeCfgType);
-            return result;
+            return rechargeCfgType == RechargeCfgType.ITEM_EXCHANGE
+                    ? singleExchangeOrderDetailInfo(playerPackService, player, shop, req.buyCount, AddType.ACTIVITY_GOLD_TREASURE_REWARDS)
+                    : nonMoneyOrderDetailInfo(shop);
         }
 
         if (shop.getPrice() == null || shop.getPrice().signum() <= 0
@@ -333,7 +335,8 @@ public class GoldTreasureController extends BaseActivityController implements Or
             log.warn("非付费购买失败，商品配置不存在或购买类型不匹配 playerId:{} detailId:{} type:{}", player.getId(), detailId, type);
             return false;
         }
-        return receivePayment(player, activityData, cfg, null, preGenerateOrderData.getProductId());
+        return completeNonMoneyPurchase(preGenerateOrderData, shop,
+                () -> receivePayment(player, activityData, cfg, null, preGenerateOrderData.getProductId()));
     }
 
 
@@ -518,7 +521,7 @@ public class GoldTreasureController extends BaseActivityController implements Or
         }
         return switch (shop.getType()) {
             case 1, 3 -> data != null && data.getClaimStatus() == ActivityConstant.ClaimStatus.CAN_CLAIM;
-            case 2 -> shop.getRedeem() != null && shop.getRedeem().size() == 1
+            case 2 -> isPaid(data) || shop.getRedeem() != null && shop.getRedeem().size() == 1
                     && playerPackService.checkHasItems(player, shop.getRedeem());
             case 4 -> true;
             default -> false;
@@ -527,6 +530,10 @@ public class GoldTreasureController extends BaseActivityController implements Or
 
     private boolean isClaimed(PlayerActivityData data) {
         return data != null && data.getClaimStatus() == ActivityConstant.ClaimStatus.CLAIMED;
+    }
+
+    private boolean isPaid(PlayerActivityData data) {
+        return data != null && data.getClaimStatus() == ActivityConstant.ClaimStatus.CAN_CLAIM;
     }
 
     private boolean isRunning(ActivityData activityData) {
@@ -599,7 +606,7 @@ public class GoldTreasureController extends BaseActivityController implements Or
                 continue;
             }
             Map.Entry<Integer, Long> cost = null;
-            if (shop.getType() == 2) {
+            if (shop.getType() == 2 && !isPaid(data)) {
                 if (shop.getRedeem() == null || shop.getRedeem().size() != 1 || pack == null) {
                     continue;
                 }

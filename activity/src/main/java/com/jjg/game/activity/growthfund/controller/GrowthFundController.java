@@ -451,7 +451,9 @@ public class GrowthFundController extends BaseActivityController implements Orde
         }
         ShopRechargeListCfg shopRechargeListCfg = getShopCfg(activityData);
         if (shopRechargeListCfg != null && shopRechargeListCfg.getType() != RechargeCfgType.MONEY.getType()) {
-            return nonMoneyOrderDetailInfo(shopRechargeListCfg);
+            return shopRechargeListCfg.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                    ? singleExchangeOrderDetailInfo(playerPackService, player, shopRechargeListCfg, req.buyCount, AddType.ACTIVITY_GROWTH_FUND_BUY)
+                    : nonMoneyOrderDetailInfo(shopRechargeListCfg);
         }
         if (shopRechargeListCfg == null || shopRechargeListCfg.getPrice() == null) {
             log.warn("成长基金下单失败，充值商品配置或价格为空 playerId={},productId={},activityId={},shopCfgId={},price={}",
@@ -520,8 +522,8 @@ public class GrowthFundController extends BaseActivityController implements Orde
     @Override
     public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
         ActivityData activityData = activityManager.getActivityData().get(Long.parseLong(preGenerateOrderData.getProductId()));
-        return activityData != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
-                getShopCfg(activityData), AddType.ACTIVITY_GROWTH_FUND_BUY,
+        return activityData != null && completeNonMoneyPurchase(preGenerateOrderData,
+                getShopCfg(activityData),
                 () -> receivePurchase(player, preGenerateOrderData.getProductId()));
     }
 }

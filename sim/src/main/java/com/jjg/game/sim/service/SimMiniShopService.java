@@ -141,7 +141,9 @@ public class SimMiniShopService implements OrderGenerate {
 
         ShopRechargeListCfg recharge = GameDataManager.getShopRechargeListCfg(shopMiniCfg.getShopRechargeListId());
         if (recharge != null && recharge.getType() != RechargeCfgType.MONEY.getType()) {
-            return nonMoneyOrderDetailInfo(recharge);
+            return recharge.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                    ? exchangeOrderDetailInfo(playerPackService, player, recharge, req.buyCount, AddType.SIM_MINI_SHOP)
+                    : nonMoneyOrderDetailInfo(recharge);
         }
         if (recharge == null || recharge.getPrice() == null) {
             log.warn("迷你商店下单失败，充值商品配置或价格为空 playerId={},productId={},shopCfgId={},price={}",
@@ -165,32 +167,37 @@ public class SimMiniShopService implements OrderGenerate {
         if (order.getRechargeType() != getRechargeType() || order.getPlayerId() != player.getId()) {
             return false;
         }
-        return receivePurchase(player, order.getProductId(), order.getId());
+        return receivePurchase(player, order.getProductId(), order.getId(), 1);
     }
 
-    private boolean receivePurchase(Player player, String productId, String orderId) {
+    private boolean receivePurchase(Player player, String productId, String orderId, int buyCount) {
         ShopMiniCfg shopMiniCfg = GameDataManager.getShopMiniCfg(Integer.parseInt(productId));
         if (shopMiniCfg == null) {
             log.warn("获取商品配置失败 playerId={},productId={}", player.getId(), productId);
             return false;
         }
         // 等级只在下单时校验，已付款订单不因玩家升级而拒绝发货。
-        if (!playerPackService.addItems(player.getId(), shopMiniCfg.getGoods(), AddType.SHOP_RECHARGE, orderId).success()) {
+        var rewards = ItemUtils.multiplyItems(shopMiniCfg.getGoods(), buyCount);
+        if (!playerPackService.addItems(player.getId(), rewards, AddType.SHOP_RECHARGE, orderId).success()) {
             return false;
         }
         ResBuyMiniShop res = new ResBuyMiniShop(Code.SUCCESS);
         res.productId = productId;
-        res.items = ItemUtils.buildItemInfo(shopMiniCfg.getGoods());
+        res.items = ItemUtils.buildItemInfo(rewards);
 
-        clusterSystem.sendToPlayer(res, player.getId());
+        try {
+            clusterSystem.sendToPlayer(res, player.getId());
+        } catch (Exception e) {
+            log.error("迷你商店购买成功推送失败 playerId={},productId={},buyCount={}", player.getId(), productId, buyCount, e);
+        }
         return true;
     }
 
     @Override
     public boolean onReceivedRecharge(Player player, PreGenerateOrderData preGenerateOrderData) {
         ShopMiniCfg cfg = GameDataManager.getShopMiniCfg(Integer.parseInt(preGenerateOrderData.getProductId()));
-        return cfg != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
-                GameDataManager.getShopRechargeListCfg(cfg.getShopRechargeListId()), AddType.SIM_MINI_SHOP,
-                () -> receivePurchase(player, preGenerateOrderData.getProductId(), null));
+        return cfg != null && completeNonMoneyPurchase(preGenerateOrderData,
+                GameDataManager.getShopRechargeListCfg(cfg.getShopRechargeListId()),
+                () -> receivePurchase(player, preGenerateOrderData.getProductId(), null, preGenerateOrderData.getBuyCount()));
     }
 }

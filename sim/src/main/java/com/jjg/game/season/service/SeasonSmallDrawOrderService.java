@@ -56,8 +56,17 @@ public class SeasonSmallDrawOrderService implements OrderGenerate {
             return new CommonResult<>(Code.NOT_ENOUGH);
         }
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(draw.config().getPricePerUse());
+        if (shop != null && shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()) {
+            int buyCount = Math.max(1, req.buyCount);
+            if (buyCount > state.getPurchaseChances()
+                    || buyCount > draw.remainingRewardCount(state.getObtainedRewards()) - state.drawChances()) {
+                return new CommonResult<>(Code.NOT_ENOUGH);
+            }
+        }
         if (shop != null && shop.getType() != RechargeCfgType.MONEY.getType()) {
-            CommonResult<PreGenerateOrderData> result = nonMoneyOrderDetailInfo(shop);
+            CommonResult<PreGenerateOrderData> result = shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                    ? exchangeOrderDetailInfo(playerPackService, player, shop, req.buyCount, AddType.SIM_SEASON_SMALL_DRAW)
+                    : nonMoneyOrderDetailInfo(shop);
             if (result.success()) {
                 result.data.setOrderProductId(productId);
             }
@@ -94,8 +103,8 @@ public class SeasonSmallDrawOrderService implements OrderGenerate {
             return false;
         }
         var draw = drawService.current(ctx);
-        return draw != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
-                GameDataManager.getShopRechargeListCfg(draw.config().getPricePerUse()), AddType.SIM_SEASON_SMALL_DRAW,
-                () -> drawService.receivePurchase(ctx, preGenerateOrderData.getProductId()));
+        return draw != null && completeNonMoneyPurchase(preGenerateOrderData,
+                GameDataManager.getShopRechargeListCfg(draw.config().getPricePerUse()),
+                () -> drawService.receivePurchase(ctx, preGenerateOrderData.getProductId(), preGenerateOrderData.getBuyCount()));
     }
 }

@@ -175,10 +175,10 @@ public class TokenShopService implements OrderGenerate {
     public CommonResult<PreGenerateOrderData> prepare(long playerId, ReqGenerateOrder req) {
         SimPlayerContext ctx = contexts.getContext(playerId);
         TokenShopConfigService.Goods product = product(req.productId);
-        int code = checkPurchase(ctx, product, System.currentTimeMillis());
-        if (code != Code.SUCCESS) {
-            log.warn("代币商店下单被拒绝 playerId={},productId={},code={}", playerId, req.productId, code);
-            return new CommonResult<>(code);
+        if (ctx == null || product == null) {
+            log.warn("代币商店下单失败，上下文或商品不存在 playerId={},productId={},contextMissing={}",
+                    playerId, req.productId, ctx == null);
+            return new CommonResult<>(Code.NOT_FOUND);
         }
         TokenShopCfg cfg = product.cfg();
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(cfg.getRechargeid());
@@ -186,8 +186,17 @@ public class TokenShopService implements OrderGenerate {
             log.warn("代币商店支付配置缺失 playerId={},goodsId={},rechargeId={}", playerId, cfg.getId(), cfg.getRechargeid());
             return new CommonResult<>(Code.SAMPLE_ERROR);
         }
+        int buyCount = shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType() ? Math.max(1, req.buyCount) : 1;
+        int code = checkPurchase(ctx, product, System.currentTimeMillis(), buyCount);
+        if (code != Code.SUCCESS) {
+            log.warn("代币商店下单被拒绝 playerId={},productId={},buyCount={},code={}", playerId, req.productId, buyCount, code);
+            return new CommonResult<>(code);
+        }
+        if (shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()) {
+            return prepareExchange(ctx, cfg, shop, buyCount);
+        }
         if (shop.getType() != RechargeCfgType.MONEY.getType()) {
-            return nonMoneyOrderDetailInfo(shop, TokenShopConfigService.exchangeCost(cfg, shop));
+            return nonMoneyOrderDetailInfo(shop);
         }
         if (shop.getPrice() == null || shop.getPrice().signum() <= 0) {
             log.warn("代币商店现金价格无效 playerId={},goodsId={},rechargeId={},price={}",
@@ -227,7 +236,7 @@ public class TokenShopService implements OrderGenerate {
             log.warn("代币商店到账失败，商品不存在 playerId={},orderId={},productId={}", playerId, orderId, order.getProductId());
             return false;
         }
-        return deliver(ctx, product, Map.of(), orderId, System.currentTimeMillis());
+        return deliver(ctx, product, Map.of(), orderId, System.currentTimeMillis(), 1);
     }
 
     @Override
@@ -243,49 +252,70 @@ public class TokenShopService implements OrderGenerate {
     boolean completePurchase(long playerId, PreGenerateOrderData data, long now) {
         SimPlayerContext ctx = contexts.getContext(playerId);
         TokenShopConfigService.Goods product = product(data.getProductId());
-        int code = checkPurchase(ctx, product, now);
+        int code = checkPurchase(ctx, product, now, data.getBuyCount());
         if (code != Code.SUCCESS) {
-            log.warn("代币商店购买被拒绝 playerId={},productId={},payType={},code={}",
-                    playerId, data.getProductId(), data.getType(), code);
+            log.warn("代币商店购买被拒绝 playerId={},productId={},payType={},buyCount={},code={}",
+                    playerId, data.getProductId(), data.getType(), data.getBuyCount(), code);
             return false;
         }
         TokenShopCfg cfg = product.cfg();
         ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(cfg.getRechargeid());
-        if (shop == null || data.getType() == null || data.getType() == RechargeCfgType.MONEY
-                || shop.getType() != data.getType().getType()) {
-            log.warn("代币商店支付类型不匹配 playerId={},goodsId={},rechargeId={},payType={},configuredType={}",
-                    playerId, cfg.getId(), cfg.getRechargeid(), data.getType(), shop == null ? null : shop.getType());
-            return false;
+        Map<Integer, Long> cost = data.getExchangeCost() == null ? Map.of() : data.getExchangeCost();
+        return completeNonMoneyPurchase(data, shop,
+                () -> deliver(ctx, product, cost, null, now, data.getBuyCount()));
+    }
+
+    private CommonResult<PreGenerateOrderData> prepareExchange(SimPlayerContext ctx, TokenShopCfg cfg,
+                                                              ShopRechargeListCfg shop, int buyCount) {
+        CommonResult<PreGenerateOrderData> result = exchangeOrderDetailInfo(shop, TokenShopConfigService.exchangeCost(cfg, shop), buyCount);
+        if (!result.success()) {
+            log.warn("代币商店兑换消耗无效 playerId={},goodsId={},rechargeId={},buyCount={},redeem={},fallbackCost={},code={}",
+                    ctx.playerId(), cfg.getId(), cfg.getRechargeid(), buyCount, shop.getRedeem(), cfg.getCost(), result.code);
+            return result;
         }
-        Map<Integer, Long> cost = TokenShopConfigService.exchangeCost(cfg, shop);
-        if (!nonMoneyOrderDetailInfo(shop, cost).success()) {
-            log.warn("代币商店兑换消耗无效 playerId={},goodsId={},rechargeId={},cost={}",
-                    playerId, cfg.getId(), cfg.getRechargeid(), cost);
-            return false;
-        }
+        Map<Integer, Long> cost = result.data.getExchangeCost();
         long contribution = cost.getOrDefault(SimConstant.Item.ID_ALLIANCE_CONTRIBUTION, 0L);
-        Map<Integer, Long> packCost = cost;
-        if (contribution > 0) {
-            packCost = new HashMap<>(cost);
-            packCost.remove(SimConstant.Item.ID_ALLIANCE_CONTRIBUTION);
-            if (!allianceAssets.deductContribution(playerId, contribution)) {
-                log.warn("代币商店联盟贡献不足 playerId={},goodsId={},required={}", playerId, cfg.getId(), contribution);
-                return false;
-            }
+        if (contribution > 0 && !allianceAssets.deductContribution(ctx.playerId(), contribution)) {
+            log.warn("代币商店联盟贡献不足 playerId={},goodsId={},buyCount={},required={}", ctx.playerId(), cfg.getId(), buyCount, contribution);
+            return new CommonResult<>(Code.NOT_ENOUGH_ITEM);
         }
-        boolean success = false;
+        boolean charged = false;
         try {
-            success = completeNonMoneyPurchase(packs, ctx.getPlayer(), data, shop, packCost, addType(cfg),
-                    () -> deliver(ctx, product, cost, null, now));
-            if (!success) {
-                log.warn("代币商店扣费或交付失败 playerId={},goodsId={},cost={}", playerId, cfg.getId(), cost);
+            Map<Integer, Long> packCost = packCost(cost);
+            int code = packCost.isEmpty() ? Code.SUCCESS : packs.removeItems(ctx.getPlayer(), packCost, addType(cfg)).code;
+            if (code != Code.SUCCESS) {
+                log.warn("代币商店扣费失败 playerId={},goodsId={},buyCount={},cost={},code={}", ctx.playerId(), cfg.getId(), buyCount, cost, code);
+                return new CommonResult<>(code);
             }
-            return success;
+            charged = true;
+            return result;
         } finally {
-            if (!success) {
-                refundContribution(ctx, contribution);
+            if (!charged) {
+                refundContribution(ctx.playerId(), contribution);
             }
         }
+    }
+
+    @Override
+    public void refundNonMoneyPurchase(PlayerPackService packs, Player player, PreGenerateOrderData data) {
+        Map<Integer, Long> cost = data.getExchangeCost();
+        if (cost == null || cost.isEmpty()) {
+            return;
+        }
+        try {
+            OrderGenerate.super.refundNonMoneyPurchase(this.packs, player, data, packCost(cost));
+        } finally {
+            refundContribution(player.getId(), cost.getOrDefault(SimConstant.Item.ID_ALLIANCE_CONTRIBUTION, 0L));
+        }
+    }
+
+    private static Map<Integer, Long> packCost(Map<Integer, Long> cost) {
+        if (!cost.containsKey(SimConstant.Item.ID_ALLIANCE_CONTRIBUTION)) {
+            return cost;
+        }
+        Map<Integer, Long> result = new HashMap<>(cost);
+        result.remove(SimConstant.Item.ID_ALLIANCE_CONTRIBUTION);
+        return result;
     }
 
     private TokenShopConfigService.Goods product(String productId) {
@@ -296,7 +326,7 @@ public class TokenShopService implements OrderGenerate {
         }
     }
 
-    private int checkPurchase(SimPlayerContext ctx, TokenShopConfigService.Goods product, long now) {
+    private int checkPurchase(SimPlayerContext ctx, TokenShopConfigService.Goods product, long now, int buyCount) {
         if (ctx == null || product == null) {
             return Code.NOT_FOUND;
         }
@@ -316,21 +346,22 @@ public class TokenShopService implements OrderGenerate {
         }
         long today = TimeHelper.getLocalDateTime(now).toLocalDate().toEpochDay();
         int purchased = purchased(ctx.getSimBaseData().getTokenShopPurchases().get(cfg.getId()), periodStart(cfg, today));
-        if (cfg.getResetDaily() > 0 && purchased >= cfg.getResetDaily()) {
-            log.warn("代币商店已达限购 playerId={},goodsId={},purchased={},limit={}",
-                    ctx.playerId(), cfg.getId(), purchased, cfg.getResetDaily());
+        if (cfg.getResetDaily() > 0 && buyCount > cfg.getResetDaily() - purchased) {
+            log.warn("代币商店已达限购 playerId={},goodsId={},purchased={},buyCount={},limit={}",
+                    ctx.playerId(), cfg.getId(), purchased, buyCount, cfg.getResetDaily());
             return Code.BET_TO_LIMIT;
         }
         return Code.SUCCESS;
     }
 
     private boolean deliver(SimPlayerContext ctx, TokenShopConfigService.Goods product,
-                            Map<Integer, Long> cost, String orderId, long now) {
+                            Map<Integer, Long> cost, String orderId, long now, int buyCount) {
         TokenShopCfg cfg = product.cfg();
         long today = TimeHelper.getLocalDateTime(now).toLocalDate().toEpochDay();
         long period = cfg.getResetDaily() > 0 ? periodStart(cfg, today) : 0;
         String desc = orderId == null ? "token-shop:" + cfg.getId() : orderId;
-        CommonResult<ItemOperationResult> added = packs.addItems(ctx.playerId(), cfg.getGoods(), addType(cfg), desc, true);
+        Map<Integer, Long> rewards = ItemUtils.multiplyItems(cfg.getGoods(), buyCount);
+        CommonResult<ItemOperationResult> added = packs.addItems(ctx.playerId(), rewards, addType(cfg), desc, true);
         if (!added.success()) {
             log.warn("代币商店发货失败 playerId={},goodsId={},orderId={},goods={},code={}",
                     ctx.playerId(), cfg.getId(), orderId, cfg.getGoods(), added.code);
@@ -339,7 +370,7 @@ public class TokenShopService implements OrderGenerate {
         if (cfg.getResetDaily() > 0) {
             TokenShopPurchaseData record = ctx.getSimBaseData().getTokenShopPurchases()
                     .computeIfAbsent(cfg.getId(), key -> new TokenShopPurchaseData());
-            record.setPurchased(purchased(record, period) + 1);
+            record.setPurchased(Math.addExact(purchased(record, period), buyCount));
             record.setPeriodStartDay(period);
         }
         // 发货已成功，保存、任务及推送异常不能造成退款或重复发货。
@@ -353,11 +384,11 @@ public class TokenShopService implements OrderGenerate {
             ctx.setLastSaveTime(0);
             log.error("代币商店保存失败，保留脏数据等待自动保存 playerId={},goodsId={}", ctx.playerId(), cfg.getId(), e);
         }
-        afterPurchase(ctx, cfg, cost);
+        afterPurchase(ctx, cfg, cost, buyCount);
         try {
             ResTokenShopExchange res = new ResTokenShopExchange(Code.SUCCESS);
             res.goodsId = cfg.getId();
-            res.goods = ItemUtils.buildItemInfo(cfg.getGoods());
+            res.goods = ItemUtils.buildItemInfo(rewards);
             res.info = info(ctx, product, today);
             cluster.sendToPlayer(res, ctx.playerId());
         } catch (RuntimeException e) {
@@ -391,17 +422,17 @@ public class TokenShopService implements OrderGenerate {
         }
     }
 
-    private void refundContribution(SimPlayerContext ctx, long amount) {
+    private void refundContribution(long playerId, long amount) {
         if (amount > 0) {
-            allianceAssets.grantContribution(ctx.playerId(), amount, 0, 0);
+            allianceAssets.grantContribution(playerId, amount, 0, 0);
         }
     }
 
-    private void afterPurchase(SimPlayerContext ctx, TokenShopCfg cfg, Map<Integer, Long> cost) {
+    private void afterPurchase(SimPlayerContext ctx, TokenShopCfg cfg, Map<Integer, Long> cost, int buyCount) {
         if (cfg.getType() <= 2) {
             try {
                 tasks.onConditionEvent(ctx, new ActionConditionEvent(
-                        ActionConditionEvent.Type.SEASON_SHOP_BUY, 0, 0, 0, 1, 0, false));
+                        ActionConditionEvent.Type.SEASON_SHOP_BUY, 0, 0, 0, buyCount, 0, false));
             } catch (RuntimeException e) {
                 log.error("代币商店赛季购买任务触发失败 playerId={},goodsId={}", ctx.playerId(), cfg.getId(), e);
             }

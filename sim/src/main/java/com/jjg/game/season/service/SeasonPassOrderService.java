@@ -87,7 +87,9 @@ public class SeasonPassOrderService implements OrderGenerate {
             return result;
         }
         if (shop.getType() != RechargeCfgType.MONEY.getType()) {
-            result = nonMoneyOrderDetailInfo(shop);
+            result = shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                    ? singleExchangeOrderDetailInfo(playerPackService, player, shop, req.buyCount, AddType.SIM_SEASON_PASS)
+                    : nonMoneyOrderDetailInfo(shop);
             if (result.success()) {
                 result.data.setOrderProductId(passService.orderToken(data, pass, target.track()));
             }
@@ -196,7 +198,8 @@ public class SeasonPassOrderService implements OrderGenerate {
             return false;
         }
         SeasonPassConfigService.PassDefinition pass = passConfig.activePass(ctx.getSeasonPlayerData().getSeasonId(), token.passId());
-        return pass != null && completeNonMoneyPurchase(playerPackService, player, preGenerateOrderData,
-                passConfig.shop(pass, token.track()), AddType.SIM_SEASON_PASS, () -> passService.unlock(ctx, token));
+        return pass != null && completeNonMoneyPurchase(preGenerateOrderData,
+                passConfig.shop(pass, token.track()),
+                () -> passService.unlock(ctx, token));
     }
 }

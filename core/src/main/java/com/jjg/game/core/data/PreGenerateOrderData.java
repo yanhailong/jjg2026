@@ -3,6 +3,7 @@ package com.jjg.game.core.data;
 import com.jjg.game.core.pb.RechargeCfgType;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 /**
  * 于下订单的信息
@@ -20,6 +21,25 @@ public class PreGenerateOrderData {
     private String desc;
     //其他
     private String orderProductId;
+    // 道具兑换的实际购买份数及已扣消耗，仅用于本次购买交付和失败返还。
+    private int buyCount = 1;
+    private Map<Integer, Long> exchangeCost;
+
+    public int getBuyCount() {
+        return type == RechargeCfgType.ITEM_EXCHANGE ? Math.max(1, buyCount) : 1;
+    }
+
+    public void setBuyCount(int buyCount) {
+        this.buyCount = buyCount;
+    }
+
+    public Map<Integer, Long> getExchangeCost() {
+        return exchangeCost;
+    }
+
+    public void setExchangeCost(Map<Integer, Long> exchangeCost) {
+        this.exchangeCost = exchangeCost;
+    }
 
     public RechargeCfgType getType() {
         return type;

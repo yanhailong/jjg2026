@@ -126,19 +126,14 @@ public class StarterPackController extends BaseActivityController implements Ord
                 result.code = Code.SAMPLE_ERROR;
                 return result;
             }
-            if(shop.getType() != RechargeCfgType.MONEY.getType()){
-                RechargeCfgType type = RechargeCfgType.valueOf(shop.getType());
-                if (!validNonMoneyShop(shop, type)) {
-                    log.error("新手礼包下单失败，非货币商品类型或兑换消耗配置无效 playerId:{} activityId:{} shopId:{} type:{} redeem:{}",
-                            player.getId(), activityId, shop.getId(), shop.getType(), shop.getRedeem());
-                    result.code = Code.SAMPLE_ERROR;
-                    return result;
+            if (shop.getType() != RechargeCfgType.MONEY.getType()) {
+                result = shop.getType() == RechargeCfgType.ITEM_EXCHANGE.getType()
+                        ? singleExchangeOrderDetailInfo(playerPackService, player, shop, req.buyCount, AddType.ITEM_EXCHANGE)
+                        : nonMoneyOrderDetailInfo(shop);
+                if (result.success()) {
+                    result.data.setPayType(req.payType);
+                    result.data.setProductId(req.productId);
                 }
-                result.data = new PreGenerateOrderData();
-                result.data.setType(type);
-                result.data.setPayType(req.payType);
-                result.data.setProductId(req.productId);
-                result.code = Code.SUCCESS;
                 return result;
             }
 
@@ -181,14 +176,8 @@ public class StarterPackController extends BaseActivityController implements Ord
             long activityId = Long.parseLong(preGenerateOrderData.getProductId().split("_")[0]);
             ActivityData activityData = activityManager.getActivityData().get(activityId);
             ShopRechargeListCfg shop = getShopCfg(activityData);
-            if (!validNonMoneyShop(shop, preGenerateOrderData.getType())) {
-                log.warn("新手礼包非货币购买失败，商品类型不匹配或兑换消耗配置无效 playerId:{} productId:{} requestType:{} shopId:{} shopType:{} redeem:{}",
-                        player.getId(), preGenerateOrderData.getProductId(), preGenerateOrderData.getType(),
-                        shop == null ? null : shop.getId(), shop == null ? null : shop.getType(), shop == null ? null : shop.getRedeem());
-                return false;
-            }
-            Map<Integer, Long> cost = preGenerateOrderData.getType() == RechargeCfgType.ITEM_EXCHANGE ? shop.getRedeem() : Map.of();
-            return receivePurchase(player, activityData, cfg.getId(), null, cost);
+            return completeNonMoneyPurchase(preGenerateOrderData, shop,
+                    () -> receivePurchase(player, activityData, cfg.getId(), null));
         } catch (Exception e) {
             log.error("新手礼包非货币购买失败 playerId:{} productId:{} type:{}",
                     player.getId(), preGenerateOrderData.getProductId(), preGenerateOrderData.getType(), e);
@@ -237,20 +226,14 @@ public class StarterPackController extends BaseActivityController implements Ord
                 return false;
             }
             // 已付款订单不重新检查当前功能开关、时间和参与条件。
-            return receivePurchase(player, activityData, detailId, order.getId(), Map.of());
+            return receivePurchase(player, activityData, detailId, order.getId());
         } catch (Exception e) {
             log.error("新手礼包支付处理失败 playerId:{} orderId:{}", player.getId(), order.getId(), e);
             return false;
         }
     }
 
-    private boolean validNonMoneyShop(ShopRechargeListCfg shop, RechargeCfgType type) {
-        return shop != null && type != null && type != RechargeCfgType.MONEY && shop.getType() == type.getType()
-                && (type != RechargeCfgType.ITEM_EXCHANGE || CollectionUtil.isNotEmpty(shop.getRedeem())
-                && shop.getRedeem().entrySet().stream().allMatch(item -> item.getKey() > 0 && item.getValue() > 0));
-    }
-
-    private boolean receivePurchase(Player player, ActivityData activityData, int detailId, String orderId, Map<Integer, Long> cost) {
+    private boolean receivePurchase(Player player, ActivityData activityData, int detailId, String orderId) {
         long activityId = activityData.getId();
         Map<Integer, StarterPackPlayerData> playerData = readPlayerData(player.getId(), activityData);
         StarterPackPlayerData previous = playerData.get(detailId);
@@ -278,26 +261,7 @@ public class StarterPackController extends BaseActivityController implements Ord
             return false;
         }
         playerData.put(detailId, new StarterPackPlayerData(activityId, activityData.getRound(), orderId));
-        if (!cost.isEmpty()) {
-            CommonResult<ItemOperationResult> removed = playerPackService.removeItems(player, cost, AddType.ITEM_EXCHANGE);
-            if (!removed.success()) {
-                log.warn("新手礼包兑换失败，扣除道具失败 playerId:{} activityId:{} detailId:{} cost:{} code:{}",
-                        player.getId(), activityId, detailId, cost, removed.code);
-                return false;
-            }
-        }
-        boolean saved = false;
-        try {
-            saved = playerActivityDao.savePlayerActivityData(player.getId(), ActivityType.STARTER_PACK, activityId, playerData);
-        } finally {
-            if (!saved && !cost.isEmpty()) {
-                CommonResult<ItemOperationResult> refunded = playerPackService.addItems(player.getId(), cost, AddType.FAIL_ROLLBACK);
-                if (!refunded.success()) {
-                    log.error("新手礼包兑换失败后退还道具失败 playerId:{} activityId:{} detailId:{} cost:{} code:{}",
-                            player.getId(), activityId, detailId, cost, refunded.code);
-                }
-            }
-        }
+        boolean saved = playerActivityDao.savePlayerActivityData(player.getId(), ActivityType.STARTER_PACK, activityId, playerData);
         if (!saved) {
             log.error("新手礼包购买处理失败，购买状态保存失败 playerId:{} orderId:{} activityId:{} detailId:{}",
                     player.getId(), orderId, activityId, detailId);

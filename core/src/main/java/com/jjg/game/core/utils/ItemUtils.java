@@ -18,6 +18,16 @@ import java.util.*;
  */
 public class ItemUtils {
 
+    /** 按份数计算道具总量，不修改配置；数量溢出时拒绝计算。 */
+    public static Map<Integer, Long> multiplyItems(Map<Integer, Long> items, int count) {
+        if (count == 1) {
+            return items;
+        }
+        Map<Integer, Long> result = new HashMap<>(items.size());
+        items.forEach((id, amount) -> result.put(id, Math.multiplyExact(amount, count)));
+        return result;
+    }
+
     //金币
     private static int GOLD_ITEM_ID = 0;
     //钻石
