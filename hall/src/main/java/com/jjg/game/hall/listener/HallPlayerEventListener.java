@@ -255,7 +255,6 @@ public class HallPlayerEventListener implements SessionCloseListener, SessionEnt
 
             res.safeBoxGold = player.getSafeBoxGold();
             res.safeBoxDiamond = player.getSafeBoxDiamond();
-            res.level = simManager.createContextByPlayerId(player.getId()).getSimBaseData().getAllLevel();
             res.exp = player.getExp();
             res.gameTypeList = likeGameDao.getLikeGames(player.getId());
             res.createTime = player.getCreateTime();
@@ -292,6 +291,8 @@ public class HallPlayerEventListener implements SessionCloseListener, SessionEnt
                 session.setReference(playerController);
                 session.setWorkId(player.getId());
 
+                res.level = simManager.createContext(playerController).getSimBaseData().getAllLevel();
+
                 session.send(res);
 
                 hallLogger.login(player, req.token, playerSessionToken.getLoginType(), playerSessionToken.getChannel(), playerSessionToken.getIp(), playerSessionToken.getDevice(), playerSessionToken.getMac(), playerSessionToken.getFcm());
@@ -318,6 +319,8 @@ public class HallPlayerEventListener implements SessionCloseListener, SessionEnt
             session.setReference(playerController);
             //需要设置workId，否则hall模块所有的请求都将处于多线程环境，当连点发生时不能保证逻辑顺序执行
             session.setWorkId(player.getId());
+
+            res.level = simManager.createContext(playerController).getSimBaseData().getAllLevel();
 
             //返回登录消息
             session.send(res);

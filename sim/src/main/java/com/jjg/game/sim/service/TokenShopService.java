@@ -31,6 +31,7 @@ import com.jjg.game.core.service.ShopService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.core.utils.SampleDataUtils;
 import com.jjg.game.sampledata.GameDataManager;
+import com.jjg.game.sampledata.bean.GameFunctionCfg;
 import com.jjg.game.sampledata.bean.ShopRechargeListCfg;
 import com.jjg.game.sampledata.bean.TokenShopCfg;
 import com.jjg.game.season.model.SeasonPhase;
@@ -129,8 +130,9 @@ public class TokenShopService implements OrderGenerate {
         res.type = type < 1 ? (res.typeList.isEmpty() ? 0 : res.typeList.getFirst().key) : type < 3 ? 1 : type;
         int configType = res.type == 1 ? currentSeasonType : res.type;
         if (res.typeList.stream().noneMatch(data -> data.key == res.type)) {
-            log.warn("代币商店类型未开启 playerId={},requestedType={},type={},configType={},openTypes={}",
-                    ctx.playerId(), type, res.type, configType, res.typeList.stream().map(data -> data.key).toList());
+            log.warn("代币商店类型未开启 playerId={},requestedType={},type={},configType={},openTypes={},unlockedFunctionIds={}",
+                    ctx.playerId(), type, res.type, configType, res.typeList.stream().map(data -> data.key).toList(),
+                    ctx.getSimBaseData().getUnlockedFunctionIds());
             res.code = Code.TOKEN_SHOP_TYPE_CLOSE;
             return res;
         }
@@ -340,8 +342,8 @@ public class TokenShopService implements OrderGenerate {
         }
         TokenShopCfg cfg = product.cfg();
         if (!shopFunctionOpen(ctx, cfg.getType())) {
-            log.warn("代币商店所属功能未开启 playerId={},goodsId={},shopType={}",
-                    ctx.playerId(), cfg.getId(), cfg.getType());
+            log.warn("代币商店所属功能未开启 playerId={},goodsId={},shopType={},unlockedFunctionIds={}",
+                    ctx.playerId(), cfg.getId(), cfg.getType(), ctx.getSimBaseData().getUnlockedFunctionIds());
             return Code.TOKEN_SHOP_TYPE_CLOSE;
         }
         int currentSeason = cfg.getType() <= 2 ? seasonType(ctx, now) : 0;
@@ -471,13 +473,22 @@ public class TokenShopService implements OrderGenerate {
     }
 
     private boolean shopFunctionOpen(SimPlayerContext ctx, int type) {
+        if (type == 3 && !hasAlliance(ctx)) {
+            return false;
+        }
         int functionId = switch (type) {
             case 1, 2 -> 5004;
             case 3 -> 5003;
             default -> 0;
         };
-        return functionId == 0 || gameFunctions.checkGameFunctionOpen(ctx.getPlayer(),
-                GameDataManager.getGameFunctionCfg(functionId), true, false);
+        if (functionId == 0) {
+            return true;
+        }
+        GameFunctionCfg function = GameDataManager.getGameFunctionCfg(functionId);
+        // 任务已解锁的功能只检查总开关，不再重算配置中的等级条件。
+        return ctx.getSimBaseData().getUnlockedFunctionIds().contains(functionId)
+                ? gameFunctions.checkGameFunctionOpen(ctx.getPlayer(), function)
+                : gameFunctions.checkGameFunctionOpen(ctx.getPlayer(), function, true, false);
     }
 
     private int availability(SimPlayerContext ctx, TokenShopConfigService.Goods goods, long now) {
