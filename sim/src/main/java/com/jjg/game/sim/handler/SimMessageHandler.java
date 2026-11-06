@@ -120,7 +120,9 @@ public class SimMessageHandler implements GmListener {
     public void reqTokenShop(PlayerController pc, ReqTokenShop req) {
         ResTokenShop res = executeTokenShop(pc, ctx -> tokenShopService.list(ctx, req.type),
                 () -> toSimBridge.tokenShop(pc.playerId(), req.type), ResTokenShop::new);
-        res.type = req.type;
+        if (res.code != Code.SUCCESS) {
+            res.type = req.type;
+        }
         pc.send(res);
     }
 
