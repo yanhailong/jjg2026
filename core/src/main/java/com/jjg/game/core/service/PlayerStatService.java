@@ -57,6 +57,7 @@ public class PlayerStatService {
     public static final int CHEATER_HUNT_PLAY = 12287;
     public static final int GOD_GAMBLERS_PLAY = 12288;
     public static final int HAPPY_HAPPY_FISH_PLAY = 12289;
+    public static final int SPEEDY_DELIVERY_PLAY = 12290;
     public static final int EMPLOYEE_MAX_LEVEL = 12291;
     public static final int SHOP_DIAMOND_CONSUME = 12292;
 
@@ -73,7 +74,7 @@ public class PlayerStatService {
         return conditionId == BUILDING_LEVEL
                 || conditionId == ALL_SCENE_LEVEL
                 || conditionId >= SLOT_ITEM && conditionId <= SHOP_DIAMOND_CONSUME
-                && conditionId != 12258 && conditionId != 12290;
+                && conditionId != 12258;
     }
 
     public static boolean recorded(int conditionId) {
@@ -84,7 +85,7 @@ public class PlayerStatService {
                     SLOT_WIN, WEALTH_GOD_MODE, ALLIANCE_DONATE, VISIT_GIFT, VISIT_SLOT_SPIN,
                     DOUXIAN_SETTLEMENT, SEASON_GEM_CRAFT, CARD_POOL_DRAW,
                     DAILY_AD_WATCH, DAILY_PASS_CONDITION, CHEATER_HUNT_PLAY, GOD_GAMBLERS_PLAY,
-                    HAPPY_HAPPY_FISH_PLAY, SHOP_DIAMOND_CONSUME -> true;
+                    HAPPY_HAPPY_FISH_PLAY, SPEEDY_DELIVERY_PLAY, SHOP_DIAMOND_CONSUME -> true;
             default -> false;
         };
     }
@@ -157,6 +158,7 @@ public class PlayerStatService {
             case 1 -> CHEATER_HUNT_PLAY;
             case 2 -> GOD_GAMBLERS_PLAY;
             case 3 -> HAPPY_HAPPY_FISH_PLAY;
+            case 4 -> SPEEDY_DELIVERY_PLAY;
             default -> throw new IllegalArgumentException("Unsupported mini game: " + miniGameId);
         };
         incrementPlayer(statId, playerId, 1);
@@ -313,7 +315,8 @@ public class PlayerStatService {
                     condition.spec().intParameter(1), playerId);
             case WEALTH_GOD_MODE -> getPlayer(WEALTH_GOD_MODE, playerId);
             case ALLIANCE_DONATE, VISIT_GIFT, DOUXIAN_SETTLEMENT, CARD_POOL_DRAW,
-                    CHEATER_HUNT_PLAY, GOD_GAMBLERS_PLAY, HAPPY_HAPPY_FISH_PLAY, SHOP_DIAMOND_CONSUME ->
+                    CHEATER_HUNT_PLAY, GOD_GAMBLERS_PLAY, HAPPY_HAPPY_FISH_PLAY, SPEEDY_DELIVERY_PLAY,
+                    SHOP_DIAMOND_CONSUME ->
                     getPlayer(conditionId, playerId);
             case DAILY_AD_WATCH, DAILY_PASS_CONDITION ->
                     getDimensionPlayer(conditionId, TimeHelper.getDayNumerical2(), playerId);

@@ -90,21 +90,43 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
         return SimPlayerTickListener.super.order();
     }
 
-    /** 领取当前场景指定建筑的游客奖励；入账失败保留缓存，成功后扣除领取快照再推进统计。 */
+    /** 领取当前场景指定建筑的游客奖励，buildingId 为 0 时领取全部；入账成功后扣除领取快照再推进统计。 */
     public ResClaimBuildingGuestRewards claimGuestRewards(SimPlayerContext ctx, int buildingId) {
         ResClaimBuildingGuestRewards res = new ResClaimBuildingGuestRewards(Code.SUCCESS);
         res.buildingId = buildingId;
-        if (buildingId <= 0) {
+        if (buildingId < 0) {
             res.code = Code.PARAM_ERROR;
+            log.warn("领取建筑游客奖励失败, 建筑id不能为负数 playerId={},buildingId={}", ctx.playerId(), buildingId);
             return res;
         }
         SimCasinoData casino = ctx.getCurrentCasino();
-        BuildingData building = casino == null ? null : casino.findBuilding(buildingId);
-        if (building == null) {
+        if (casino == null) {
             res.code = Code.NOT_FOUND;
+            log.warn("领取建筑游客奖励失败, 当前场景不存在 playerId={},buildingId={}", ctx.playerId(), buildingId);
             return res;
         }
-        Map<Integer, Long> rewards = new HashMap<>(building.getGuestRewards());
+        Collection<BuildingData> buildings;
+        if (buildingId == 0) {
+            buildings = casino.getBuildingData() == null ? Collections.emptyList() : casino.getBuildingData().values();
+        } else {
+            BuildingData building = casino.findBuilding(buildingId);
+            if (building == null) {
+                res.code = Code.NOT_FOUND;
+                log.warn("领取建筑游客奖励失败, 当前场景中建筑不存在 playerId={},casinoId={},buildingId={}",
+                        ctx.playerId(), casino.getCasinoId(), buildingId);
+                return res;
+            }
+            buildings = Collections.singletonList(building);
+        }
+        Map<BuildingData, Map<Integer, Long>> snapshots = new HashMap<>();
+        Map<Integer, Long> rewards = new HashMap<>();
+        for (BuildingData building : buildings) {
+            Map<Integer, Long> snapshot = new HashMap<>(building.getGuestRewards());
+            if (!snapshot.isEmpty()) {
+                snapshots.put(building, snapshot);
+                snapshot.forEach((itemId, count) -> rewards.merge(itemId, count, Long::sum));
+            }
+        }
         if (rewards.isEmpty()) {
             res.rewards = Collections.emptyList();
             return res;
@@ -113,12 +135,13 @@ public class SimBuildingService implements SimPlayerTickListener, SimTaskStateRe
                 ctx.playerId(), rewards, AddType.SIM_GUEST_REWARDS, null, true);
         if (result == null || !result.success()) {
             res.code = result == null ? Code.FAIL : result.code;
-            log.warn("领取建筑游客奖励入账失败 playerId={},buildingId={},code={}",
-                    ctx.playerId(), buildingId, res.code);
+            log.warn("领取建筑游客奖励入账失败 playerId={},casinoId={},buildingId={},rewards={},nullResult={},code={}",
+                    ctx.playerId(), casino.getCasinoId(), buildingId, rewards, result == null, res.code);
             return res;
         }
-        rewards.forEach((itemId, count) -> building.getGuestRewards().computeIfPresent(itemId,
-                (id, current) -> current > count ? current - count : null));
+        snapshots.forEach((building, snapshot) -> snapshot.forEach((itemId, count) ->
+                building.getGuestRewards().computeIfPresent(itemId,
+                        (id, current) -> current > count ? current - count : null)));
         ctx.setLastSaveTime(0);
         res.rewards = ItemUtils.buildItemInfo(rewards);
         SimBaseData base = ctx.getSimBaseData();

@@ -264,7 +264,8 @@ final class DefaultConditionRules {
                 (s, e) -> e.subjectId() == 2, (s, e) -> e.count()));
         rules.add(action(12289, 1, 1, 0, ProgressMode.ADD, ActionConditionEvent.Type.MINI_GAME_PLAY,
                 (s, e) -> e.subjectId() == 3, (s, e) -> e.count()));
-        //12290 送货小游戏尚未实现，暂不注册。
+        rules.add(action(12290, 1, 1, 0, ProgressMode.ADD, ActionConditionEvent.Type.MINI_GAME_PLAY,
+                (s, e) -> e.subjectId() == 4, (s, e) -> e.count()));
         rules.add(action(12291, 1, 1, 0, ProgressMode.SET, ActionConditionEvent.Type.EMPLOYEE_LEVEL,
                 (s, e) -> true, (s, e) -> e.value()));
         rules.add(action(12292, 1, 1, 0, ProgressMode.ADD, ActionConditionEvent.Type.SHOP_DIAMOND_CONSUME,

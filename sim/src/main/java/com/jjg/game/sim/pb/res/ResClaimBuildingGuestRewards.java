@@ -12,9 +12,9 @@ import java.util.List;
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_GAME, cmd = SimConstant.MsgBean.RES_CLAIM_BUILDING_GUEST_REWARDS, resp = true)
 @ProtoDesc("领取建筑游客奖励返回")
 public class ResClaimBuildingGuestRewards extends AbstractResponse {
-    @ProtoDesc("建筑id")
+    @ProtoDesc("建筑id，0表示领取当前场景所有建筑的游客奖励")
     public int buildingId;
-    @ProtoDesc("本次实际领取的道具，建筑无待领奖励时为空")
+    @ProtoDesc("本次实际领取的道具，领取全部时按道具合并，无待领奖励时为空")
     public List<ItemInfo> rewards;
 
     public ResClaimBuildingGuestRewards(int code) {
