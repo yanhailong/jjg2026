@@ -930,6 +930,9 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private void loadTokenShopConfig() {
         Map<Integer, TokenShopData> tmp = new HashMap<>();
         for (TokenShopCfg cfg : GameDataManager.getTokenShopCfgList()) {
+            if (!cfg.getIsOpen()) {
+                continue;
+            }
             tmp.computeIfAbsent(cfg.getType(), type -> {
                 TokenShopData data = new TokenShopData();
                 data.setType(type);

@@ -30,7 +30,7 @@ public class TokenShopCfg extends BaseCfgBean {
   /** 序列 */
   protected int Order;
   /** 开放等级 */
-  protected int PurchaseLevel;
+  protected List<Integer> PurchaseLevel;
   /** Rechargeid */
   protected int Rechargeid;
   /** 限购次数 */
@@ -45,6 +45,8 @@ public class TokenShopCfg extends BaseCfgBean {
   protected Map<Integer,Long> cost;
   /** 客服端资源 */
   protected String icon;
+  /** 是否开启 */
+  protected boolean isOpen;
   /** 多语言id */
   protected int language;
   /** 商店类型 */
@@ -76,7 +78,7 @@ public class TokenShopCfg extends BaseCfgBean {
   }
 
   /** 返回开放等级 */
-  public int getPurchaseLevel() {
+  public List<Integer> getPurchaseLevel() {
     return PurchaseLevel;
   }
 
@@ -113,6 +115,11 @@ public class TokenShopCfg extends BaseCfgBean {
   /** 返回客服端资源 */
   public String getIcon() {
     return icon;
+  }
+
+  /** 返回是否开启 */
+  public boolean getIsOpen() {
+    return isOpen;
   }
 
   /** 返回多语言id */

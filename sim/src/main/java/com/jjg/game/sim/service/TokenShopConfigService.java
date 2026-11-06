@@ -21,14 +21,14 @@ import java.util.Map;
 /** 商品排序、时间解析只在配置加载/热更新时执行，快照整体替换。 */
 @Service
 public class TokenShopConfigService implements ConfigExcelChangeListener {
-    private static final Logger log = LoggerFactory.getLogger(TokenShopConfigService.class);
-    private static final DateTimeFormatter DATE_TIME =
+    private final Logger log = LoggerFactory.getLogger(TokenShopConfigService.class);
+    private final DateTimeFormatter DATE_TIME =
             DateTimeFormatter.ofPattern("[yyyy-MM-dd HH:mm:ss][yyyy/MM/dd HH:mm:ss]");
     private volatile Snapshot snapshot = new Snapshot(Map.of(), Map.of());
 
     public record Goods(TokenShopCfg cfg, long startTime, long endTime) {
         public boolean isOpen(long now) {
-            return cfg.getIsEnabled() && (startTime == 0 || now >= startTime)
+            return cfg.getIsOpen() && cfg.getIsEnabled() && (startTime == 0 || now >= startTime)
                     && (endTime == 0 || now < endTime);
         }
     }
@@ -62,6 +62,11 @@ public class TokenShopConfigService implements ConfigExcelChangeListener {
                         || cfg.getResetDaily() < 0 || cfg.getGoods() == null || cfg.getGoods().isEmpty()) {
                     throw new IllegalArgumentException("商品类型、重置或限购配置错误，或奖励为空");
                 }
+                List<Integer> levels = cfg.getPurchaseLevel();
+                if (levels == null || levels.size() != 2 || levels.get(0) == null || levels.get(1) == null
+                        || levels.get(0) < 0 || levels.get(0) > levels.get(1)) {
+                    throw new IllegalArgumentException("购买等级必须为[最小等级,最大等级]: " + levels);
+                }
                 validateItems(cfg.getGoods());
                 ShopRechargeListCfg shop = GameDataManager.getShopRechargeListCfg(cfg.getRechargeid());
                 if (shop == null || shop.getType() < RechargeCfgType.MONEY.getType()
@@ -84,7 +89,9 @@ public class TokenShopConfigService implements ConfigExcelChangeListener {
                 }
                 Goods goods = new Goods(cfg, start, end);
                 byId.put(cfg.getId(), goods);
-                byType.computeIfAbsent(cfg.getType(), key -> new ArrayList<>()).add(goods);
+                if (cfg.getIsOpen()) {
+                    byType.computeIfAbsent(cfg.getType(), key -> new ArrayList<>()).add(goods);
+                }
             } catch (RuntimeException e) {
                 log.error("代币商店商品配置无效，跳过商品 goodsId={},rechargeId={}", cfg.getId(), cfg.getRechargeid(), e);
             }
@@ -95,7 +102,7 @@ public class TokenShopConfigService implements ConfigExcelChangeListener {
         snapshot = new Snapshot(Map.copyOf(byId), Map.copyOf(byType));
     }
 
-    private static void validateItems(Map<Integer, Long> items) {
+    private void validateItems(Map<Integer, Long> items) {
         if (items == null) {
             return;
         }
@@ -106,7 +113,7 @@ public class TokenShopConfigService implements ConfigExcelChangeListener {
         });
     }
 
-    private static long timestamp(String value) {
+    private long timestamp(String value) {
         return value == null || value.isBlank() ? 0
                 : TimeHelper.getTimestamp(LocalDateTime.parse(value.trim(), DATE_TIME));
     }

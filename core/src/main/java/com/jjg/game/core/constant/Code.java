@@ -272,4 +272,7 @@ public interface Code {
     int BUILD_BONUS_MEDAL = 4010057;
     //建筑加成-技能
     int BUILD_BONUS_SKILL = 4010058;
+
+    //该类型商城未开启
+    int TOKEN_SHOP_TYPE_CLOSE = 8000010;
 }

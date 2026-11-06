@@ -655,7 +655,7 @@ public class CoreMessageHandler {
                     return;
                 }
                 res.code = Code.SUCCESS;
-                log.debug("玩家下单成功 req = {},resp = {}", JSON.toJSONString(req), JSON.toJSONString(res));
+                log.debug("玩家下单成功 playerId={},payType={},productId={},rechargeType={},resCode={}", playerController.playerId(), req.payType, req.productId, req.rechargeType, res.code);
             }
         } catch (Exception e) {
             if (!orderCreated) {

@@ -21,7 +21,7 @@ public class ResTokenShop extends AbstractResponse {
     public int costItemId;
     @ProtoDesc("拥有该类型货币的数量")
     public long hasItemCount;
-    @ProtoDesc("商店类型id -> 多语言id，赛季商店统一为1且仅返回一项，不保证顺序")
+    @ProtoDesc("开启的商店类型id -> 多语言id，按类型升序；赛季商店统一为1且仅返回一项")
     public List<KVInfo> typeList;
 
     public ResTokenShop(int code) {

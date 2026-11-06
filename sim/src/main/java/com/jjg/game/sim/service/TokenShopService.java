@@ -23,6 +23,7 @@ import com.jjg.game.core.pb.RechargeCfgType;
 import com.jjg.game.core.pb.RechargeType;
 import com.jjg.game.core.pb.ReqGenerateOrder;
 import com.jjg.game.core.service.CorePlayerService;
+import com.jjg.game.core.service.GameFunctionService;
 import com.jjg.game.core.service.OrderService;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.service.ServerOpenTimeService;
@@ -49,6 +50,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +79,7 @@ public class TokenShopService implements OrderGenerate {
     private final SimNodeService nodes;
     private final OrderService orders;
     private final ClusterSystem cluster;
+    private final GameFunctionService gameFunctions;
     @ClusterRpcReference
     private ToSimBridge bridge;
 
@@ -86,7 +89,8 @@ public class TokenShopService implements OrderGenerate {
                             SimTaskService tasks, ShopService shops, ServerOpenTimeService serverOpenTimeService,
                             AlliancePlayerDao alliancePlayerDao, CorePlayerService playerService,
                             SimConfigCacheService configCache, SimPlayerContextRegistry contexts,
-                            SimNodeService nodes, OrderService orders, ClusterSystem cluster) {
+                            SimNodeService nodes, OrderService orders, ClusterSystem cluster,
+                            GameFunctionService gameFunctions) {
         this.configs = configs;
         this.seasons = seasons;
         this.packs = packs;
@@ -103,6 +107,7 @@ public class TokenShopService implements OrderGenerate {
         this.nodes = nodes;
         this.orders = orders;
         this.cluster = cluster;
+        this.gameFunctions = gameFunctions;
     }
 
     public ResTokenShop list(SimPlayerContext ctx, int type) {
@@ -111,23 +116,26 @@ public class TokenShopService implements OrderGenerate {
 
     ResTokenShop list(SimPlayerContext ctx, int type, long now) {
         ResTokenShop res = new ResTokenShop(Code.SUCCESS);
-        res.type = type < 3 ? 1 : type;
         res.goods = List.of();
         Map<Integer, TokenShopData> shopDataMap = configCache.getTokenShopDataMap();
-        int currentSeasonType = seasonType(ctx, now);
+        boolean seasonOpen = (shopDataMap.containsKey(1) || shopDataMap.containsKey(2)) && shopFunctionOpen(ctx, 1);
+        int currentSeasonType = seasonOpen ? seasonType(ctx, now) : 0;
         int seasonShopType = currentSeasonType == 0 ? 1 : currentSeasonType;
         res.typeList = shopDataMap.values().stream()
-                .filter(data -> data.getType() >= 3 || data.getType() == seasonShopType)
-                .map(data -> new KVInfo(data.getType() < 3 ? 1 : data.getType(), data.getLangId())).toList();
-        int configType = type < 3 ? currentSeasonType : type;
-        //新手赛季没有商品，商店信息沿用进阶赛季。
-        TokenShopData shopData = shopDataMap.get(configType == 0 ? 1 : configType);
-        if (shopData == null) {
-            log.warn("代币商店类型未配置 playerId={},type={},configType={},configuredTypes={}",
-                    ctx.playerId(), type, configType, shopDataMap.keySet());
-            res.code = Code.PARAM_ERROR;
+                .filter(data -> data.getType() < 3
+                        ? seasonOpen && data.getType() == seasonShopType : shopFunctionOpen(ctx, data.getType()))
+                .map(data -> new KVInfo(data.getType() < 3 ? 1 : data.getType(), data.getLangId()))
+                .sorted(Comparator.comparingInt(data -> data.key)).toList();
+        res.type = type < 1 ? (res.typeList.isEmpty() ? 0 : res.typeList.getFirst().key) : type < 3 ? 1 : type;
+        int configType = res.type == 1 ? currentSeasonType : res.type;
+        if (res.typeList.stream().noneMatch(data -> data.key == res.type)) {
+            log.warn("代币商店类型未开启 playerId={},requestedType={},type={},configType={},openTypes={}",
+                    ctx.playerId(), type, res.type, configType, res.typeList.stream().map(data -> data.key).toList());
+            res.code = Code.TOKEN_SHOP_TYPE_CLOSE;
             return res;
         }
+        //新手赛季没有商品，商店信息沿用进阶赛季。
+        TokenShopData shopData = shopDataMap.get(configType == 0 ? 1 : configType);
         res.costItemId = shopData.getItemId();
         res.hasItemCount = shopData.getItemId() > 0 ? itemCount(ctx, shopData.getItemId()) : 0;
 
@@ -331,6 +339,11 @@ public class TokenShopService implements OrderGenerate {
             return Code.NOT_FOUND;
         }
         TokenShopCfg cfg = product.cfg();
+        if (!shopFunctionOpen(ctx, cfg.getType())) {
+            log.warn("代币商店所属功能未开启 playerId={},goodsId={},shopType={}",
+                    ctx.playerId(), cfg.getId(), cfg.getType());
+            return Code.TOKEN_SHOP_TYPE_CLOSE;
+        }
         int currentSeason = cfg.getType() <= 2 ? seasonType(ctx, now) : 0;
         if (cfg.getType() <= 2 && cfg.getType() != currentSeason || cfg.getType() == 3 && !hasAlliance(ctx)) {
             log.warn("代币商店购买条件不符 playerId={},goodsId={},shopType={},seasonType={}",
@@ -339,8 +352,8 @@ public class TokenShopService implements OrderGenerate {
         }
         int code = availability(ctx, product, now);
         if (code != Code.SUCCESS) {
-            log.warn("代币商店商品未开放 playerId={},goodsId={},enabled={},start={},end={},now={},level={},requiredLevel={}",
-                    ctx.playerId(), cfg.getId(), cfg.getIsEnabled(), product.startTime(), product.endTime(), now,
+            log.warn("代币商店商品未开放 playerId={},goodsId={},isOpen={},enabled={},start={},end={},now={},level={},requiredLevel={}",
+                    ctx.playerId(), cfg.getId(), cfg.getIsOpen(), cfg.getIsEnabled(), product.startTime(), product.endTime(), now,
                     ctx.getCurrentCasino() == null ? null : ctx.getCurrentCasino().getCasinoLevel(), cfg.getPurchaseLevel());
             return code;
         }
@@ -457,12 +470,24 @@ public class TokenShopService implements OrderGenerate {
         return alliances.getAlliance(alliances.getAllianceId(ctx.playerId())) != null;
     }
 
+    private boolean shopFunctionOpen(SimPlayerContext ctx, int type) {
+        int functionId = switch (type) {
+            case 1, 2 -> 5004;
+            case 3 -> 5003;
+            default -> 0;
+        };
+        return functionId == 0 || gameFunctions.checkGameFunctionOpen(ctx.getPlayer(),
+                GameDataManager.getGameFunctionCfg(functionId), true, false);
+    }
+
     private int availability(SimPlayerContext ctx, TokenShopConfigService.Goods goods, long now) {
         if (!goods.isOpen(now)) {
             return Code.FORBID;
         }
+        List<Integer> levels = goods.cfg().getPurchaseLevel();
         return ctx.getCurrentCasino() != null
-                && ctx.getCurrentCasino().getCasinoLevel() >= goods.cfg().getPurchaseLevel()
+                && ctx.getCurrentCasino().getCasinoLevel() >= levels.get(0)
+                && ctx.getCurrentCasino().getCasinoLevel() <= levels.get(1)
                 ? Code.SUCCESS : Code.NOT_UNLOCKED;
     }
 
