@@ -31,8 +31,6 @@ public class BuildingSkinCfg extends BaseCfgBean {
   protected int needItemId;
   /** 区域皮肤名称 */
   protected String skinFieldName;
-  /** 皮肤图标 */
-  protected String skinIcon;
   /** 皮肤名称 */
   protected int skinLanguageId;
   /** 解锁条件 */
@@ -66,11 +64,6 @@ public class BuildingSkinCfg extends BaseCfgBean {
   /** 返回区域皮肤名称 */
   public String getSkinFieldName() {
     return skinFieldName;
-  }
-
-  /** 返回皮肤图标 */
-  public String getSkinIcon() {
-    return skinIcon;
   }
 
   /** 返回皮肤名称 */

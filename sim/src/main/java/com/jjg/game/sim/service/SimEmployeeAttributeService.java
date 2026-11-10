@@ -44,8 +44,10 @@ public class SimEmployeeAttributeService {
             if (level != null && level.getAttributeValue() != null) {
                 long offset = (long) employee.getLevel() - level.getLevel();
                 Map<Integer, Integer> additions = level.getAddAttribute();
+                Map<Integer, Integer> breakthrough = configCache.getEmployeeBreakthroughStats(level);
                 level.getAttributeValue().forEach((type, value) -> addEmployeeAttribute(bonuses, type,
-                        value + offset * (additions == null ? 0 : additions.getOrDefault(type, 0))));
+                        value + offset * (additions == null ? 0 : additions.getOrDefault(type, 0))
+                                + breakthrough.getOrDefault(type, 0)));
             }
             Map<Integer, EmployeeStarCfg> stars = starConfigs == null ? null : starConfigs.get(employeeId);
             EmployeeStarCfg star = stars == null ? null : stars.get(employee.getStar());

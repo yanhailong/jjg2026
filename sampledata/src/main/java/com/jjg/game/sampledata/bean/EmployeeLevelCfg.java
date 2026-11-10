@@ -21,6 +21,10 @@ public class EmployeeLevelCfg extends BaseCfgBean {
 
   /** 属性值 */
   protected Map<Integer,Integer> AttributeValue;
+  /** 突破材料 */
+  protected Map<Integer,Long> BreakthroughMaterials;
+  /** 突破属性 */
+  protected Map<Integer,Integer> BreakthroughStats;
   /** 雇员ID */
   protected int EmployeeID;
   /** 等级 */
@@ -35,6 +39,16 @@ public class EmployeeLevelCfg extends BaseCfgBean {
   /** 返回属性值 */
   public Map<Integer,Integer> getAttributeValue() {
     return AttributeValue;
+  }
+
+  /** 返回突破材料 */
+  public Map<Integer,Long> getBreakthroughMaterials() {
+    return BreakthroughMaterials;
+  }
+
+  /** 返回突破属性 */
+  public Map<Integer,Integer> getBreakthroughStats() {
+    return BreakthroughStats;
   }
 
   /** 返回雇员ID */

@@ -633,7 +633,7 @@ public class SimMessageHandler implements GmListener {
     @Command(SimConstant.MsgBean.REQ_UPGRADE_EMPLOYEE)
     public void reqUpgradeEmployee(PlayerController playerController, ReqUpgradeEmployee req) {
         execute(playerController, ctx -> {
-            employeeService.onUpgradeEmployee(ctx, req.employeeId);
+            employeeService.onUpgradeEmployee(ctx, req.employeeId, req.ten);
         }, ReqUpgradeEmployee.class);
     }
 

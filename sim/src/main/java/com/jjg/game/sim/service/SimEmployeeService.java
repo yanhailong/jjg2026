@@ -203,29 +203,32 @@ public class SimEmployeeService implements SimTaskStateReporter {
     /**
      * 升级雇员
      */
-    public void onUpgradeEmployee(SimPlayerContext ctx, int employeeId) {
+    public void onUpgradeEmployee(SimPlayerContext ctx, int employeeId, boolean ten) {
         ResUpgradeEmployee res = new ResUpgradeEmployee(Code.SUCCESS);
         res.employeeId = employeeId;
         try {
             SimEmployeeData data = ctx.getEmployee(employeeId);
             if (data == null) {
-                log.warn("升级雇员失败, 未解锁 playerId={},employeeId={}", ctx.playerId(), employeeId);
+                log.warn("升级雇员失败, 未解锁 playerId={},employeeId={},ten={}", ctx.playerId(), employeeId, ten);
                 res.code = Code.NOT_FOUND;
                 ctx.send(res);
                 return;
             }
-            //检查星级带来的等级上限
+            int level = data.getLevel();
+            int targetLevel = level + (ten ? 10 : 1);
             EmployeeStarCfg starCfg = getStarCfg(employeeId, data.getStar());
             int levelCap = starCfg == null ? 0 : starCfg.getLevelCap();
-            if (levelCap > 0 && data.getLevel() >= levelCap) {
-                log.warn("升级雇员失败, 已到星级等级上限 playerId={},employeeId={},level={},cap={}", ctx.playerId(), employeeId, data.getLevel(), levelCap);
+            if (levelCap > 0 && targetLevel > levelCap) {
+                log.warn("升级雇员失败, 目标等级超过星级上限 playerId={},employeeId={},level={},targetLevel={},cap={}",
+                        ctx.playerId(), employeeId, level, targetLevel, levelCap);
                 res.code = Code.PARAM_ERROR;
                 ctx.send(res);
                 return;
             }
-            Map<Integer, Long> cost = configCache.getEmployeeUpgradeCost(employeeId, data.getLevel());
+            Map<Integer, Long> cost = configCache.getEmployeeUpgradeCost(employeeId, level, targetLevel);
             if (cost == null) {
-                log.warn("升级雇员失败, 等级配置不存在或已满级 playerId={},employeeId={},level={}", ctx.playerId(), employeeId, data.getLevel());
+                log.warn("升级雇员失败, 等级配置不存在或目标等级超过配置上限 playerId={},employeeId={},level={},targetLevel={}",
+                        ctx.playerId(), employeeId, level, targetLevel);
                 res.code = Code.LEVEL_MAX;
                 ctx.send(res);
                 return;
@@ -235,7 +238,8 @@ public class SimEmployeeService implements SimTaskStateReporter {
             if (!cost.isEmpty()) {
                 CommonResult<ItemOperationResult> removeResult = playerPackService.removeItems(ctx.getPlayer(), cost, AddType.SIM_EMPLOYEE_LEVEL_UP, null);
                 if (!removeResult.success()) {
-                    log.warn("升级雇员失败, 扣除道具失败 playerId={},employeeId={},level={},cost={},code={}", ctx.playerId(), employeeId, data.getLevel(), cost, removeResult.code);
+                    log.warn("升级雇员失败, 扣除道具失败 playerId={},employeeId={},level={},targetLevel={},cost={},code={}",
+                            ctx.playerId(), employeeId, level, targetLevel, cost, removeResult.code);
                     res.code = Code.NOT_ENOUGH_ITEM;
                     ctx.send(res);
                     return;
@@ -243,15 +247,16 @@ public class SimEmployeeService implements SimTaskStateReporter {
                 changeEndItemNum = removeResult.data.getChangeEndItemNum();
             }
 
-            data.setLevel(data.getLevel() + 1);
-            res.level = data.getLevel();
+            data.setLevel(targetLevel);
+            res.level = targetLevel;
             simTaskService.onConditionEvent(ctx, new ActionConditionEvent(ActionConditionEvent.Type.EMPLOYEE_LEVEL,
-                    employeeId, 0, data.getLevel(), 0, 0, false));
+                    employeeId, 0, targetLevel, 0, 0, false));
             employeeRedDotService.updateRedDots(ctx.playerId(),
                     SimConstant.Employee.RED_DOT_EMPLOYEE_GROWTH);
-            log.info("升级雇员成功 playerId={},employeeId={},newLevel={},changeEndItemNum={}", ctx.playerId(), employeeId, data.getLevel(), changeEndItemNum);
+            log.info("升级雇员成功 playerId={},employeeId={},level={},newLevel={},changeEndItemNum={}",
+                    ctx.playerId(), employeeId, level, targetLevel, changeEndItemNum);
         } catch (Exception e) {
-            log.error("", e);
+            log.error("升级雇员异常 playerId={},employeeId={},ten={}", ctx.playerId(), employeeId, ten, e);
             res.code = Code.EXCEPTION;
         }
         ctx.send(res);
@@ -336,6 +341,16 @@ public class SimEmployeeService implements SimTaskStateReporter {
                 return;
             }
 
+            int nextStar = data.getStar() + 1;
+            EmployeeStarCfg nextCfg = getStarCfg(employeeId, nextStar);
+            if (nextCfg == null) {
+                log.warn("升星雇员失败, 目标星级配置不存在 playerId={},employeeId={},star={},nextStar={}",
+                        ctx.playerId(), employeeId, data.getStar(), nextStar);
+                res.code = Code.PARAM_ERROR;
+                ctx.send(res);
+                return;
+            }
+
             EmployeeProfileCfg employeeProfileCfg = GameDataManager.getEmployeeProfileCfg(employeeId);
             if (employeeProfileCfg == null || employeeProfileCfg.getDuplicatetoShard() == null) {
                 log.warn("升星雇员失败, 获取雇员配置失败 playerId={},employeeId={}", ctx.playerId(), employeeId);
@@ -351,8 +366,12 @@ public class SimEmployeeService implements SimTaskStateReporter {
                 ctx.send(res);
                 return;
             }
-            data.setStar(data.getStar() + 1);
-            res.star = data.getStar();
+            data.setStar(nextStar);
+            int groupId = nextCfg.getUnlockSkill();
+            if (groupId > 0) {
+                data.getSkillLevels().putIfAbsent(groupId, 0);
+            }
+            res.star = nextStar;
             employeeRedDotService.updateRedDots(ctx.playerId(),
                     SimConstant.Employee.RED_DOT_EMPLOYEE_GROWTH);
             //主线任务: 升星改变各星级持有量 -> 上报 12212 "拥有 N 个 X 星雇员"
@@ -553,6 +572,11 @@ public class SimEmployeeService implements SimTaskStateReporter {
                 info.attributes.add(new KVLongInfo(type.getCode(), value)));
         info.attributes.sort(Comparator.comparingInt(attribute -> attribute.key));
         info.skills = skillInfos(data);
+
+        EmployeeProfileCfg employeeProfileCfg = GameDataManager.getEmployeeProfileCfg(data.getEmployeeId());
+        if(employeeProfileCfg != null) {
+            info.professionID = employeeProfileCfg.getProfessionID();
+        }
         return info;
     }
 

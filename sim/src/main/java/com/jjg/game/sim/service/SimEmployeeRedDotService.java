@@ -316,7 +316,8 @@ public class SimEmployeeRedDotService implements IRedDotService, ItemAddListener
         List<Requirement> requirements = new ArrayList<>();
         for (SimEmployeeData employee : employees) {
             EmployeeStarCfg starCfg = getEmployeeStarCfg(employee.getEmployeeId(), employee.getStar());
-            if (starCfg != null && starCfg.getStarUpCost() > 0) {
+            if (starCfg != null && starCfg.getStarUpCost() > 0
+                    && getEmployeeStarCfg(employee.getEmployeeId(), employee.getStar() + 1) != null) {
                 EmployeeProfileCfg profileCfg = GameDataManager.getEmployeeProfileCfg(employee.getEmployeeId());
                 List<Integer> shard = profileCfg == null ? null : profileCfg.getDuplicatetoShard();
                 if (shard != null && shard.size() > 1) {

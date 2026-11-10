@@ -1060,31 +1060,69 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return entry == null ? null : entry.getValue();
     }
 
+    /** 突破属性是累计值，留空的等级行沿用此前的突破属性。 */
+    public Map<Integer, Integer> getEmployeeBreakthroughStats(EmployeeLevelCfg cfg) {
+        Map<Integer, Integer> stats = cfg.getBreakthroughStats();
+        if (stats != null && !stats.isEmpty()) {
+            return stats;
+        }
+        NavigableMap<Integer, EmployeeLevelCfg> levels = employeeLevelCfgMap.get(cfg.getEmployeeID());
+        if (levels != null) {
+            for (Integer previous = levels.lowerKey(cfg.getLevel()); previous != null; previous = levels.lowerKey(previous)) {
+                stats = levels.get(previous).getBreakthroughStats();
+                if (stats != null && !stats.isEmpty()) {
+                    return stats;
+                }
+            }
+        }
+        return Map.of();
+    }
+
     /**
      * 当前等级升一级的费用；无配置或已达最高配置等级时返回 null，空费用表示免费升级。
      */
     public Map<Integer, Long> getEmployeeUpgradeCost(int employeeId, int level) {
+        return getEmployeeUpgradeCost(employeeId, level, level + 1);
+    }
+
+    /** 汇总从当前等级到目标等级的费用，突破材料只在离开配置等级时扣一次。 */
+    public Map<Integer, Long> getEmployeeUpgradeCost(int employeeId, int level, int targetLevel) {
         NavigableMap<Integer, EmployeeLevelCfg> levels = employeeLevelCfgMap.get(employeeId);
-        if (levels == null || level >= levels.lastKey()) {
+        if (levels == null || level < levels.firstKey() || targetLevel <= level || targetLevel > levels.lastKey()) {
             return null;
         }
-        Map.Entry<Integer, EmployeeLevelCfg> entry = levels.floorEntry(level);
-        if (entry == null) {
-            return null;
+        boolean singleLevel = targetLevel == level + 1;
+        Map<Integer, Long> cost = null;
+        for (int current = level; current < targetLevel; current++) {
+            EmployeeLevelCfg cfg = levels.floorEntry(current).getValue();
+            long offset = (long) current - cfg.getLevel();
+            Map<Integer, Long> base = cfg.getUpgradeCost();
+            Map<Integer, Long> additions = cfg.getAddCost();
+            Map<Integer, Long> materials = offset == 0 ? cfg.getBreakthroughMaterials() : null;
+            boolean hasBase = base != null && !base.isEmpty();
+            boolean hasMaterials = materials != null && !materials.isEmpty();
+            if (!hasBase && !hasMaterials) {
+                continue;
+            }
+            if (singleLevel && !hasMaterials && (offset == 0 || additions == null || additions.isEmpty())) {
+                return base;
+            }
+            if (cost == null) {
+                cost = new HashMap<>();
+            }
+            if (hasBase) {
+                for (Map.Entry<Integer, Long> item : base.entrySet()) {
+                    long increase = additions == null ? 0 : offset * additions.getOrDefault(item.getKey(), 0L);
+                    cost.merge(item.getKey(), item.getValue() + increase, Long::sum);
+                }
+            }
+            if (hasMaterials) {
+                for (Map.Entry<Integer, Long> item : materials.entrySet()) {
+                    cost.merge(item.getKey(), item.getValue(), Long::sum);
+                }
+            }
         }
-        EmployeeLevelCfg cfg = entry.getValue();
-        Map<Integer, Long> base = cfg.getUpgradeCost();
-        Map<Integer, Long> additions = cfg.getAddCost();
-        long offset = (long) level - cfg.getLevel();
-        if (base == null || base.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        if (offset == 0 || additions == null || additions.isEmpty()) {
-            return base;
-        }
-        Map<Integer, Long> cost = new HashMap<>(base.size());
-        base.forEach((itemId, count) -> cost.put(itemId, count + offset * additions.getOrDefault(itemId, 0L)));
-        return cost;
+        return cost == null ? Map.of() : cost;
     }
 
     public Map<Integer, Map<Integer, EmployeeStarCfg>> getEmployeeStarCfgMap() {
