@@ -23,6 +23,8 @@ public class MinigamegoodsCfg extends BaseCfgBean {
   protected String Emoji;
   /** 基础分 */
   protected int Score;
+  /** 货物单价 */
+  protected int UnitPrice;
   /** 刷新权重 */
   protected int Weight;
   /** 货物类型 */
@@ -36,6 +38,11 @@ public class MinigamegoodsCfg extends BaseCfgBean {
   /** 返回基础分 */
   public int getScore() {
     return Score;
+  }
+
+  /** 返回货物单价 */
+  public int getUnitPrice() {
+    return UnitPrice;
   }
 
   /** 返回刷新权重 */

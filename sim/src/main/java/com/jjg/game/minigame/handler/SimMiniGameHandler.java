@@ -28,6 +28,8 @@ import com.jjg.game.minigame.pb.req.ReqDeliverSpeedyDeliveryGoods;
 import com.jjg.game.minigame.pb.req.ReqDeductSpeedyDeliveryTime;
 import com.jjg.game.minigame.pb.req.ReqEndSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.req.ReqQuickClearSpeedyDeliveryGame;
+import com.jjg.game.minigame.pb.req.ReqSpeedyDeliveryGoodsInfo;
+import com.jjg.game.minigame.pb.req.ReqStockSpeedyDeliveryShelf;
 import com.jjg.game.minigame.pb.res.ResCheaterHuntGameInfo;
 import com.jjg.game.minigame.pb.res.ResEnterCheaterHuntGame;
 import com.jjg.game.minigame.pb.res.ResExitCheaterHuntGame;
@@ -50,6 +52,8 @@ import com.jjg.game.minigame.pb.res.ResDeliverSpeedyDeliveryGoods;
 import com.jjg.game.minigame.pb.res.ResDeductSpeedyDeliveryTime;
 import com.jjg.game.minigame.pb.res.ResEndSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.res.ResQuickClearSpeedyDeliveryGame;
+import com.jjg.game.minigame.pb.res.ResSpeedyDeliveryGoodsInfo;
+import com.jjg.game.minigame.pb.res.ResStockSpeedyDeliveryShelf;
 import com.jjg.game.minigame.service.SimMiniGameService;
 import com.jjg.game.minigame.service.GodGamblersService;
 import com.jjg.game.minigame.service.HappyHappyFishService;
@@ -338,5 +342,28 @@ public class SimMiniGameHandler {
             return;
         }
         ctx.send(speedyDeliveryService.quickClear(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_STOCK_SPEEDY_DELIVERY_SHELF)
+    public void reqStockSpeedyDeliveryShelf(PlayerController playerController, ReqStockSpeedyDeliveryShelf req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            log.warn("货物上架失败，玩家会话不存在 playerId={},type={},slotId={},goodsId={}",
+                    playerController.playerId(), req.type, req.slotId, req.goodsId);
+            playerController.send(new ResStockSpeedyDeliveryShelf(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.stockShelf(ctx, req.type, req.slotId, req.goodsId));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_SPEEDY_DELIVERY_GOODS_INFO)
+    public void reqSpeedyDeliveryGoodsInfo(PlayerController playerController, ReqSpeedyDeliveryGoodsInfo req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            log.warn("查询货物失败，玩家会话不存在 playerId={},type={}", playerController.playerId(), req.type);
+            playerController.send(new ResSpeedyDeliveryGoodsInfo(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.goodsInfo(ctx, req.type));
     }
 }

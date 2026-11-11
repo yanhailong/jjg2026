@@ -8,6 +8,8 @@ import com.jjg.game.core.constant.GameConstant;
  * @date 2026/5/15
  */
 public interface SimConstant {
+    int TAVERN_BUILDING_ID = 1104;
+
     interface MsgBean {
         int BASE_MSG_PREFIX = MessageConst.MessageTypeDef.SIM_GAME << MessageConst.MessageCommon.RIGHT_MOVE;
 

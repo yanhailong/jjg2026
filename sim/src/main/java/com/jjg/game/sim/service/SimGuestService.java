@@ -434,16 +434,21 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
             return;
         }
 
-        if (!dest.claimed && dest.rewards != null && !dest.rewards.isEmpty()) {
-            BuildingData building = casino.findBuilding(dest.buildingId);
-            if (building == null) {
-                res.code = Code.NOT_FOUND;
-                ctx.send(res);
-                return;
+        if (!dest.claimed) {
+            if (dest.rewards != null && !dest.rewards.isEmpty()) {
+                BuildingData building = casino.findBuilding(dest.buildingId);
+                if (building == null) {
+                    res.code = Code.NOT_FOUND;
+                    log.warn("领取购买游客奖励失败，目的地建筑不存在 playerId={},casinoId={},uid={},index={},buildingId={}",
+                            ctx.playerId(), casino.getCasinoId(), uid, index, dest.buildingId);
+                    ctx.send(res);
+                    return;
+                }
+                for (ItemInfo item : dest.rewards) {
+                    building.getGuestRewards().merge(item.itemId, item.count, Long::sum);
+                }
             }
-            for (ItemInfo item : dest.rewards) {
-                building.getGuestRewards().merge(item.itemId, item.count, Long::sum);
-            }
+            consumeTavernGoods(ctx, dest.buildingId);
         }
         dest.claimed = true;
         res.rewards = dest.rewards;
@@ -585,6 +590,7 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
 
         //奖励生成即存入建筑；场景外缓存的游客仅用于补发展示。
         for (DestinationInfo info : destinations) {
+            consumeTavernGoods(ctx, info.buildingId);
             if (info.rewards == null || info.rewards.isEmpty()) {
                 continue;
             }
@@ -602,6 +608,12 @@ public class SimGuestService implements SimPlayerTickListener, ItemListener, Sim
         recordDashboardJourney(ctx.getCurrentCasino(), destinations, now);
         ctx.getSimBaseData().recordGuestGenerated(false, now);
         return SimPbConverter.toGuestInfo(guest, destinations, visitorQuestCfg);
+    }
+
+    private void consumeTavernGoods(SimPlayerContext ctx, int buildingId) {
+        if (buildingId == SimConstant.TAVERN_BUILDING_ID && ctx.getSpeedyDeliveryData() != null) {
+            ctx.getSpeedyDeliveryData().consumeShelfGoods();
+        }
     }
 
     private void notifyGuestOutputLimit(SimPlayerContext ctx, CasinoStatsSheetCfg cfg, long now) {

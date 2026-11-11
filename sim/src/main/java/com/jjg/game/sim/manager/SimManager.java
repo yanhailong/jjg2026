@@ -693,6 +693,7 @@ public class SimManager {
                     happyHappyFishDao.save(ctx.getHappyHappyFishData());
                 }
                 if (ctx.getSpeedyDeliveryData() != null) {
+                    ctx.getSpeedyDeliveryData().prepareGoodsForExitSave();
                     speedyDeliveryDao.save(ctx.getSpeedyDeliveryData());
                 }
                 //落库完成后再删路由; 玩家可能在复活等待超时后已重建 ctx, 此时路由必须保留

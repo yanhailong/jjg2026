@@ -13,11 +13,15 @@ import com.jjg.game.minigame.dao.SpeedyDeliveryDao;
 import com.jjg.game.minigame.data.SpeedyDeliveryData;
 import com.jjg.game.minigame.data.SpeedyDeliveryRound;
 import com.jjg.game.minigame.pb.res.*;
+import com.jjg.game.minigame.pb.struct.SpeedyDeliveryShelfGoods;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.GlobalConfigCfg;
 import com.jjg.game.sampledata.bean.MinigameSpeedyDeliveryCfg;
 import com.jjg.game.sampledata.bean.MinigameTruckCfg;
 import com.jjg.game.sampledata.bean.MinigamegoodsCfg;
+import com.jjg.game.sim.constant.SimConstant;
+import com.jjg.game.sim.data.BuildingData;
+import com.jjg.game.sim.data.SimCasinoData;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.listener.SimPlayerTickListener;
 import com.jjg.game.sim.service.SimAutoSaveService;
@@ -54,6 +58,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
     }
 
     public void onLogin(SimPlayerContext ctx) {
+        loadData(ctx);
         //退出发奖失败时重试原会话中的交付，不恢复游戏过程。
         SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
         if (round != null && round.getState() == RoundState.REWARD_PENDING) {
@@ -114,14 +119,20 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
             res.score = round.getScore();
         }
         if (res.code != Code.SUCCESS) {
+            log.warn("飞驰快送交货失败，当前对局不可交货 playerId={},truckId={},state={},endTime={},code={}",
+                    ctx.playerId(), truckId, round == null ? RoundState.NONE : round.getState(),
+                    round == null ? 0 : round.getEndTime(), res.code);
             return res;
         }
         if (goodsIds == null || goodsIds.isEmpty() || goodsIds.size() > round.getConfig().getBackpackCapacity()) {
+            log.warn("飞驰快送交货失败，货物数量无效 playerId={},truckId={},count={},capacity={}",
+                    ctx.playerId(), truckId, goodsIds == null ? 0 : goodsIds.size(), round.getConfig().getBackpackCapacity());
             res.code = Code.PARAM_ERROR;
             return res;
         }
         MinigameTruckCfg truck = GameDataManager.getMinigameTruckCfg(truckId);
         if (truck == null) {
+            log.warn("飞驰快送交货失败，卡车配置不存在 playerId={},truckId={}", ctx.playerId(), truckId);
             res.code = Code.PARAM_ERROR;
             return res;
         }
@@ -130,6 +141,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         for (Integer goodsId : goodsIds) {
             MinigamegoodsCfg goods = goodsId == null ? null : GameDataManager.getMinigamegoodsCfg(goodsId);
             if (goods == null) {
+                log.warn("飞驰快送交货失败，货物配置不存在 playerId={},truckId={},goodsId={}", ctx.playerId(), truckId, goodsId);
                 res.code = Code.PARAM_ERROR;
                 return res;
             }
@@ -140,19 +152,79 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                 default -> -1;
             };
             if (goods.getScore() < 0 || multiplier < 0) {
+                log.warn("飞驰快送交货失败，计分配置无效 playerId={},truckId={},goodsId={},type={},score={},multiplier={}",
+                        ctx.playerId(), truckId, goodsId, goods.getType(), goods.getScore(), multiplier);
                 res.code = Code.SAMPLE_ERROR;
                 return res;
             }
             long value = (long) goods.getScore() * multiplier;
             if (value > limit - numerator) {
+                log.warn("飞驰快送交货失败，积分超出上限 playerId={},truckId={},goodsId={},score={},required={},remaining={}",
+                        ctx.playerId(), truckId, goodsId, round.getScore(), value, limit - numerator);
                 res.code = Code.PARAM_ERROR;
                 return res;
             }
             numerator += value;
         }
+        loadData(ctx).addDeliveredGoods(goodsIds);
         res.deliveryScore = (int) ((numerator + 99) / 100);
         round.setScore(round.getScore() + res.deliveryScore);
         res.score = round.getScore();
+        return res;
+    }
+
+    public ResStockSpeedyDeliveryShelf stockShelf(SimPlayerContext ctx, int type, int slotId, int goodsId) {
+        if (type <= 0 || slotId < 0 || slotId >= MiniGameConstant.SPEEDY_DELIVERY_SHELF_SLOT_COUNT || goodsId <= 0) {
+            log.warn("货物上架失败，货架类型、格子或货物ID无效 playerId={},type={},slotId={},goodsId={},slotCount={}",
+                    ctx.playerId(), type, slotId, goodsId, MiniGameConstant.SPEEDY_DELIVERY_SHELF_SLOT_COUNT);
+            return new ResStockSpeedyDeliveryShelf(Code.PARAM_ERROR);
+        }
+        MinigamegoodsCfg goods = GameDataManager.getMinigamegoodsCfg(goodsId);
+        if (goods == null || goods.getType() != type) {
+            log.warn("货物上架失败，货物配置不存在或类型与货架不匹配 playerId={},type={},slotId={},goodsId={},goodsType={}",
+                    ctx.playerId(), type, slotId, goodsId, goods == null ? null : goods.getType());
+            return new ResStockSpeedyDeliveryShelf(Code.PARAM_ERROR);
+        }
+        SimCasinoData casino = ctx.getCurrentCasino();
+        BuildingData tavern = casino == null ? null : casino.findBuilding(SimConstant.TAVERN_BUILDING_ID);
+        if (tavern == null || tavern.getLevel() <= 0) {
+            log.warn("货物上架失败，当前场景未解锁温馨酒馆 playerId={},casinoId={},buildingId={},level={},type={},slotId={},goodsId={}",
+                    ctx.playerId(), casino == null ? null : casino.getCasinoId(), SimConstant.TAVERN_BUILDING_ID,
+                    tavern == null ? 0 : tavern.getLevel(), type, slotId, goodsId);
+            return new ResStockSpeedyDeliveryShelf(Code.NOT_UNLOCKED);
+        }
+        if (!loadData(ctx).stockShelf(type, slotId, goodsId, tavern.getLevel())) {
+            log.warn("货物上架失败，仓库无该货物 playerId={},type={},slotId={},goodsId={},available=0,capacity={}",
+                    ctx.playerId(), type, slotId, goodsId, tavern.getLevel());
+            return new ResStockSpeedyDeliveryShelf(Code.NOT_ENOUGH_ITEM);
+        }
+        return new ResStockSpeedyDeliveryShelf(Code.SUCCESS);
+    }
+
+    public ResSpeedyDeliveryGoodsInfo goodsInfo(SimPlayerContext ctx, int type) {
+        Map<Integer, MinigamegoodsCfg> configs = GameDataManager.getMinigamegoodsCfgMap();
+        if (type <= 0 || configs.values().stream().noneMatch(goods -> goods.getType() == type)) {
+            log.warn("查询货物失败，货架类型无效 playerId={},type={}", ctx.playerId(), type);
+            return new ResSpeedyDeliveryGoodsInfo(Code.PARAM_ERROR);
+        }
+        SpeedyDeliveryData data = loadData(ctx);
+        ResSpeedyDeliveryGoodsInfo res = new ResSpeedyDeliveryGoodsInfo(Code.SUCCESS);
+        res.houseGoods = new ArrayList<>();
+        data.warehouseGoods().forEach((goodsId, count) -> {
+            MinigamegoodsCfg goods = configs.get(goodsId);
+            if (goods != null && goods.getType() == type) {
+                res.houseGoods.add(ItemUtils.buildItemInfo(goodsId, count));
+            }
+        });
+        Map<Integer, int[]> shelf = data.shelfGoods(type);
+        res.goods = new ArrayList<>(shelf.size());
+        shelf.forEach((slotId, stock) -> {
+            SpeedyDeliveryShelfGoods info = new SpeedyDeliveryShelfGoods();
+            info.slotId = slotId;
+            info.goodsId = stock[0];
+            info.count = stock[1];
+            res.goods.add(info);
+        });
         return res;
     }
 
@@ -332,15 +404,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         if (cfg == null) {
             return Code.SAMPLE_ERROR;
         }
-        SpeedyDeliveryData data = ctx.getSpeedyDeliveryData();
-        if (data == null) {
-            data = dao.findById(ctx.playerId()).orElseGet(() -> {
-                SpeedyDeliveryData created = new SpeedyDeliveryData();
-                created.setPlayerId(ctx.playerId());
-                return created;
-            });
-            ctx.setSpeedyDeliveryData(data);
-        }
+        SpeedyDeliveryData data = loadData(ctx);
         if (data.getLastDailyGrantTime() >= now || TimeHelper.inSameDay(data.getLastDailyGrantTime(), now)) {
             return Code.SUCCESS;
         }
@@ -353,6 +417,20 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         data.setLastDailyGrantTime(now);
         autoSaveService.enqueueSave(data);
         return Code.SUCCESS;
+    }
+
+    private SpeedyDeliveryData loadData(SimPlayerContext ctx) {
+        SpeedyDeliveryData data = ctx.getSpeedyDeliveryData();
+        if (data == null) {
+            data = dao.findById(ctx.playerId()).orElseGet(() -> {
+                SpeedyDeliveryData created = new SpeedyDeliveryData();
+                created.setPlayerId(ctx.playerId());
+                return created;
+            });
+            data.restoreGoods();
+            ctx.setSpeedyDeliveryData(data);
+        }
+        return data;
     }
 
     private MinigameSpeedyDeliveryCfg config() {
