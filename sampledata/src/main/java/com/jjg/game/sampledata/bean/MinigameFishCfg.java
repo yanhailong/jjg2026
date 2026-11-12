@@ -19,10 +19,12 @@ public class MinigameFishCfg extends BaseCfgBean {
   /** 配置表工作薄名 */
   public static final String SHEET_NAME = "MinigameFish";
 
-  /** 鱼生成时间间隔(s) */
+  /** 鱼生成时间间隔(ms) */
   protected int Interval;
   /** 最大出现次数 */
   protected int MaxCount;
+  /** 钩爪中鱼回收速度（px/s） */
+  protected int ReturnSpeed;
   /** 捕捉获得积分 */
   protected int Score;
   /** 游动速率 */
@@ -32,7 +34,7 @@ public class MinigameFishCfg extends BaseCfgBean {
   /** 图标icon */
   protected String icon;
 
-  /** 返回鱼生成时间间隔(s) */
+  /** 返回鱼生成时间间隔(ms) */
   public int getInterval() {
     return Interval;
   }
@@ -40,6 +42,11 @@ public class MinigameFishCfg extends BaseCfgBean {
   /** 返回最大出现次数 */
   public int getMaxCount() {
     return MaxCount;
+  }
+
+  /** 返回钩爪中鱼回收速度（px/s） */
+  public int getReturnSpeed() {
+    return ReturnSpeed;
   }
 
   /** 返回捕捉获得积分 */

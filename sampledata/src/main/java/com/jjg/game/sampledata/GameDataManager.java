@@ -199,6 +199,7 @@ public class GameDataManager {
     containerMap.put(MinigameCheaterHuntLevelCfg.class, new MinigameCheaterHuntLevelCfgContainer());
     containerMap.put(MinigameCheaterHuntMapCfg.class, new MinigameCheaterHuntMapCfgContainer());
     containerMap.put(MinigameFishCfg.class, new MinigameFishCfgContainer());
+    containerMap.put(MinigameFishSkilCfg.class, new MinigameFishSkilCfgContainer());
     containerMap.put(MinigameGodofGamblersRubbingCfg.class, new MinigameGodofGamblersRubbingCfgContainer());
     containerMap.put(MinigameHappyHappyFishCfg.class, new MinigameHappyHappyFishCfgContainer());
     containerMap.put(MinigameSpeedyDeliveryCfg.class, new MinigameSpeedyDeliveryCfgContainer());
@@ -1686,6 +1687,18 @@ public class GameDataManager {
 
   public static List<MinigameFishCfg> getMinigameFishCfgList() {
     return getInstance().getCfgContainer(MinigameFishCfg.class).getCfgBeanList();
+  }
+
+  public static MinigameFishSkilCfg getMinigameFishSkilCfg(int key) {
+    return getInstance().getCfgContainer(MinigameFishSkilCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, MinigameFishSkilCfg> getMinigameFishSkilCfgMap() {
+    return getInstance().getCfgContainer(MinigameFishSkilCfg.class).getCfgBeanMap();
+  }
+
+  public static List<MinigameFishSkilCfg> getMinigameFishSkilCfgList() {
+    return getInstance().getCfgContainer(MinigameFishSkilCfg.class).getCfgBeanList();
   }
 
   public static MinigameGodofGamblersRubbingCfg getMinigameGodofGamblersRubbingCfg(int key) {

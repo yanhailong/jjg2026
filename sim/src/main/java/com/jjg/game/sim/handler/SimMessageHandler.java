@@ -633,8 +633,14 @@ public class SimMessageHandler implements GmListener {
     @Command(SimConstant.MsgBean.REQ_UPGRADE_EMPLOYEE)
     public void reqUpgradeEmployee(PlayerController playerController, ReqUpgradeEmployee req) {
         execute(playerController, ctx -> {
-            employeeService.onUpgradeEmployee(ctx, req.employeeId, req.ten);
+            employeeService.onUpgradeEmployee(ctx, req.employeeId, req.levelCount);
         }, ReqUpgradeEmployee.class);
+    }
+
+    @Command(SimConstant.MsgBean.REQ_RESET_EMPLOYEE_LEVEL)
+    public void reqResetEmployeeLevel(PlayerController playerController, ReqResetEmployeeLevel req) {
+        execute(playerController, ctx -> ctx.send(employeeService.resetEmployeeLevel(ctx, req.employeeId)),
+                ReqResetEmployeeLevel.class);
     }
 
     /**
@@ -652,9 +658,19 @@ public class SimMessageHandler implements GmListener {
      */
     @Command(SimConstant.MsgBean.REQ_STAR_UP_EMPLOYEE)
     public void reqStarUpEmployee(PlayerController playerController, ReqStarUpEmployee req) {
-        execute(playerController, ctx -> {
-            employeeService.onStarUpEmployee(ctx, req.employeeId);
-        }, ReqStarUpEmployee.class);
+        execute(playerController, ctx -> employeeService.onStarUpEmployee(ctx, req.employeeId, req.auto),
+                ReqStarUpEmployee.class);
+    }
+
+    /**
+     * 兑换升星碎片
+     * @param playerController
+     * @param req
+     */
+    @Command(SimConstant.MsgBean.REQ_EMPLOYEE_EXCHANGE_FRAGMENTS)
+    public void reqEmployeeExcFragments(PlayerController playerController, ReqEmployeeExcFragments req) {
+        execute(playerController, ctx -> ctx.send(employeeService.exchangeEmployeeFragments(ctx, req.employeeId, req.count)),
+                ReqEmployeeExcFragments.class);
     }
 
     /**

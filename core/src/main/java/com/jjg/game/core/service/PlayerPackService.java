@@ -434,16 +434,20 @@ public class PlayerPackService implements IPlayerRegister {
                 insufficientItemIds.add(item.getId());
             }
         }
+        notifyItemsNotEnough(player.getId(), insufficientItemIds, addType);
+    }
+
+    private void notifyItemsNotEnough(long playerId, Set<Integer> insufficientItemIds, AddType addType) {
         if (insufficientItemIds.isEmpty()) {
             return;
         }
         Set<Integer> immutable = Collections.unmodifiableSet(insufficientItemIds);
         for (ItemNotEnoughListener listener : itemNotEnoughListeners) {
             try {
-                listener.onItemsNotEnough(player.getId(), immutable, addType);
+                listener.onItemsNotEnough(playerId, immutable, addType);
             } catch (Exception e) {
                 log.error("道具不足监听器异常 listener={},playerId={},itemIds={}",
-                        listener.getClass().getSimpleName(), player.getId(), immutable, e);
+                        listener.getClass().getSimpleName(), playerId, immutable, e);
             }
         }
     }
@@ -995,6 +999,24 @@ public class PlayerPackService implements IPlayerRegister {
                                                                Map<Integer, Long> removeItems,
                                                                Map<Integer, Long> addItems,
                                                                AddType addType, String desc) {
+        return exchangePackItems(player, requiredItems, removeItems, addItems, addType, desc, 0);
+    }
+
+    /**
+     * 优先消耗指定道具，在同一背包锁内用替代道具按 1:1 补足缺口。
+     * substituteItemId 为 0 时只扣指定道具。
+     */
+    public CommonResult<ItemOperationResult> removePackItemWithSubstitute(Player player, int itemId, long count,
+                                                                         int substituteItemId, AddType addType) {
+        if (substituteItemId < 0 || substituteItemId == itemId) {
+            return new CommonResult<>(Code.PARAM_ERROR);
+        }
+        return exchangePackItems(player, Map.of(), Map.of(itemId, count), Map.of(), addType, null, substituteItemId);
+    }
+
+    private CommonResult<ItemOperationResult> exchangePackItems(Player player, Map<Integer, Long> requiredItems,
+                                                                Map<Integer, Long> removeItems, Map<Integer, Long> addItems,
+                                                                AddType addType, String desc, int substituteItemId) {
         CommonResult<ItemOperationResult> result = new CommonResult<>(Code.FAIL);
         result.data = new ItemOperationResult();
         if (player == null) {
@@ -1030,10 +1052,32 @@ public class PlayerPackService implements IPlayerRegister {
                 result.code = Code.NOT_FOUND;
                 return result;
             }
+            if (substituteItemId > 0) {
+                Item primary = removes.getFirst();
+                long owned = pack.getItemCount(primary.getId());
+                if (owned < primary.getItemCount()) {
+                    Item substitute = new Item(substituteItemId, primary.getItemCount() - owned);
+                    List<Item> substitutes = List.of(substitute);
+                    if (!validPackExchangeItems(substitutes)) {
+                        result.code = Code.PARAM_ERROR;
+                        return result;
+                    }
+                    removes = owned == 0 ? substitutes : List.of(new Item(primary.getId(), owned), substitute);
+                }
+            }
             boolean requirementsEnough = pack.checkHasItems(requirements);
             if (!requirementsEnough || !pack.checkHasItems(removes)) {
                 result.code = Code.NOT_ENOUGH_ITEM;
-                notifyItemsNotEnough(player, requirementsEnough ? removes : requirements, addType);
+                Set<Integer> insufficientItemIds = new LinkedHashSet<>();
+                for (Item item : requirementsEnough ? removes : requirements) {
+                    long owned = pack.getItemCount(item.getId());
+                    if (owned < item.getItemCount()) {
+                        insufficientItemIds.add(item.getId());
+                        log.warn("兑换背包道具材料不足 playerId={},itemId={},owned={},need={},addType={}",
+                                playerId, item.getId(), owned, item.getItemCount(), addType);
+                    }
+                }
+                notifyItemsNotEnough(playerId, insufficientItemIds, addType);
                 return result;
             }
 

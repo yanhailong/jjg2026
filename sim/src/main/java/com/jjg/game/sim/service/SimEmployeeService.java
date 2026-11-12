@@ -9,6 +9,7 @@ import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.pb.KVLongInfo;
 import com.jjg.game.core.service.PlayerPackService;
+import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
 import com.jjg.game.sim.constant.SimConstant;
@@ -42,6 +43,8 @@ public class SimEmployeeService implements SimTaskStateReporter {
     //雇员初始等级 / 星级
     private static final int INITIAL_LEVEL = 1;
     private static final int INITIAL_STAR = 1;
+    private static final int FIRST_UNIVERSAL_SHARD_ITEM_ID = 1350101;
+    private static final int LAST_UNIVERSAL_SHARD_ITEM_ID = 1350105;
 
     @Autowired
     private SimConfigCacheService configCache;
@@ -203,19 +206,26 @@ public class SimEmployeeService implements SimTaskStateReporter {
     /**
      * 升级雇员
      */
-    public void onUpgradeEmployee(SimPlayerContext ctx, int employeeId, boolean ten) {
+    public void onUpgradeEmployee(SimPlayerContext ctx, int employeeId, int levelCount) {
         ResUpgradeEmployee res = new ResUpgradeEmployee(Code.SUCCESS);
         res.employeeId = employeeId;
         try {
             SimEmployeeData data = ctx.getEmployee(employeeId);
             if (data == null) {
-                log.warn("升级雇员失败, 未解锁 playerId={},employeeId={},ten={}", ctx.playerId(), employeeId, ten);
+                log.warn("升级雇员失败, 未解锁 playerId={},employeeId={},levelCount={}", ctx.playerId(), employeeId, levelCount);
                 res.code = Code.NOT_FOUND;
                 ctx.send(res);
                 return;
             }
+
+            if (levelCount < 1) {
+                levelCount = 1;
+            } else if (levelCount > 10) {
+                levelCount = 10;
+            }
+
             int level = data.getLevel();
-            int targetLevel = level + (ten ? 10 : 1);
+            int targetLevel = level + levelCount;
             EmployeeStarCfg starCfg = getStarCfg(employeeId, data.getStar());
             int levelCap = starCfg == null ? 0 : starCfg.getLevelCap();
             if (levelCap > 0 && targetLevel > levelCap) {
@@ -245,6 +255,7 @@ public class SimEmployeeService implements SimTaskStateReporter {
                     return;
                 }
                 changeEndItemNum = removeResult.data.getChangeEndItemNum();
+                data.addLevelUpCost(cost);
             }
 
             data.setLevel(targetLevel);
@@ -256,10 +267,69 @@ public class SimEmployeeService implements SimTaskStateReporter {
             log.info("升级雇员成功 playerId={},employeeId={},level={},newLevel={},changeEndItemNum={}",
                     ctx.playerId(), employeeId, level, targetLevel, changeEndItemNum);
         } catch (Exception e) {
-            log.error("升级雇员异常 playerId={},employeeId={},ten={}", ctx.playerId(), employeeId, ten, e);
+            log.error("升级雇员异常 playerId={},employeeId={},levelCount={}", ctx.playerId(), employeeId, levelCount, e);
             res.code = Code.EXCEPTION;
         }
         ctx.send(res);
+    }
+
+    /**
+     * 重置雇员等级，返还本轮升级实际扣除的道具。
+     */
+    public ResResetEmployeeLevel resetEmployeeLevel(SimPlayerContext ctx, int employeeId) {
+        ResResetEmployeeLevel res = new ResResetEmployeeLevel(Code.SUCCESS);
+        res.employeeId = employeeId;
+        try {
+            SimEmployeeData data = ctx.getEmployee(employeeId);
+            if (data == null) {
+                log.warn("重置雇员等级失败, 雇员未解锁 playerId={},employeeId={}", ctx.playerId(), employeeId);
+                res.code = Code.NOT_FOUND;
+                return res;
+            }
+            int level = data.getLevel();
+            res.level = level;
+            if (level == INITIAL_LEVEL) {
+                return res;
+            }
+
+            Map<Integer, Long> refund = data.getLevelUpCost();
+            if (!refund.isEmpty()) {
+                for (int itemId : refund.keySet()) {
+                    if (GameDataManager.getItemCfg(itemId) == null) {
+                        log.error("重置雇员等级失败, 缺少返还道具配置 playerId={},employeeId={},level={},itemId={},count={}",
+                                ctx.playerId(), employeeId, level, itemId, refund.get(itemId));
+                        res.code = Code.NOT_FOUND;
+                        return res;
+                    }
+                }
+                CommonResult<ItemOperationResult> added = playerPackService.addItems(ctx.playerId(), refund,
+                        AddType.SIM_EMPLOYEE_LEVEL_RESET, "employeeId=" + employeeId);
+                if (!added.success()) {
+                    log.warn("重置雇员等级失败, 道具返还失败 playerId={},employeeId={},level={},refund={},code={}",
+                            ctx.playerId(), employeeId, level, refund, added.code);
+                    res.code = added.code;
+                    return res;
+                }
+            }
+
+            data.setLevel(INITIAL_LEVEL);
+            data.clearLevelUpCost();
+            res.level = INITIAL_LEVEL;
+            res.refundItems = ItemUtils.buildItemInfo(refund);
+            ctx.setEmployeeRedDotDirty(true);
+            int maxLevel = ctx.getEmployeeMap().values().stream().mapToInt(SimEmployeeData::getLevel)
+                    .max().orElse(INITIAL_LEVEL);
+            if (maxLevel < level) {
+                simTaskService.onConditionEvent(ctx, new ActionConditionEvent(ActionConditionEvent.Type.EMPLOYEE_LEVEL,
+                        0, 0, maxLevel, 0, 0, false));
+            }
+            log.info("重置雇员等级成功 playerId={},employeeId={},level={},refund={}",
+                    ctx.playerId(), employeeId, level, refund);
+        } catch (Exception e) {
+            log.error("重置雇员等级异常 playerId={},employeeId={}", ctx.playerId(), employeeId, e);
+            res.code = Code.EXCEPTION;
+        }
+        return res;
     }
 
     /**
@@ -319,10 +389,40 @@ public class SimEmployeeService implements SimTaskStateReporter {
         ctx.send(res);
     }
 
+    public ResEmployeeExcFragments exchangeEmployeeFragments(SimPlayerContext ctx, int employeeId, long count) {
+        try {
+            if (employeeId <= 0 || count <= 0) {
+                log.warn("兑换雇员碎片失败, 参数错误 playerId={},employeeId={},count={}", ctx.playerId(), employeeId, count);
+                return new ResEmployeeExcFragments(Code.PARAM_ERROR);
+            }
+            if (ctx.getEmployee(employeeId) == null) {
+                log.warn("兑换雇员碎片失败, 雇员未解锁 playerId={},employeeId={},count={}", ctx.playerId(), employeeId, count);
+                return new ResEmployeeExcFragments(Code.NOT_FOUND);
+            }
+            int shardItemId = getEmployeeShardItemId(employeeId);
+            int universalShardId = getUniversalShardItemId(shardItemId);
+            if (universalShardId == 0) {
+                log.warn("兑换雇员碎片失败, 专属碎片配置或同品质万能碎片缺失 playerId={},employeeId={},shardItemId={},count={}",
+                        ctx.playerId(), employeeId, shardItemId, count);
+                return new ResEmployeeExcFragments(Code.PARAM_ERROR);
+            }
+            CommonResult<ItemOperationResult> exchanged = playerPackService.exchangePackItems(ctx.getPlayer(), Map.of(),
+                    Map.of(universalShardId, count), Map.of(shardItemId, count), AddType.ITEM_EXCHANGE, "雇员碎片兑换");
+            if (!exchanged.success()) {
+                log.warn("兑换雇员碎片失败, 背包兑换失败 playerId={},employeeId={},shardItemId={},universalShardId={},count={},code={}",
+                        ctx.playerId(), employeeId, shardItemId, universalShardId, count, exchanged.code);
+            }
+            return new ResEmployeeExcFragments(exchanged.code);
+        } catch (Exception e) {
+            log.error("兑换雇员碎片异常 playerId={},employeeId={},count={}", ctx.playerId(), employeeId, count, e);
+            return new ResEmployeeExcFragments(Code.EXCEPTION);
+        }
+    }
+
     /**
      * 升星雇员
      */
-    public void onStarUpEmployee(SimPlayerContext ctx, int employeeId) {
+    public void onStarUpEmployee(SimPlayerContext ctx, int employeeId, boolean auto) {
         ResStarUpEmployee res = new ResStarUpEmployee(Code.SUCCESS);
         res.employeeId = employeeId;
         try {
@@ -351,18 +451,23 @@ public class SimEmployeeService implements SimTaskStateReporter {
                 return;
             }
 
-            EmployeeProfileCfg employeeProfileCfg = GameDataManager.getEmployeeProfileCfg(employeeId);
-            if (employeeProfileCfg == null || employeeProfileCfg.getDuplicatetoShard() == null) {
-                log.warn("升星雇员失败, 获取雇员配置失败 playerId={},employeeId={}", ctx.playerId(), employeeId);
+            int shardItemId = getEmployeeShardItemId(employeeId);
+            if (shardItemId <= 0) {
+                log.warn("升星雇员失败, 缺少专属碎片配置 playerId={},employeeId={},star={}",
+                        ctx.playerId(), employeeId, data.getStar());
                 res.code = Code.PARAM_ERROR;
                 ctx.send(res);
                 return;
             }
 
-            boolean remove = playerPackService.removeItem(ctx.getPlayer(), employeeProfileCfg.getDuplicatetoShard().get(1), curCfg.getStarUpCost(), AddType.SIM_EMPLOYEE_STAR_UP).success();
-            if (!remove) {
-                log.warn("升星雇员失败, 扣除碎片道具失败 playerId={},employeeId={},need={}", ctx.playerId(), employeeId, curCfg.getStarUpCost());
-                res.code = Code.NOT_ENOUGH;
+            int cost = curCfg.getStarUpCost();
+            int universalShardId = auto ? getUniversalShardItemId(shardItemId) : 0;
+            CommonResult<ItemOperationResult> removed = playerPackService.removePackItemWithSubstitute(
+                    ctx.getPlayer(), shardItemId, cost, universalShardId, AddType.SIM_EMPLOYEE_STAR_UP);
+            if (!removed.success()) {
+                log.warn("升星雇员失败, 扣除碎片失败 playerId={},employeeId={},star={},shardItemId={},universalShardId={},need={},auto={},code={}",
+                        ctx.playerId(), employeeId, data.getStar(), shardItemId, universalShardId, cost, auto, removed.code);
+                res.code = removed.code == Code.NOT_ENOUGH_ITEM ? Code.NOT_ENOUGH : removed.code;
                 ctx.send(res);
                 return;
             }
@@ -378,10 +483,35 @@ public class SimEmployeeService implements SimTaskStateReporter {
             reportEmployeeCounts(ctx);
             log.info("升星雇员成功 playerId={},employeeId={},newStar={}", ctx.playerId(), employeeId, data.getStar());
         } catch (Exception e) {
-            log.error("", e);
-            res.code = Code.EXCEPTION;
+            log.error("升星雇员异常 playerId={},employeeId={},auto={},newStar={}", ctx.playerId(), employeeId, auto, res.star, e);
+            if (res.star == 0) {
+                res.code = Code.EXCEPTION;
+            }
         }
         ctx.send(res);
+    }
+
+    private int getEmployeeShardItemId(int employeeId) {
+        EmployeeProfileCfg profile = GameDataManager.getEmployeeProfileCfg(employeeId);
+        List<Integer> shards = profile == null ? null : profile.getDuplicatetoShard();
+        return shards != null && shards.size() > 1 ? shards.get(1) : 0;
+    }
+
+    private int getUniversalShardItemId(int shardItemId) {
+        if (shardItemId <= 0 || (shardItemId >= FIRST_UNIVERSAL_SHARD_ITEM_ID && shardItemId <= LAST_UNIVERSAL_SHARD_ITEM_ID)) {
+            return 0;
+        }
+        ItemCfg shard = GameDataManager.getItemCfg(shardItemId);
+        if (shard == null) {
+            return 0;
+        }
+        for (int itemId = FIRST_UNIVERSAL_SHARD_ITEM_ID; itemId <= LAST_UNIVERSAL_SHARD_ITEM_ID; itemId++) {
+            ItemCfg universal = GameDataManager.getItemCfg(itemId);
+            if (universal != null && universal.getQuality() == shard.getQuality()) {
+                return itemId;
+            }
+        }
+        return 0;
     }
 
     /**
@@ -560,7 +690,7 @@ public class SimEmployeeService implements SimTaskStateReporter {
     }
 
     public EmployDetailInfo toEmployeeDetail(SimPlayerContext ctx, SimEmployeeData data,
-                                           SimEmployeeAttributeService.Snapshot snapshot) {
+                                             SimEmployeeAttributeService.Snapshot snapshot) {
         EmployDetailInfo info = new EmployDetailInfo();
         info.id = data.getEmployeeId();
         info.level = data.getLevel();
@@ -574,7 +704,7 @@ public class SimEmployeeService implements SimTaskStateReporter {
         info.skills = skillInfos(data);
 
         EmployeeProfileCfg employeeProfileCfg = GameDataManager.getEmployeeProfileCfg(data.getEmployeeId());
-        if(employeeProfileCfg != null) {
+        if (employeeProfileCfg != null) {
             info.professionID = employeeProfileCfg.getProfessionID();
         }
         return info;

@@ -15,4 +15,6 @@ import com.jjg.game.sim.constant.SimConstant;
 public class ReqStarUpEmployee extends AbstractMessage {
     @ProtoDesc("雇员id")
     public int employeeId;
+    @ProtoDesc("是否自动兑换")
+    public boolean auto;
 }

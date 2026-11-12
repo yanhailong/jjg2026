@@ -358,6 +358,14 @@ public interface SimConstant {
         //上报客户端空白页面状态
         int REQ_SIM_BLANK_PAGE = BASE_MSG_PREFIX | 0xB8;
         int RES_SIM_BLANK_PAGE = BASE_MSG_PREFIX | 0xB9;
+
+        //兑换碎片
+        int REQ_EMPLOYEE_EXCHANGE_FRAGMENTS = BASE_MSG_PREFIX | 0xBA;
+        int RES_EMPLOYEE_EXCHANGE_FRAGMENTS = BASE_MSG_PREFIX | 0xBB;
+
+        //重置雇员等级
+        int REQ_RESET_EMPLOYEE_LEVEL = BASE_MSG_PREFIX | 0xBC;
+        int RES_RESET_EMPLOYEE_LEVEL = BASE_MSG_PREFIX | 0xBD;
     }
 
     interface SpecialGuest {
