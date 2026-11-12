@@ -363,6 +363,8 @@ public enum AddType {
     SIM_HAPPY_HAPPY_FISH(1837),
     //飞驰快送消耗、积分奖励及每日赠送
     SIM_SPEEDY_DELIVERY(1838),
+    //雇员等级重置返还
+    SIM_EMPLOYEE_LEVEL_RESET(1839),
 
     //创建联盟
     ALLIANCE_CREATE(2001),

@@ -15,6 +15,6 @@ import com.jjg.game.sim.constant.SimConstant;
 public class ReqUpgradeEmployee extends AbstractMessage {
     @ProtoDesc("雇员id")
     public int employeeId;
-    @ProtoDesc("是否连升10级")
-    public boolean ten;
+    @ProtoDesc("升多少级")
+    public int levelCount;
 }

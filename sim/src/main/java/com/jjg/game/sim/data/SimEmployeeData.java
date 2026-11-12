@@ -24,6 +24,8 @@ public class SimEmployeeData extends AbstractData {
     private int employeeId;
     //当前等级 (>=1 表示已招募)
     private int level;
+    //本轮升级已扣除的道具，按道具 ID 累计，随雇员等级一并落库
+    private Map<Integer, Long> levelUpCost;
     //当前星级
     private int star;
     //技能组 -> 当前等级；各雇员独立升级
@@ -60,6 +62,22 @@ public class SimEmployeeData extends AbstractData {
 
     public void setLevel(int level) {
         this.level = level;
+    }
+
+    public Map<Integer, Long> getLevelUpCost() {
+        return levelUpCost == null ? Map.of() : levelUpCost;
+    }
+
+    public void addLevelUpCost(Map<Integer, Long> cost) {
+        if (levelUpCost == null) {
+            levelUpCost = new HashMap<>(cost);
+        } else {
+            cost.forEach((itemId, count) -> levelUpCost.merge(itemId, count, Long::sum));
+        }
+    }
+
+    public void clearLevelUpCost() {
+        levelUpCost = null;
     }
 
     public int getStar() {
