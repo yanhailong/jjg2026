@@ -12,4 +12,6 @@ public class EmployeeSkillInfo {
     public int level;
     @ProtoDesc("当前EmployeeSkillConfig配置id")
     public int configId;
+    @ProtoDesc("最大等级")
+    public int maxLevel;
 }

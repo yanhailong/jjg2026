@@ -11,7 +11,7 @@ import com.jjg.game.minigame.constant.MiniGameConstant;
 public class ResCatchHappyHappyFish extends AbstractResponse {
     @ProtoDesc("服务器当前累计积分")
     public int score;
-    @ProtoDesc("当前结束时间，毫秒时间戳，含沙漏加时")
+    @ProtoDesc("本局结束时间，毫秒时间戳")
     public long endTime;
 
     public ResCatchHappyHappyFish(int code) {

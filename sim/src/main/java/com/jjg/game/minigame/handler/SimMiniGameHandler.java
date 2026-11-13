@@ -22,6 +22,8 @@ import com.jjg.game.minigame.pb.req.ReqStartHappyHappyFishGame;
 import com.jjg.game.minigame.pb.req.ReqCatchHappyHappyFish;
 import com.jjg.game.minigame.pb.req.ReqEndHappyHappyFishGame;
 import com.jjg.game.minigame.pb.req.ReqQuickClearHappyHappyFishGame;
+import com.jjg.game.minigame.pb.req.ReqHappyHappyFishSkills;
+import com.jjg.game.minigame.pb.req.ReqUpgradeHappyHappyFishSkill;
 import com.jjg.game.minigame.pb.req.ReqEnterSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.req.ReqStartSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.req.ReqDeliverSpeedyDeliveryGoods;
@@ -46,6 +48,8 @@ import com.jjg.game.minigame.pb.res.ResStartHappyHappyFishGame;
 import com.jjg.game.minigame.pb.res.ResCatchHappyHappyFish;
 import com.jjg.game.minigame.pb.res.ResEndHappyHappyFishGame;
 import com.jjg.game.minigame.pb.res.ResQuickClearHappyHappyFishGame;
+import com.jjg.game.minigame.pb.res.ResHappyHappyFishSkills;
+import com.jjg.game.minigame.pb.res.ResUpgradeHappyHappyFishSkill;
 import com.jjg.game.minigame.pb.res.ResEnterSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.res.ResStartSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.res.ResDeliverSpeedyDeliveryGoods;
@@ -278,6 +282,26 @@ public class SimMiniGameHandler {
             return;
         }
         ctx.send(happyHappyFishService.quickClear(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_HAPPY_HAPPY_FISH_SKILLS)
+    public void reqHappyHappyFishSkills(PlayerController playerController, ReqHappyHappyFishSkills req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResHappyHappyFishSkills(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(happyHappyFishService.skills(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_UPGRADE_HAPPY_HAPPY_FISH_SKILL)
+    public void reqUpgradeHappyHappyFishSkill(PlayerController playerController, ReqUpgradeHappyHappyFishSkill req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            playerController.send(new ResUpgradeHappyHappyFishSkill(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(happyHappyFishService.upgradeSkill(ctx, req.groupId));
     }
 
     @Command(MiniGameConstant.MsgBean.REQ_ENTER_SPEEDY_DELIVERY_GAME)

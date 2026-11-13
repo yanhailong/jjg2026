@@ -19,6 +19,8 @@ public class EmployeeStarCfg extends BaseCfgBean {
   /** 配置表工作薄名 */
   public static final String SHEET_NAME = "EmployeeStar";
 
+  /** 属性标题多语言 */
+  protected int AttributeTitleLocale;
   /** 雇员ID */
   protected int EmployeeID;
   /** 等级上限 */
@@ -31,6 +33,11 @@ public class EmployeeStarCfg extends BaseCfgBean {
   protected Map<Integer,Integer> SupervisorBonus;
   /** 升星解锁技能 */
   protected int UnlockSkill;
+
+  /** 返回属性标题多语言 */
+  public int getAttributeTitleLocale() {
+    return AttributeTitleLocale;
+  }
 
   /** 返回雇员ID */
   public int getEmployeeID() {

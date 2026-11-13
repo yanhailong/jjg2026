@@ -19,6 +19,8 @@ public class EmployeeLevelCfg extends BaseCfgBean {
   /** 配置表工作薄名 */
   public static final String SHEET_NAME = "EmployeeLevel";
 
+  /** 属性标题多语言 */
+  protected int AttributeTitleLocale;
   /** 属性值 */
   protected Map<Integer,Integer> AttributeValue;
   /** 突破材料 */
@@ -35,6 +37,11 @@ public class EmployeeLevelCfg extends BaseCfgBean {
   protected Map<Integer,Integer> addAttribute;
   /** 每级消耗增加 */
   protected Map<Integer,Long> addCost;
+
+  /** 返回属性标题多语言 */
+  public int getAttributeTitleLocale() {
+    return AttributeTitleLocale;
+  }
 
   /** 返回属性值 */
   public Map<Integer,Integer> getAttributeValue() {

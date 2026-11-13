@@ -21,6 +21,8 @@ public class MinigamegoodsCfg extends BaseCfgBean {
 
   /** 货物图标 */
   protected String Emoji;
+  /** 货物多语言 */
+  protected int GoodsLocale;
   /** 基础分 */
   protected int Score;
   /** 货物单价 */
@@ -33,6 +35,11 @@ public class MinigamegoodsCfg extends BaseCfgBean {
   /** 返回货物图标 */
   public String getEmoji() {
     return Emoji;
+  }
+
+  /** 返回货物多语言 */
+  public int getGoodsLocale() {
+    return GoodsLocale;
   }
 
   /** 返回基础分 */

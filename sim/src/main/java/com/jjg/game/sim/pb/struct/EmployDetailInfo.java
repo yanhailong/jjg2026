@@ -29,4 +29,8 @@ public class EmployDetailInfo {
     public List<EmployeeSkillInfo> skills;
     @ProtoDesc("职业   10.对战  20.下注  30.电子  40.酒水")
     public int professionID;
+    @ProtoDesc("最高等级")
+    public int maxLevel;
+    @ProtoDesc("最高星级")
+    public int maxStar;
 }

@@ -33,6 +33,8 @@ public class MinigameFishCfg extends BaseCfgBean {
   protected int Weight;
   /** 图标icon */
   protected String icon;
+  /** 类型 */
+  protected int type;
 
   /** 返回鱼生成时间间隔(ms) */
   public int getInterval() {
@@ -67,6 +69,11 @@ public class MinigameFishCfg extends BaseCfgBean {
   /** 返回图标icon */
   public String getIcon() {
     return icon;
+  }
+
+  /** 返回类型 */
+  public int getType() {
+    return type;
   }
 
   @Override

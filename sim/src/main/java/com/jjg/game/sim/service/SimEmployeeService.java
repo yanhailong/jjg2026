@@ -682,6 +682,7 @@ public class SimEmployeeService implements SimTaskStateReporter {
                 info.groupId = groupId;
                 info.level = level;
                 info.configId = cfg.getId();
+                info.maxLevel = configCache.employSkillMaxLevel(groupId);
                 infos.add(info);
             }
         });
@@ -695,6 +696,8 @@ public class SimEmployeeService implements SimTaskStateReporter {
         info.id = data.getEmployeeId();
         info.level = data.getLevel();
         info.star = data.getStar();
+        info.maxLevel = configCache.getEmployeeMaxLevel(info.id);
+        info.maxStar = configCache.getEmployeeMaxStar(info.id);
         info.manager = ctx.getCurrentCasino().employIsManager(data.getEmployeeId());
         info.combatPower = snapshot.combatPower(data.getEmployeeId());
         info.attributes = new ArrayList<>();

@@ -26,7 +26,7 @@ public class MinigameFishSkilCfg extends BaseCfgBean {
   /** 等级 */
   protected int Level;
   /** 关联技能id */
-  protected String LinkedSkillID;
+  protected List<Integer> LinkedSkillID;
   /** 增益万分比 */
   protected int Permille;
   /** 位置坐标 */
@@ -40,7 +40,7 @@ public class MinigameFishSkilCfg extends BaseCfgBean {
   /** 技能影响对象 */
   protected int Target;
   /** 技能影响类型 */
-  protected Map<Integer,Integer> Type;
+  protected List<List<Integer>> Type;
   /** 技能组ID */
   protected int groupId;
 
@@ -60,7 +60,7 @@ public class MinigameFishSkilCfg extends BaseCfgBean {
   }
 
   /** 返回关联技能id */
-  public String getLinkedSkillID() {
+  public List<Integer> getLinkedSkillID() {
     return LinkedSkillID;
   }
 
@@ -95,7 +95,7 @@ public class MinigameFishSkilCfg extends BaseCfgBean {
   }
 
   /** 返回技能影响类型 */
-  public Map<Integer,Integer> getType() {
+  public List<List<Integer>> getType() {
     return Type;
   }
 

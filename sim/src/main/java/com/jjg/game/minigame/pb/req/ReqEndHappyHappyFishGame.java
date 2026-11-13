@@ -9,6 +9,6 @@ import com.jjg.game.minigame.constant.MiniGameConstant;
 @ProtobufMessage(messageType = MessageConst.MessageTypeDef.SIM_MINI_GAME, cmd = MiniGameConstant.MsgBean.REQ_END_HAPPY_HAPPY_FISH_GAME)
 @ProtoDesc("结束欢乐捉鱼，支持中途退出并按当前积分结算")
 public class ReqEndHappyHappyFishGame extends AbstractMessage {
-    @ProtoDesc("开局返回的初始endTime，沙漏加时后仍使用初始值")
+    @ProtoDesc("开局返回的endTime")
     public long roundId;
 }

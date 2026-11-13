@@ -16,6 +16,8 @@ public class ResEndHappyHappyFishGame extends AbstractResponse {
     public int score;
     @ProtoDesc("本次成功发放的奖励")
     public List<ItemInfo> rewards;
+    @ProtoDesc("结算后的可用技能积分")
+    public long skillPoints;
 
     public ResEndHappyHappyFishGame(int code) {
         super(code);

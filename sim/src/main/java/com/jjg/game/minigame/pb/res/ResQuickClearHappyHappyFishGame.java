@@ -16,6 +16,8 @@ public class ResQuickClearHappyHappyFishGame extends AbstractResponse {
     public int score;
     @ProtoDesc("本次成功发放的奖励；发奖失败可重试本协议，不重复扣费")
     public List<ItemInfo> rewards;
+    @ProtoDesc("结算后的可用技能积分")
+    public long skillPoints;
 
     public ResQuickClearHappyHappyFishGame(int code) {
         super(code);

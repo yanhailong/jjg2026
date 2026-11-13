@@ -16,6 +16,7 @@ import com.jjg.game.core.constant.TaskConstant;
 import com.jjg.game.core.data.Item;
 import com.jjg.game.core.listener.ConfigExcelChangeListener;
 import com.jjg.game.core.utils.ItemUtils;
+import com.jjg.game.minigame.constant.MiniGameConstant;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
 import com.jjg.game.sim.constant.BuildingOutputType;
@@ -85,11 +86,16 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
 
     //EmployeeLevel配置 employeeId -> 区间起始等级 -> cfg，热更新整体替换
-    private volatile Map<Integer, NavigableMap<Integer, EmployeeLevelCfg>> employeeLevelCfgMap = Map.of();
+    private Map<Integer, NavigableMap<Integer, EmployeeLevelCfg>> employeeLevelCfgMap = Map.of();
     //EmployeeStar配置 employeeId -> star -> cfg
     private Map<Integer, Map<Integer, EmployeeStarCfg>> employeeStarCfgMap;
+    //EmployeeStar配置 employeeId -> maxStar
+    private volatile Map<Integer, Integer> employeeMaxStarMap = Map.of();
     //EmployeeSkillConfig配置 groupId -> level -> cfg，热更新整体替换
-    private volatile Map<Integer, Map<Integer, EmployeeSkillConfigCfg>> employeeSkillCfgMap = Map.of();
+    private Map<Integer, Map<Integer, EmployeeSkillConfigCfg>> employeeSkillCfgMap = Map.of();
+    //EmployeeSkillConfig配置 groupId -> maxlevel
+    private Map<Integer, Integer> employeeSkillMaxLevelMap = null;
+
     //EmployeeProfile配置 道具id(角色道具) -> cfg
     private Map<Integer, EmployeeProfileCfg> employeeProfileItemCfgMap;
     //EmployeeProfile配置 ProfessionID -> cfg
@@ -98,15 +104,15 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private Map<Integer, WeightRandom<List<Integer>>> employeePoolRandomMap;
 
     //建筑等级配置 buildingId -> level -> cfg
-    private volatile Map<Integer, NavigableMap<Integer, BuildingUpgradeTableCfg>> buildingUpgradeCfgMap;
+    private Map<Integer, NavigableMap<Integer, BuildingUpgradeTableCfg>> buildingUpgradeCfgMap;
     //RegionID -> level -> List.BuildLevelMaxInfo
-    private volatile Map<Integer, Map<Integer, List<BuildLevelMaxInfo>>> buildingLevelMaxInfoMap;
+    private Map<Integer, Map<Integer, List<BuildLevelMaxInfo>>> buildingLevelMaxInfoMap;
     //建筑等级解锁设备的信息
-    private volatile Map<Integer, BuildingUnlockEquipmentData> buildingUnlockEquipmentDataMap;
+    private Map<Integer, BuildingUnlockEquipmentData> buildingUnlockEquipmentDataMap;
     //建筑区域解锁条件：buildingId -> level -> 累计已解锁设备和装饰
-    private volatile Map<Integer, NavigableMap<Integer, Set<Integer>>> buildingAreaUnlockIdsMap = Map.of();
+    private Map<Integer, NavigableMap<Integer, Set<Integer>>> buildingAreaUnlockIdsMap = Map.of();
     //建筑区域配置 buildingId -> cfgs
-    private volatile Map<Integer, List<BuildingUpgradeAreaCfg>> buildingUpgradeAreaCfgMap = Map.of();
+    private Map<Integer, List<BuildingUpgradeAreaCfg>> buildingUpgradeAreaCfgMap = Map.of();
 
     //gameType -> BuildingAreaTableCfg
     private Map<Integer, BuildingAreaTableCfg> gameBuildingAreaTableCfg;
@@ -180,6 +186,14 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private Map<Integer, Integer> levelToChapterIdMap = null;
     private List<Integer> allChapterLevels = null;
 
+    //捕鱼技能
+    private volatile MinigameFishSkills minigameFishSkills = new MinigameFishSkills(Map.of(), Map.of());
+    private volatile Set<Integer> minigameFishInitialSkillGroupIds = Set.of();
+
+    private record MinigameFishSkills(Map<Integer, Map<Integer, MinigameFishSkilCfg>> levels,
+                                     Map<Integer, List<MinigameFishSkilCfg>> prerequisites) {
+    }
+
     @Autowired
     public SimConfigCacheService(ConditionRuleRegistry conditionRules,
                                  ConditionParser conditionParser) {
@@ -232,6 +246,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         loadTokenShopConfig();
 
         loadChapterConfig();
+
+        loadMinigameFishSkilCfg();
     }
 
     /**
@@ -420,18 +436,28 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
      */
     private void loadEmployeeStarConfig() {
         Map<Integer, Map<Integer, EmployeeStarCfg>> tmp = new HashMap<>();
+        Map<Integer, Integer> maxStars = new HashMap<>();
         for (EmployeeStarCfg cfg : GameDataManager.getEmployeeStarCfgList()) {
             tmp.computeIfAbsent(cfg.getEmployeeID(), k -> new HashMap<>()).put(cfg.getStar(), cfg);
+            maxStars.merge(cfg.getEmployeeID(), cfg.getStar(), Math::max);
         }
         this.employeeStarCfgMap = tmp;
+        this.employeeMaxStarMap = maxStars;
     }
 
     private void loadEmployeeSkillConfig() {
         Map<Integer, Map<Integer, EmployeeSkillConfigCfg>> tmp = new HashMap<>();
+        Map<Integer, Integer> tmpEmployeeSkillMaxLevelMap = new HashMap<>();
         for (EmployeeSkillConfigCfg cfg : GameDataManager.getEmployeeSkillConfigCfgList()) {
             tmp.computeIfAbsent(cfg.getGroupId(), k -> new HashMap<>()).put(cfg.getSkillLevel(), cfg);
+
+            Integer level = tmpEmployeeSkillMaxLevelMap.get(cfg.getGroupId());
+            if (level == null || level < cfg.getSkillLevel()) {
+                tmpEmployeeSkillMaxLevelMap.put(cfg.getGroupId(), cfg.getSkillLevel());
+            }
         }
         this.employeeSkillCfgMap = tmp;
+        this.employeeSkillMaxLevelMap = tmpEmployeeSkillMaxLevelMap;
     }
 
     /**
@@ -598,6 +624,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private void loadGlobalConfig() {
         loadSpecialGuestGlobalConfig();
         loadOnlineRewardDiamondCosts();
+        loadMinigameFishInitialSkillGroupIds();
         //广告收益倍数配置
         GlobalConfigCfg adCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Common.GLOBAL_AD_MULTIPLIER_ID);
         if (adCfg != null && adCfg.getValue() != null && !adCfg.getValue().isEmpty()) {
@@ -969,6 +996,41 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         this.allChapterLevels = tmpAllChapterLevels;
     }
 
+    private void loadMinigameFishSkilCfg() {
+        Map<Integer, Map<Integer, MinigameFishSkilCfg>> levels = new HashMap<>();
+        Map<Integer, List<MinigameFishSkilCfg>> prerequisites = new HashMap<>();
+        for (MinigameFishSkilCfg cfg : GameDataManager.getMinigameFishSkilCfgList()) {
+            levels.computeIfAbsent(cfg.getGroupId(), k -> new HashMap<>()).put(cfg.getLevel(), cfg);
+            if (cfg.getLinkedSkillID() != null) {
+                for (int targetId : cfg.getLinkedSkillID()) {
+                    prerequisites.computeIfAbsent(targetId, k -> new ArrayList<>()).add(cfg);
+                }
+            }
+        }
+        prerequisites.replaceAll((id, sources) -> List.copyOf(sources));
+        this.minigameFishSkills = new MinigameFishSkills(Map.copyOf(levels), Map.copyOf(prerequisites));
+    }
+
+    private void loadMinigameFishInitialSkillGroupIds() {
+        int globalId = MiniGameConstant.HAPPY_HAPPY_FISH_INITIAL_SKILLS_GLOBAL_ID;
+        GlobalConfigCfg cfg = GameDataManager.getGlobalConfigCfg(globalId);
+        String value = cfg == null ? null : cfg.getValue();
+        if (StringUtils.isBlank(value)) {
+            minigameFishInitialSkillGroupIds = Set.of();
+            return;
+        }
+
+        Set<Integer> ids = new HashSet<>();
+        for (String token : value.split("_", -1)) {
+            try {
+                ids.add(Integer.parseInt(token.trim()));
+            } catch (NumberFormatException e) {
+                log.warn("欢乐捉鱼初始技能组ID格式错误 globalId={},value={},token={}", globalId, value, token);
+            }
+        }
+        minigameFishInitialSkillGroupIds = Set.copyOf(ids);
+    }
+
     @Override
     public void initSampleCallbackCollector() {
         addInitSampleFileObserveWithCallBack(CasinoStatsSheetCfg.EXCEL_NAME, this::loadCasinoStatsSheetCfg);
@@ -1012,6 +1074,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         addInitSampleFileObserveWithCallBack(TokenShopCfg.EXCEL_NAME, this::loadTokenShopConfig);
 
         addInitSampleFileObserveWithCallBack(ChapterCfg.EXCEL_NAME, this::loadChapterConfig);
+
+        addInitSampleFileObserveWithCallBack(MinigameFishSkilCfg.EXCEL_NAME, this::loadMinigameFishSkilCfg);
     }
 
     @Override
@@ -1060,7 +1124,14 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return entry == null ? null : entry.getValue();
     }
 
-    /** 突破属性是累计值，留空的等级行沿用此前的突破属性。 */
+    public int getEmployeeMaxLevel(int employeeId) {
+        NavigableMap<Integer, EmployeeLevelCfg> levels = employeeLevelCfgMap.get(employeeId);
+        return levels == null ? 0 : levels.lastKey();
+    }
+
+    /**
+     * 突破属性是累计值，留空的等级行沿用此前的突破属性。
+     */
     public Map<Integer, Integer> getEmployeeBreakthroughStats(EmployeeLevelCfg cfg) {
         Map<Integer, Integer> stats = cfg.getBreakthroughStats();
         if (stats != null && !stats.isEmpty()) {
@@ -1085,7 +1156,9 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return getEmployeeUpgradeCost(employeeId, level, level + 1);
     }
 
-    /** 汇总从当前等级到目标等级的费用，突破材料只在离开配置等级时扣一次。 */
+    /**
+     * 汇总从当前等级到目标等级的费用，突破材料只在离开配置等级时扣一次。
+     */
     public Map<Integer, Long> getEmployeeUpgradeCost(int employeeId, int level, int targetLevel) {
         NavigableMap<Integer, EmployeeLevelCfg> levels = employeeLevelCfgMap.get(employeeId);
         if (levels == null || level < levels.firstKey() || targetLevel <= level || targetLevel > levels.lastKey()) {
@@ -1127,6 +1200,10 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
     public Map<Integer, Map<Integer, EmployeeStarCfg>> getEmployeeStarCfgMap() {
         return employeeStarCfgMap;
+    }
+
+    public int getEmployeeMaxStar(int employeeId) {
+        return employeeMaxStarMap.getOrDefault(employeeId, 0);
     }
 
     public EmployeeSkillConfigCfg getEmployeeSkillCfg(int groupId, int level) {
@@ -1674,5 +1751,26 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
             return null;
         }
         return this.employeeProfileProfessionCfgMap.get(employeeProfile);
+    }
+
+    public int employSkillMaxLevel(int skillGropId) {
+        return this.employeeSkillMaxLevelMap.getOrDefault(skillGropId, 0);
+    }
+
+    public MinigameFishSkilCfg getMinigameFishSkilCfgLevel(int groupId, int level) {
+        Map<Integer, MinigameFishSkilCfg> levels = minigameFishSkills.levels().get(groupId);
+        return levels == null ? null : levels.get(level);
+    }
+
+    public Set<Integer> getMinigameFishSkillGroupIds() {
+        return minigameFishSkills.levels().keySet();
+    }
+
+    public List<MinigameFishSkilCfg> getMinigameFishSkillPrerequisites(int configId) {
+        return minigameFishSkills.prerequisites().getOrDefault(configId, List.of());
+    }
+
+    public Set<Integer> getMinigameFishInitialSkillGroupIds() {
+        return minigameFishInitialSkillGroupIds;
     }
 }

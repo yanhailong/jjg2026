@@ -15,13 +15,14 @@ public interface MiniGameConstant {
     int GOD_GAMBLERS_QUICK_CLEAR_CHAPTER_GLOBAL_ID = 358;
     /** 赌神搓牌只有一条配置。 */
     int GOD_GAMBLERS_CONFIG_ID = 1001;
-    /** 欢乐捉鱼一键通关的章节门槛、结算积分及沙漏配置ID。 */
+    /** 欢乐捉鱼一键通关的章节门槛和结算积分。 */
     int HAPPY_HAPPY_FISH_QUICK_CLEAR_CHAPTER_GLOBAL_ID = 359;
     int HAPPY_HAPPY_FISH_QUICK_CLEAR_SCORE_GLOBAL_ID = 360;
-    int HAPPY_HAPPY_FISH_HOURGLASS_ID = 104;
     /** 飞驰快送一键通关的章节门槛和结算积分。 */
     int SPEEDY_DELIVERY_QUICK_CLEAR_CHAPTER_GLOBAL_ID = 361;
     int SPEEDY_DELIVERY_QUICK_CLEAR_SCORE_GLOBAL_ID = 362;
+    /** 欢乐捉鱼初始解锁的技能组ID。 */
+    int HAPPY_HAPPY_FISH_INITIAL_SKILLS_GLOBAL_ID = 363;
     int SPEEDY_DELIVERY_SHELF_SLOT_COUNT = 15;
 
     /**
@@ -121,5 +122,11 @@ public interface MiniGameConstant {
         int RES_STOCK_SPEEDY_DELIVERY_SHELF = BASE_MSG_PREFIX | 0x2E;
         int REQ_SPEEDY_DELIVERY_GOODS_INFO = BASE_MSG_PREFIX | 0x2F;
         int RES_SPEEDY_DELIVERY_GOODS_INFO = BASE_MSG_PREFIX | 0x30;
+
+        //欢乐捉鱼：技能查询和升级
+        int REQ_HAPPY_HAPPY_FISH_SKILLS = BASE_MSG_PREFIX | 0x31;
+        int RES_HAPPY_HAPPY_FISH_SKILLS = BASE_MSG_PREFIX | 0x32;
+        int REQ_UPGRADE_HAPPY_HAPPY_FISH_SKILL = BASE_MSG_PREFIX | 0x33;
+        int RES_UPGRADE_HAPPY_HAPPY_FISH_SKILL = BASE_MSG_PREFIX | 0x34;
     }
 }
