@@ -1,5 +1,6 @@
 package com.jjg.game.minigame.service;
 
+import com.alibaba.fastjson.JSON;
 import com.jjg.game.common.utils.TimeHelper;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
@@ -28,11 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /** 欢乐捉鱼：客户端负责操作，服务器负责单局时限、积分和道具结算。 */
 @Service
@@ -113,6 +110,7 @@ public class HappyHappyFishService {
                 .map(groupId -> new HappyHappyFishSkillInfo(groupId, data.getSkillLevel(groupId)))
                 .toList();
         res.skillPoints = data.getSkillPoints();
+        log.warn("打印捉鱼技能 playerId={},res={}",ctx.playerId(), JSON.toJSONString(res));
         return res;
     }
 
@@ -134,14 +132,12 @@ public class HappyHappyFishService {
                     ctx.playerId(), current.getId(), current.getCost());
             res.code = Code.SAMPLE_ERROR;
         } else {
-            List<MinigameFishSkilCfg> prerequisites = configCacheService.getMinigameFishSkillPrerequisites(current.getId());
+            List<MinigameFishSkilCfg> prerequisites = configCacheService.getMinigameFishSkillPrerequisites(groupId);
             Set<Integer> initialGroups = configCacheService.getMinigameFishInitialSkillGroupIds();
-            boolean canUpgrade = level == 0 && initialGroups.contains(groupId);
-            if (!canUpgrade) {
-                canUpgrade = prerequisites.isEmpty() ? level > 0 : prerequisites.stream().anyMatch(source ->
+            boolean canUpgrade = level > 0 || initialGroups.contains(groupId)
+                    || prerequisites.stream().anyMatch(source ->
                         data.getSkillLevel(source.getGroupId()) == source.getLevel()
                                 && (source.getLevel() > 0 || initialGroups.contains(source.getGroupId())));
-            }
             if (!canUpgrade) {
                 log.warn("欢乐捉鱼升级失败，技能未解锁 playerId={},groupId={},skillId={},level={},levels={},prerequisiteIds={}",
                         ctx.playerId(), groupId, current.getId(), level, data.getSkillLevels(),

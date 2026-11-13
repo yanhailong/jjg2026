@@ -1002,8 +1002,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         for (MinigameFishSkilCfg cfg : GameDataManager.getMinigameFishSkilCfgList()) {
             levels.computeIfAbsent(cfg.getGroupId(), k -> new HashMap<>()).put(cfg.getLevel(), cfg);
             if (cfg.getLinkedSkillID() != null) {
-                for (int targetId : cfg.getLinkedSkillID()) {
-                    prerequisites.computeIfAbsent(targetId, k -> new ArrayList<>()).add(cfg);
+                for (int targetGroupId : cfg.getLinkedSkillID()) {
+                    prerequisites.computeIfAbsent(targetGroupId, k -> new ArrayList<>()).add(cfg);
                 }
             }
         }
@@ -1766,8 +1766,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return minigameFishSkills.levels().keySet();
     }
 
-    public List<MinigameFishSkilCfg> getMinigameFishSkillPrerequisites(int configId) {
-        return minigameFishSkills.prerequisites().getOrDefault(configId, List.of());
+    public List<MinigameFishSkilCfg> getMinigameFishSkillPrerequisites(int groupId) {
+        return minigameFishSkills.prerequisites().getOrDefault(groupId, List.of());
     }
 
     public Set<Integer> getMinigameFishInitialSkillGroupIds() {
