@@ -13,4 +13,6 @@ public class ReqChapterLightGird extends AbstractMessage {
     public int levelId;
     @ProtoDesc("格子下标")
     public int girdIndex;
+    @ProtoDesc("是否完成拼图")
+    public boolean finishPuzzle;
 }

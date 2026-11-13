@@ -7,11 +7,11 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
-import com.jjg.game.core.pb.KVLongInfo;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
+import com.jjg.game.sim.constant.BuildingOutputType;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.dao.SimEmployeeDao;
 import com.jjg.game.sim.data.SimEmployeeData;
@@ -20,6 +20,7 @@ import com.jjg.game.sim.listener.SimTaskStateReporter;
 import com.jjg.game.sim.pb.res.*;
 import com.jjg.game.sim.pb.struct.EmployDetailInfo;
 import com.jjg.game.sim.pb.struct.EmployeeSkillInfo;
+import com.jjg.game.sim.pb.struct.OutputAttributsInfo;
 import com.jjg.game.sim.pb.struct.RecruitItemInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -273,16 +274,21 @@ public class SimEmployeeService implements SimTaskStateReporter {
         ctx.send(res);
     }
 
-    /**
-     * 重置雇员等级，返还本轮升级实际扣除的道具。
-     */
     public ResResetEmployeeLevel resetEmployeeLevel(SimPlayerContext ctx, int employeeId) {
+        return resetEmployeeLevel(ctx, employeeId, false);
+    }
+
+    /**
+     * 预览或执行雇员等级重置，按本轮升级实际扣除的道具计算返还。
+     */
+    public ResResetEmployeeLevel resetEmployeeLevel(SimPlayerContext ctx, int employeeId, boolean preview) {
         ResResetEmployeeLevel res = new ResResetEmployeeLevel(Code.SUCCESS);
         res.employeeId = employeeId;
         try {
             SimEmployeeData data = ctx.getEmployee(employeeId);
             if (data == null) {
-                log.warn("重置雇员等级失败, 雇员未解锁 playerId={},employeeId={}", ctx.playerId(), employeeId);
+                log.warn("重置雇员等级失败, 雇员未解锁 playerId={},employeeId={},preview={}",
+                        ctx.playerId(), employeeId, preview);
                 res.code = Code.NOT_FOUND;
                 return res;
             }
@@ -293,15 +299,16 @@ public class SimEmployeeService implements SimTaskStateReporter {
             }
 
             Map<Integer, Long> refund = data.getLevelUpCost();
-            if (!refund.isEmpty()) {
-                for (int itemId : refund.keySet()) {
-                    if (GameDataManager.getItemCfg(itemId) == null) {
-                        log.error("重置雇员等级失败, 缺少返还道具配置 playerId={},employeeId={},level={},itemId={},count={}",
-                                ctx.playerId(), employeeId, level, itemId, refund.get(itemId));
-                        res.code = Code.NOT_FOUND;
-                        return res;
-                    }
+            for (int itemId : refund.keySet()) {
+                if (GameDataManager.getItemCfg(itemId) == null) {
+                    log.error("重置雇员等级失败, 缺少返还道具配置 playerId={},employeeId={},preview={},level={},itemId={},count={}",
+                            ctx.playerId(), employeeId, preview, level, itemId, refund.get(itemId));
+                    res.code = Code.NOT_FOUND;
+                    return res;
                 }
+            }
+            var refundItems = ItemUtils.buildItemInfo(refund);
+            if (!preview && !refund.isEmpty()) {
                 CommonResult<ItemOperationResult> added = playerPackService.addItems(ctx.playerId(), refund,
                         AddType.SIM_EMPLOYEE_LEVEL_RESET, "employeeId=" + employeeId);
                 if (!added.success()) {
@@ -312,10 +319,14 @@ public class SimEmployeeService implements SimTaskStateReporter {
                 }
             }
 
+            res.level = INITIAL_LEVEL;
+            res.refundItems = refundItems;
+            if (preview) {
+                return res;
+            }
+
             data.setLevel(INITIAL_LEVEL);
             data.clearLevelUpCost();
-            res.level = INITIAL_LEVEL;
-            res.refundItems = ItemUtils.buildItemInfo(refund);
             ctx.setEmployeeRedDotDirty(true);
             int maxLevel = ctx.getEmployeeMap().values().stream().mapToInt(SimEmployeeData::getLevel)
                     .max().orElse(INITIAL_LEVEL);
@@ -326,7 +337,7 @@ public class SimEmployeeService implements SimTaskStateReporter {
             log.info("重置雇员等级成功 playerId={},employeeId={},level={},refund={}",
                     ctx.playerId(), employeeId, level, refund);
         } catch (Exception e) {
-            log.error("重置雇员等级异常 playerId={},employeeId={}", ctx.playerId(), employeeId, e);
+            log.error("重置雇员等级异常 playerId={},employeeId={},preview={}", ctx.playerId(), employeeId, preview, e);
             res.code = Code.EXCEPTION;
         }
         return res;
@@ -700,15 +711,30 @@ public class SimEmployeeService implements SimTaskStateReporter {
         info.maxStar = configCache.getEmployeeMaxStar(info.id);
         info.manager = ctx.getCurrentCasino().employIsManager(data.getEmployeeId());
         info.combatPower = snapshot.combatPower(data.getEmployeeId());
-        info.attributes = new ArrayList<>();
-        snapshot.attributes(data.getEmployeeId()).forEach((type, value) ->
-                info.attributes.add(new KVLongInfo(type.getCode(), value)));
-        info.attributes.sort(Comparator.comparingInt(attribute -> attribute.key));
         info.skills = skillInfos(data);
 
-        EmployeeProfileCfg employeeProfileCfg = GameDataManager.getEmployeeProfileCfg(data.getEmployeeId());
-        if (employeeProfileCfg != null) {
-            info.professionID = employeeProfileCfg.getProfessionID();
+        Integer profession = snapshot.profession(info.id);
+        info.attributes = List.of();
+        if (profession != null) {
+            info.professionID = profession;
+            var current = snapshot.attributes(info.id);
+            var preview = attributeService.preview(ctx, data, snapshot, info.professionID, info.maxLevel);
+            var types = EnumSet.noneOf(BuildingOutputType.class);
+            types.addAll(current.keySet());
+            types.addAll(preview.nextStar().keySet());
+            types.addAll(preview.nextLevel().keySet());
+            types.addAll(preview.nextTenLevels().keySet());
+            info.attributes = new ArrayList<>(types.size());
+            for (BuildingOutputType type : types) {
+                OutputAttributsInfo attribute = new OutputAttributsInfo();
+                attribute.key = type.getCode();
+                attribute.currentValue = current.getOrDefault(type, 0L);
+                attribute.nextStarValue = preview.nextStar().getOrDefault(type, 0L);
+                attribute.nextLevelValue = preview.nextLevel().getOrDefault(type, 0L);
+                attribute.nextTenLevelValue = preview.nextTenLevels().getOrDefault(type, 0L);
+                info.attributes.add(attribute);
+            }
+            info.attributes.sort(Comparator.comparingInt(attribute -> attribute.key));
         }
         return info;
     }

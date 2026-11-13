@@ -14,6 +14,4 @@ public class EmployeeSkillInfo {
     public int configId;
     @ProtoDesc("最大等级")
     public int maxLevel;
-    @ProtoDesc("多少星级解锁该技能")
-    public int unlockStar;
 }

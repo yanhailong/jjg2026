@@ -1,7 +1,7 @@
 package com.jjg.game.sim.service;
 
-import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.base.condition.numeric.ActionConditionEvent;
+import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
@@ -74,6 +74,7 @@ public class SimChapterService {
         res.chapterId = simConfigCacheService.getLevelIdByChapterId(chapterLevelId);
         res.girdIndex = ctx.getSimChapterData().getGirdIndex();
         res.girdLightCount = ctx.getSimChapterData().getGirdLightCount();
+        res.finishPuzzle = ctx.getSimChapterData().isFinishPuzzle();
 
         int nextChapterLevelId = simConfigCacheService.getNextChapterLevelId(res.levelId);
         ChapterLevelCfg chapterLevelCfg = GameDataManager.getChapterLevelCfg(nextChapterLevelId);
@@ -159,6 +160,7 @@ public class SimChapterService {
         ctx.getSimChapterData().setLevelId(levelId);
         ctx.getSimChapterData().setGirdIndex(0);
         ctx.getSimChapterData().setGirdLightCount(0);
+        ctx.getSimChapterData().setFinishPuzzle(false);
         simTaskService.onConditionEvent(ctx, new ActionConditionEvent(ActionConditionEvent.Type.CHAPTER_LEVEL,
                 0, 0, levelId, 0, 0, false));
         return res;
@@ -171,7 +173,7 @@ public class SimChapterService {
      * @param levelId
      * @return
      */
-    public ResChapterLightGird lightGird(SimPlayerContext ctx, int levelId, int girdIndex) {
+    public ResChapterLightGird lightGird(SimPlayerContext ctx, int levelId, int girdIndex, boolean finishPuzzle) {
         ResChapterLightGird res = new ResChapterLightGird(Code.SUCCESS);
         if (ctx.getSimChapterData() == null) {
             res.code = Code.NOT_FOUND;
@@ -200,50 +202,54 @@ public class SimChapterService {
             return res;
         }
 
-        if (ctx.getSimBaseData().getAllLevel() < chapterLevelCfg.getLevelLimit()) {
-            log.warn("点亮格子时等级不足 playerId={},levelId={}，simLevel={}", ctx.playerId(), levelId, ctx.getSimBaseData().getAllLevel());
-            res.code = Code.LEVEL_NOT_ENOUGH;
-            return res;
-        }
-
         if (chapterLevelCfg.getLevelType() != 2) {
             res.code = Code.PARAM_ERROR;
             return res;
         }
 
-        int allGirdLen = chapterLevelCfg.getSpecification().get(0) * chapterLevelCfg.getSpecification().get(1);
-        if (girdIndex < 0 || girdIndex >= allGirdLen) {
-            log.warn("点亮格子时格子下标错误 playerId={},levelId={},girdIndex={},allGirdLen={}", ctx.playerId(), levelId, girdIndex, allGirdLen);
-            res.code = Code.PARAM_ERROR;
-            return res;
-        }
-
-        int expectedGirdIndex = ctx.getSimChapterData().getGirdIndex();
-        int girdLightCount = ctx.getSimChapterData().getGirdLightCount();
-        if (girdLightCount >= chapterLevelCfg.getNumOperations()) {
-            expectedGirdIndex = ctx.getSimChapterData().getGirdIndex() + 1;
-            girdLightCount = 0;
-        }
-        if (girdIndex != expectedGirdIndex) {
-            log.warn("点亮格子时格子顺序错误 playerId={},levelId={},girdIndex={},expectedGirdIndex={}", ctx.playerId(), levelId, girdIndex, expectedGirdIndex);
-            res.code = Code.PARAM_ERROR;
-            return res;
-        }
-
-        if (chapterLevelCfg.getConsumableItems() != null && !chapterLevelCfg.getConsumableItems().isEmpty()) {
-            CommonResult<ItemOperationResult> removeResult = playerPackService.removeItem(ctx.getPlayer(), ItemUtils.buildItems(chapterLevelCfg.getConsumableItems()), AddType.SIM_CHAPTER_LIGHT_GIRD);
-            if (!removeResult.success()) {
-                log.warn("点亮格子时扣除道具失败 playerId={},levelId={},girdIndex={},code={}", ctx.playerId(), levelId, girdIndex, removeResult.code);
-                res.code = removeResult.code;
+        if(finishPuzzle){
+            ctx.getSimChapterData().setFinishPuzzle(finishPuzzle);
+        }else {
+            if (ctx.getSimBaseData().getAllLevel() < chapterLevelCfg.getLevelLimit()) {
+                log.warn("点亮格子时等级不足 playerId={},levelId={}，simLevel={}", ctx.playerId(), levelId, ctx.getSimBaseData().getAllLevel());
+                res.code = Code.LEVEL_NOT_ENOUGH;
                 return res;
             }
-        }
-        if (chapterLevelCfg.getRewardProps() != null && !chapterLevelCfg.getRewardProps().isEmpty()) {
-            playerPackService.addItems(ctx.playerId(), chapterLevelCfg.getRewardProps(), AddType.SIM_CHAPTER_LIGHT_GIRD, true);
-        }
 
-        ctx.getSimChapterData().setGirdIndex(girdIndex);
-        ctx.getSimChapterData().setGirdLightCount(girdLightCount + 1);
+            int allGirdLen = chapterLevelCfg.getSpecification().get(0) * chapterLevelCfg.getSpecification().get(1);
+            if (girdIndex < 0 || girdIndex >= allGirdLen) {
+                log.warn("点亮格子时格子下标错误 playerId={},levelId={},girdIndex={},allGirdLen={}", ctx.playerId(), levelId, girdIndex, allGirdLen);
+                res.code = Code.PARAM_ERROR;
+                return res;
+            }
+
+            int expectedGirdIndex = ctx.getSimChapterData().getGirdIndex();
+            int girdLightCount = ctx.getSimChapterData().getGirdLightCount();
+            if (girdLightCount >= chapterLevelCfg.getNumOperations()) {
+                expectedGirdIndex = ctx.getSimChapterData().getGirdIndex() + 1;
+                girdLightCount = 0;
+            }
+            if (girdIndex != expectedGirdIndex) {
+                log.warn("点亮格子时格子顺序错误 playerId={},levelId={},girdIndex={},expectedGirdIndex={}", ctx.playerId(), levelId, girdIndex, expectedGirdIndex);
+                res.code = Code.PARAM_ERROR;
+                return res;
+            }
+
+            if (chapterLevelCfg.getConsumableItems() != null && !chapterLevelCfg.getConsumableItems().isEmpty()) {
+                CommonResult<ItemOperationResult> removeResult = playerPackService.removeItem(ctx.getPlayer(), ItemUtils.buildItems(chapterLevelCfg.getConsumableItems()), AddType.SIM_CHAPTER_LIGHT_GIRD);
+                if (!removeResult.success()) {
+                    log.warn("点亮格子时扣除道具失败 playerId={},levelId={},girdIndex={},code={}", ctx.playerId(), levelId, girdIndex, removeResult.code);
+                    res.code = removeResult.code;
+                    return res;
+                }
+            }
+            if (chapterLevelCfg.getRewardProps() != null && !chapterLevelCfg.getRewardProps().isEmpty()) {
+                playerPackService.addItems(ctx.playerId(), chapterLevelCfg.getRewardProps(), AddType.SIM_CHAPTER_LIGHT_GIRD, true);
+            }
+
+            ctx.getSimChapterData().setGirdIndex(girdIndex);
+            ctx.getSimChapterData().setGirdLightCount(girdLightCount + 1);
+        }
         return res;
     }
 }

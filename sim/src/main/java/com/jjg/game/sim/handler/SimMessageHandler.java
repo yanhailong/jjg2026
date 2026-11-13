@@ -127,7 +127,7 @@ public class SimMessageHandler implements GmListener {
     }
 
     private <T extends AbstractResponse> T executeTokenShop(PlayerController pc, Function<SimPlayerContext, T> local,
-                                                           Supplier<T> remote, IntFunction<T> error) {
+                                                            Supplier<T> remote, IntFunction<T> error) {
         try {
             SimPlayerContext ctx = simPlayerContextRegistry.getContext(pc.playerId());
             if (ctx != null) {
@@ -639,7 +639,7 @@ public class SimMessageHandler implements GmListener {
 
     @Command(SimConstant.MsgBean.REQ_RESET_EMPLOYEE_LEVEL)
     public void reqResetEmployeeLevel(PlayerController playerController, ReqResetEmployeeLevel req) {
-        execute(playerController, ctx -> ctx.send(employeeService.resetEmployeeLevel(ctx, req.employeeId)),
+        execute(playerController, ctx -> ctx.send(employeeService.resetEmployeeLevel(ctx, req.employeeId, req.preview)),
                 ReqResetEmployeeLevel.class);
     }
 
@@ -664,6 +664,7 @@ public class SimMessageHandler implements GmListener {
 
     /**
      * 兑换升星碎片
+     *
      * @param playerController
      * @param req
      */
@@ -1312,7 +1313,7 @@ public class SimMessageHandler implements GmListener {
      */
     @Command(SimConstant.MsgBean.REQ_CHAPTER_LIGHT_GIRD)
     public void reqChapterLightGird(PlayerController playerController, ReqChapterLightGird req) {
-        execute(playerController, ctx -> ctx.send(simChapterService.lightGird(ctx, req.levelId, req.girdIndex)),
+        execute(playerController, ctx -> ctx.send(simChapterService.lightGird(ctx, req.levelId, req.girdIndex, req.finishPuzzle)),
                 ResChapterLightGird.class);
     }
 

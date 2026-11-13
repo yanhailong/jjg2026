@@ -11,4 +11,6 @@ import com.jjg.game.sim.constant.SimConstant;
 public class ReqResetEmployeeLevel extends AbstractMessage {
     @ProtoDesc("雇员id")
     public int employeeId;
+    @ProtoDesc("是否仅预览重置结果")
+    public boolean preview;
 }

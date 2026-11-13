@@ -1129,6 +1129,25 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return levels == null ? 0 : levels.lastKey();
     }
 
+    /** 十级预览停在途中的首个突破门槛；已站在门槛时，从该等级继续向后预览。 */
+    int getEmployeeTenLevelPreviewTarget(int employeeId, int level, int levelLimit) {
+        int target = Math.min(level + 10, levelLimit);
+        if (target <= level) {
+            return level;
+        }
+        NavigableMap<Integer, EmployeeLevelCfg> levels = employeeLevelCfgMap.get(employeeId);
+        if (levels == null) {
+            return level;
+        }
+        for (EmployeeLevelCfg cfg : levels.subMap(level, false, target, false).values()) {
+            Map<Integer, Long> materials = cfg.getBreakthroughMaterials();
+            if (materials != null && !materials.isEmpty()) {
+                return cfg.getLevel();
+            }
+        }
+        return target;
+    }
+
     /**
      * 突破属性是累计值，留空的等级行沿用此前的突破属性。
      */

@@ -13,6 +13,8 @@ public class SimChapterData extends AbstractData {
     private int girdIndex;
     //该格子已经点击次数
     private int girdLightCount;
+    //是否完成拼图
+    private boolean finishPuzzle;
 
     public long getPlayerId() {
         return playerId;
@@ -44,5 +46,13 @@ public class SimChapterData extends AbstractData {
 
     public void setGirdLightCount(int girdLightCount) {
         this.girdLightCount = girdLightCount;
+    }
+
+    public boolean isFinishPuzzle() {
+        return finishPuzzle;
+    }
+
+    public void setFinishPuzzle(boolean finishPuzzle) {
+        this.finishPuzzle = finishPuzzle;
     }
 }

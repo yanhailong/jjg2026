@@ -20,6 +20,8 @@ public class ResChapterInfo extends AbstractResponse {
     public int girdLightCount;
     @ProtoDesc("pk信息，没有pk环节的时候该值为空")
     public ChapterPKInfo chapterPKInfo;
+    @ProtoDesc("是否完成拼图")
+    public boolean finishPuzzle;
 
     public ResChapterInfo(int code) {
         super(code);
