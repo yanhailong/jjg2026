@@ -17,6 +17,7 @@ import com.jjg.game.core.data.Item;
 import com.jjg.game.core.listener.ConfigExcelChangeListener;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.minigame.constant.MiniGameConstant;
+import com.jjg.game.minigame.data.MiniGameSkillTree;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
 import com.jjg.game.sim.constant.BuildingOutputType;
@@ -186,13 +187,9 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private Map<Integer, Integer> levelToChapterIdMap = null;
     private List<Integer> allChapterLevels = null;
 
-    //捕鱼技能
-    private volatile MinigameFishSkills minigameFishSkills = new MinigameFishSkills(Map.of(), Map.of());
+    private volatile MiniGameSkillTree<MinigameFishSkilCfg> minigameFishSkills = fishSkillTree(List.of());
     private volatile Set<Integer> minigameFishInitialSkillGroupIds = Set.of();
-
-    private record MinigameFishSkills(Map<Integer, Map<Integer, MinigameFishSkilCfg>> levels,
-                                     Map<Integer, List<MinigameFishSkilCfg>> prerequisites) {
-    }
+    private volatile MiniGameSkillTree<MinigameSpeedySkilCfg> minigameSpeedySkills = speedySkillTree(List.of());
 
     @Autowired
     public SimConfigCacheService(ConditionRuleRegistry conditionRules,
@@ -248,6 +245,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         loadChapterConfig();
 
         loadMinigameFishSkilCfg();
+        loadMinigameSpeedySkilCfg();
     }
 
     /**
@@ -997,18 +995,21 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     }
 
     private void loadMinigameFishSkilCfg() {
-        Map<Integer, Map<Integer, MinigameFishSkilCfg>> levels = new HashMap<>();
-        Map<Integer, List<MinigameFishSkilCfg>> prerequisites = new HashMap<>();
-        for (MinigameFishSkilCfg cfg : GameDataManager.getMinigameFishSkilCfgList()) {
-            levels.computeIfAbsent(cfg.getGroupId(), k -> new HashMap<>()).put(cfg.getLevel(), cfg);
-            if (cfg.getLinkedSkillID() != null) {
-                for (int targetGroupId : cfg.getLinkedSkillID()) {
-                    prerequisites.computeIfAbsent(targetGroupId, k -> new ArrayList<>()).add(cfg);
-                }
-            }
-        }
-        prerequisites.replaceAll((id, sources) -> List.copyOf(sources));
-        this.minigameFishSkills = new MinigameFishSkills(Map.copyOf(levels), Map.copyOf(prerequisites));
+        minigameFishSkills = fishSkillTree(GameDataManager.getMinigameFishSkilCfgList());
+    }
+
+    private static MiniGameSkillTree<MinigameFishSkilCfg> fishSkillTree(List<MinigameFishSkilCfg> rows) {
+        return new MiniGameSkillTree<>("欢乐捉鱼", rows, MinigameFishSkilCfg::getGroupId,
+                MinigameFishSkilCfg::getLevel, MinigameFishSkilCfg::getCost, MinigameFishSkilCfg::getLinkedSkillID);
+    }
+
+    private void loadMinigameSpeedySkilCfg() {
+        minigameSpeedySkills = speedySkillTree(GameDataManager.getMinigameSpeedySkilCfgList());
+    }
+
+    private static MiniGameSkillTree<MinigameSpeedySkilCfg> speedySkillTree(List<MinigameSpeedySkilCfg> rows) {
+        return new MiniGameSkillTree<>("飞驰快送", rows, MinigameSpeedySkilCfg::getGroupId,
+                MinigameSpeedySkilCfg::getLevel, MinigameSpeedySkilCfg::getCost, MinigameSpeedySkilCfg::getLinkedSkillID);
     }
 
     private void loadMinigameFishInitialSkillGroupIds() {
@@ -1076,6 +1077,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         addInitSampleFileObserveWithCallBack(ChapterCfg.EXCEL_NAME, this::loadChapterConfig);
 
         addInitSampleFileObserveWithCallBack(MinigameFishSkilCfg.EXCEL_NAME, this::loadMinigameFishSkilCfg);
+        addInitSampleFileObserveWithCallBack(MinigameSpeedySkilCfg.EXCEL_NAME, this::loadMinigameSpeedySkilCfg);
     }
 
     @Override
@@ -1776,20 +1778,15 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
         return this.employeeSkillMaxLevelMap.getOrDefault(skillGropId, 0);
     }
 
-    public MinigameFishSkilCfg getMinigameFishSkilCfgLevel(int groupId, int level) {
-        Map<Integer, MinigameFishSkilCfg> levels = minigameFishSkills.levels().get(groupId);
-        return levels == null ? null : levels.get(level);
-    }
-
-    public Set<Integer> getMinigameFishSkillGroupIds() {
-        return minigameFishSkills.levels().keySet();
-    }
-
-    public List<MinigameFishSkilCfg> getMinigameFishSkillPrerequisites(int groupId) {
-        return minigameFishSkills.prerequisites().getOrDefault(groupId, List.of());
+    public MiniGameSkillTree<MinigameFishSkilCfg> getMinigameFishSkills() {
+        return minigameFishSkills;
     }
 
     public Set<Integer> getMinigameFishInitialSkillGroupIds() {
         return minigameFishInitialSkillGroupIds;
+    }
+
+    public MiniGameSkillTree<MinigameSpeedySkilCfg> getMinigameSpeedySkills() {
+        return minigameSpeedySkills;
     }
 }

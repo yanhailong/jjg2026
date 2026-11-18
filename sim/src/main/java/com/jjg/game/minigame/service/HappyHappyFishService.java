@@ -14,6 +14,8 @@ import com.jjg.game.minigame.constant.MiniGameConstant.RoundState;
 import com.jjg.game.minigame.dao.HappyHappyFishDao;
 import com.jjg.game.minigame.data.HappyHappyFishData;
 import com.jjg.game.minigame.data.HappyHappyFishRound;
+import com.jjg.game.minigame.data.MiniGameSkillEffect;
+import com.jjg.game.minigame.data.MiniGameSkillTree;
 import com.jjg.game.minigame.pb.res.*;
 import com.jjg.game.minigame.pb.struct.HappyHappyFishSkillInfo;
 import com.jjg.game.sampledata.GameDataManager;
@@ -105,8 +107,7 @@ public class HappyHappyFishService {
     public ResHappyHappyFishSkills skills(SimPlayerContext ctx) {
         HappyHappyFishData data = getData(ctx);
         ResHappyHappyFishSkills res = new ResHappyHappyFishSkills(Code.SUCCESS);
-        res.skills = configCacheService.getMinigameFishSkillGroupIds().stream()
-                .sorted()
+        res.skills = configCacheService.getMinigameFishSkills().groupIds().stream()
                 .map(groupId -> new HappyHappyFishSkillInfo(groupId, data.getSkillLevel(groupId)))
                 .toList();
         res.skillPoints = data.getSkillPoints();
@@ -117,44 +118,16 @@ public class HappyHappyFishService {
     public ResUpgradeHappyHappyFishSkill upgradeSkill(SimPlayerContext ctx, int groupId) {
         HappyHappyFishData data = getData(ctx);
         int level = data.getSkillLevel(groupId);
-        ResUpgradeHappyHappyFishSkill res = new ResUpgradeHappyHappyFishSkill(Code.SUCCESS);
+        MiniGameSkillTree.Upgrade upgrade = configCacheService.getMinigameFishSkills().checkUpgrade(ctx.playerId(),
+                groupId, data.getSkillLevels(), data.getSkillPoints(), configCacheService.getMinigameFishInitialSkillGroupIds()::contains);
+        if (upgrade.code() == Code.SUCCESS) {
+            data.setSkillPoints(data.getSkillPoints() - upgrade.cost());
+            data.getSkillLevels().put(groupId, ++level);
+            autoSaveService.enqueueSave(data);
+        }
+        ResUpgradeHappyHappyFishSkill res = new ResUpgradeHappyHappyFishSkill(upgrade.code());
         res.skill = new HappyHappyFishSkillInfo(groupId, level);
         res.skillPoints = data.getSkillPoints();
-        MinigameFishSkilCfg current = configCacheService.getMinigameFishSkilCfgLevel(groupId, level);
-        if (current == null) {
-            log.warn("欢乐捉鱼升级失败，缺少当前等级配置 playerId={},groupId={},level={}", ctx.playerId(), groupId, level);
-            res.code = level == 0 ? Code.PARAM_ERROR : Code.SAMPLE_ERROR;
-        } else if (configCacheService.getMinigameFishSkilCfgLevel(groupId, level + 1) == null) {
-            log.warn("欢乐捉鱼升级失败，已达配置等级上限 playerId={},groupId={},level={}", ctx.playerId(), groupId, level);
-            res.code = Code.LEVEL_MAX;
-        } else if (current.getCost() < 0) {
-            log.warn("欢乐捉鱼升级失败，费用配置为负数 playerId={},skillId={},cost={}",
-                    ctx.playerId(), current.getId(), current.getCost());
-            res.code = Code.SAMPLE_ERROR;
-        } else {
-            List<MinigameFishSkilCfg> prerequisites = configCacheService.getMinigameFishSkillPrerequisites(groupId);
-            Set<Integer> initialGroups = configCacheService.getMinigameFishInitialSkillGroupIds();
-            boolean canUpgrade = level > 0 || initialGroups.contains(groupId)
-                    || prerequisites.stream().anyMatch(source ->
-                        data.getSkillLevel(source.getGroupId()) == source.getLevel()
-                                && (source.getLevel() > 0 || initialGroups.contains(source.getGroupId())));
-            if (!canUpgrade) {
-                log.warn("欢乐捉鱼升级失败，技能未解锁 playerId={},groupId={},skillId={},level={},levels={},prerequisiteIds={}",
-                        ctx.playerId(), groupId, current.getId(), level, data.getSkillLevels(),
-                        prerequisites.stream().map(MinigameFishSkilCfg::getId).toList());
-                res.code = Code.NOT_UNLOCKED;
-            } else if (data.getSkillPoints() < current.getCost()) {
-                log.warn("欢乐捉鱼升级失败，积分不足 playerId={},skillId={},skillPoints={},cost={}",
-                        ctx.playerId(), current.getId(), data.getSkillPoints(), current.getCost());
-                res.code = Code.NOT_ENOUGH;
-            } else {
-                data.setSkillPoints(data.getSkillPoints() - current.getCost());
-                data.getSkillLevels().put(groupId, level + 1);
-                autoSaveService.enqueueSave(data);
-                res.skill.level = level + 1;
-                res.skillPoints = data.getSkillPoints();
-            }
-        }
         return res;
     }
 
@@ -323,8 +296,9 @@ public class HappyHappyFishService {
     private long applySkillEffects(HappyHappyFishData data, HappyHappyFishRound round, long baseDuration) {
         long flatSeconds = 0;
         long permille = 0;
+        var skillTree = configCacheService.getMinigameFishSkills();
         for (var skill : data.getSkillLevels().entrySet()) {
-            MinigameFishSkilCfg cfg = configCacheService.getMinigameFishSkilCfgLevel(skill.getKey(), skill.getValue());
+            MinigameFishSkilCfg cfg = skillTree.levelConfig(skill.getKey(), skill.getValue());
             if (cfg == null) {
                 log.warn("欢乐捉鱼开局缺少已升级技能配置 playerId={},groupId={},level={}",
                         data.getPlayerId(), skill.getKey(), skill.getValue());
@@ -342,7 +316,7 @@ public class HappyHappyFishService {
                 }
             }
         }
-        return baseDuration + flatSeconds * 1000 + HappyHappyFishRound.scaleByPermille(baseDuration, permille);
+        return baseDuration + flatSeconds * 1000 + MiniGameSkillEffect.scaleByPermille(baseDuration, permille);
     }
 
     private int checkRound(HappyHappyFishRound round, long roundId) {

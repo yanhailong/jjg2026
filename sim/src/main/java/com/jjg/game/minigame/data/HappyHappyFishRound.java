@@ -1,6 +1,5 @@
 package com.jjg.game.minigame.data;
 
-import com.jjg.game.core.constant.GameConstant;
 import com.jjg.game.minigame.constant.MiniGameConstant.RoundState;
 
 import java.util.HashMap;
@@ -50,12 +49,7 @@ public class HappyHappyFishRound {
             flat += scoreFlat[index];
             permille += scorePermille[index];
         }
-        return baseScore + flat + scaleByPermille(baseScore, permille);
-    }
-
-    public static long scaleByPermille(long base, long permille) {
-        return base * (permille / GameConstant.TEN_THOUSAND)
-                + base * (permille % GameConstant.TEN_THOUSAND) / GameConstant.TEN_THOUSAND;
+        return baseScore + flat + MiniGameSkillEffect.scaleByPermille(baseScore, permille);
     }
 
     public long getRoundId() {

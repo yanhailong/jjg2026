@@ -32,6 +32,8 @@ import com.jjg.game.minigame.pb.req.ReqEndSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.req.ReqQuickClearSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.req.ReqSpeedyDeliveryGoodsInfo;
 import com.jjg.game.minigame.pb.req.ReqStockSpeedyDeliveryShelf;
+import com.jjg.game.minigame.pb.req.ReqSpeedyDeliverySkills;
+import com.jjg.game.minigame.pb.req.ReqUpgradeSpeedyDeliverySkill;
 import com.jjg.game.minigame.pb.res.ResCheaterHuntGameInfo;
 import com.jjg.game.minigame.pb.res.ResEnterCheaterHuntGame;
 import com.jjg.game.minigame.pb.res.ResExitCheaterHuntGame;
@@ -58,6 +60,8 @@ import com.jjg.game.minigame.pb.res.ResEndSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.res.ResQuickClearSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.res.ResSpeedyDeliveryGoodsInfo;
 import com.jjg.game.minigame.pb.res.ResStockSpeedyDeliveryShelf;
+import com.jjg.game.minigame.pb.res.ResSpeedyDeliverySkills;
+import com.jjg.game.minigame.pb.res.ResUpgradeSpeedyDeliverySkill;
 import com.jjg.game.minigame.service.SimMiniGameService;
 import com.jjg.game.minigame.service.GodGamblersService;
 import com.jjg.game.minigame.service.HappyHappyFishService;
@@ -389,5 +393,27 @@ public class SimMiniGameHandler {
             return;
         }
         ctx.send(speedyDeliveryService.goodsInfo(ctx, req.type));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_SPEEDY_DELIVERY_SKILLS)
+    public void reqSpeedyDeliverySkills(PlayerController playerController, ReqSpeedyDeliverySkills req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            log.warn("查询飞驰快送技能失败，玩家会话不存在 playerId={}", playerController.playerId());
+            playerController.send(new ResSpeedyDeliverySkills(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.skills(ctx));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_UPGRADE_SPEEDY_DELIVERY_SKILL)
+    public void reqUpgradeSpeedyDeliverySkill(PlayerController playerController, ReqUpgradeSpeedyDeliverySkill req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            log.warn("升级飞驰快送技能失败，玩家会话不存在 playerId={},groupId={}", playerController.playerId(), req.groupId);
+            playerController.send(new ResUpgradeSpeedyDeliverySkill(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.upgradeSkill(ctx, req.groupId));
     }
 }

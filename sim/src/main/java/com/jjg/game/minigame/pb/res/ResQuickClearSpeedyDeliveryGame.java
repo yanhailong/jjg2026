@@ -16,6 +16,8 @@ public class ResQuickClearSpeedyDeliveryGame extends AbstractResponse {
     public int score;
     @ProtoDesc("结算奖励；发奖失败重试本协议不重复扣费")
     public List<ItemInfo> rewards;
+    @ProtoDesc("结算后的可用技能积分")
+    public long skillPoints;
 
     public ResQuickClearSpeedyDeliveryGame(int code) {
         super(code);

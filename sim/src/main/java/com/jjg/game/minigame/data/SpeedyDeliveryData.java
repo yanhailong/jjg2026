@@ -9,12 +9,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 持久化每日补足日期及退出时的仓库、货架库存，单局不落库。 */
+/** 持久化每日补足日期、技能进度及退出时的仓库和货架库存。 */
 @Document
 public class SpeedyDeliveryData extends AbstractData {
     @Id
     private long playerId;
     private long lastDailyGrantTime;
+    private long skillPoints;
+    private Map<Integer, Integer> skillLevels = Map.of();
     //送到的货物，仓库的货物 Minigamegoods.id -> 数量
     private Map<Integer, Integer> houseGoods;
     //上架的货物 Minigamegoods.type -> 格子id -> [商品id, 数量]
@@ -40,6 +42,29 @@ public class SpeedyDeliveryData extends AbstractData {
 
     public void setLastDailyGrantTime(long lastDailyGrantTime) {
         this.lastDailyGrantTime = lastDailyGrantTime;
+    }
+
+    public long getSkillPoints() {
+        return skillPoints;
+    }
+
+    public void setSkillPoints(long skillPoints) {
+        this.skillPoints = skillPoints;
+    }
+
+    public Map<Integer, Integer> getSkillLevels() {
+        return skillLevels;
+    }
+
+    public int getSkillLevel(int groupId) {
+        return skillLevels.getOrDefault(groupId, 0);
+    }
+
+    public void setSkillLevel(int groupId, int level) {
+        if (skillLevels.isEmpty()) {
+            skillLevels = new HashMap<>();
+        }
+        skillLevels.put(groupId, level);
     }
 
     public Map<Integer, Integer> getHouseGoods() {

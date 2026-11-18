@@ -203,6 +203,7 @@ public class GameDataManager {
     containerMap.put(MinigameGodofGamblersRubbingCfg.class, new MinigameGodofGamblersRubbingCfgContainer());
     containerMap.put(MinigameHappyHappyFishCfg.class, new MinigameHappyHappyFishCfgContainer());
     containerMap.put(MinigameSpeedyDeliveryCfg.class, new MinigameSpeedyDeliveryCfgContainer());
+    containerMap.put(MinigameSpeedySkilCfg.class, new MinigameSpeedySkilCfgContainer());
     containerMap.put(MinigameTruckCfg.class, new MinigameTruckCfgContainer());
     containerMap.put(MinigamegoodsCfg.class, new MinigamegoodsCfgContainer());
     containerMap.put(MiningAchievementCfg.class, new MiningAchievementCfgContainer());
@@ -232,6 +233,7 @@ public class GameDataManager {
     containerMap.put(PopularityRankingCfg.class, new PopularityRankingCfgContainer());
     containerMap.put(PrivilegeCardCfg.class, new PrivilegeCardCfgContainer());
     containerMap.put(PropCfg.class, new PropCfgContainer());
+    containerMap.put(RandomEventDetailsCfg.class, new RandomEventDetailsCfgContainer());
     containerMap.put(ResearchInstituteCfg.class, new ResearchInstituteCfgContainer());
     containerMap.put(ResearchSkillsCfg.class, new ResearchSkillsCfgContainer());
     containerMap.put(RobotActionCfg.class, new RobotActionCfgContainer());
@@ -1737,6 +1739,18 @@ public class GameDataManager {
     return getInstance().getCfgContainer(MinigameSpeedyDeliveryCfg.class).getCfgBeanList();
   }
 
+  public static MinigameSpeedySkilCfg getMinigameSpeedySkilCfg(int key) {
+    return getInstance().getCfgContainer(MinigameSpeedySkilCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, MinigameSpeedySkilCfg> getMinigameSpeedySkilCfgMap() {
+    return getInstance().getCfgContainer(MinigameSpeedySkilCfg.class).getCfgBeanMap();
+  }
+
+  public static List<MinigameSpeedySkilCfg> getMinigameSpeedySkilCfgList() {
+    return getInstance().getCfgContainer(MinigameSpeedySkilCfg.class).getCfgBeanList();
+  }
+
   public static MinigameTruckCfg getMinigameTruckCfg(int key) {
     return getInstance().getCfgContainer(MinigameTruckCfg.class).getCfgBeanMap().get(key);
   }
@@ -2083,6 +2097,18 @@ public class GameDataManager {
 
   public static List<PropCfg> getPropCfgList() {
     return getInstance().getCfgContainer(PropCfg.class).getCfgBeanList();
+  }
+
+  public static RandomEventDetailsCfg getRandomEventDetailsCfg(int key) {
+    return getInstance().getCfgContainer(RandomEventDetailsCfg.class).getCfgBeanMap().get(key);
+  }
+
+  public static Map<Integer, RandomEventDetailsCfg> getRandomEventDetailsCfgMap() {
+    return getInstance().getCfgContainer(RandomEventDetailsCfg.class).getCfgBeanMap();
+  }
+
+  public static List<RandomEventDetailsCfg> getRandomEventDetailsCfgList() {
+    return getInstance().getCfgContainer(RandomEventDetailsCfg.class).getCfgBeanList();
   }
 
   public static ResearchInstituteCfg getResearchInstituteCfg(int key) {
