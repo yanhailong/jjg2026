@@ -180,7 +180,7 @@ public class SimVisitService implements IRedDotService {
             res.unreadComments = self == null ? 0 : self.getUnreadCommentCount();
             res.commentUnlocked = canComment(ctx.playerId());
             res.commissionRate = configService.getCommissionRate();
-            if (!robot && friendService.isFriend(ctx.playerId(), playerId)) {
+            if (!robot) {
                 try {
                     randomEvents.onFriendVisit(ctx, playerId, res);
                 } catch (Exception e) {
