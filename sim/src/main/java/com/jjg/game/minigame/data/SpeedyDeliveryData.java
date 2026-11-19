@@ -6,7 +6,6 @@ import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /** 持久化每日补足日期、技能进度及退出时的仓库和货架库存。 */
@@ -110,10 +109,16 @@ public class SpeedyDeliveryData extends AbstractData {
         return tmpToods.getOrDefault(type, Map.of());
     }
 
-    public void addDeliveredGoods(List<Integer> goodsIds) {
-        for (int goodsId : goodsIds) {
-            tmpTouseGoods.merge(goodsId, 1, Integer::sum);
+    public int addWarehouseGoods(int goodsId, long count) {
+        if (count <= 0) {
+            return 0;
         }
+        int available = tmpTouseGoods.getOrDefault(goodsId, 0);
+        int added = (int) Math.min(count, Integer.MAX_VALUE - available);
+        if (added > 0) {
+            tmpTouseGoods.put(goodsId, available + added);
+        }
+        return added;
     }
 
     public boolean stockShelf(int type, int slotId, int goodsId, int capacity) {
@@ -130,7 +135,7 @@ public class SpeedyDeliveryData extends AbstractData {
             return true;
         }
         if (stock != null && !sameGoods) {
-            tmpTouseGoods.merge(stock[0], stock[1], Integer::sum);
+            addWarehouseGoods(stock[0], stock[1]);
         }
         if (available == moved) {
             tmpTouseGoods.remove(goodsId);

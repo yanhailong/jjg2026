@@ -51,6 +51,8 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
     private static final long END_TOLERANCE_MILLIS = 2000L;
     private static final int DURATION_BONUS = 1;
     private static final int SCORE_BONUS = 4;
+    private static final int BACKPACK_CAPACITY_BONUS = 5;
+    private static final int GOODS_REWARD_BONUS = 9;
 
     private final SpeedyDeliveryDao dao;
     private final SimAutoSaveService autoSaveService;
@@ -164,9 +166,10 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                     round == null ? 0 : round.getEndTime(), res.code);
             return res;
         }
-        if (goodsIds == null || goodsIds.isEmpty() || goodsIds.size() > round.getConfig().getBackpackCapacity()) {
+        int capacity = round.getBackpackCapacity();
+        if (goodsIds == null || goodsIds.isEmpty() || goodsIds.size() > capacity) {
             log.warn("飞驰快送交货失败，货物数量无效 playerId={},truckId={},count={},capacity={}",
-                    ctx.playerId(), truckId, goodsIds == null ? 0 : goodsIds.size(), round.getConfig().getBackpackCapacity());
+                    ctx.playerId(), truckId, goodsIds == null ? 0 : goodsIds.size(), capacity);
             res.code = Code.PARAM_ERROR;
             return res;
         }
@@ -214,7 +217,12 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
             res.code = Code.PARAM_ERROR;
             return res;
         }
-        loadData(ctx).addDeliveredGoods(goodsIds);
+        SpeedyDeliveryData data = loadData(ctx);
+        for (int goodsId : goodsIds) {
+            if (data.addWarehouseGoods(goodsId, 1) > 0) {
+                round.recordDeliveredGood(goodsId);
+            }
+        }
         res.deliveryScore = (int) deliveryScore;
         round.setScore(round.getScore() + res.deliveryScore);
         res.score = round.getScore();
@@ -296,25 +304,19 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
     /** 中途退出也走结束协议；待发奖重试不再受游戏时限限制。 */
     public ResEndSpeedyDeliveryGame end(SimPlayerContext ctx) {
         SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
-        ResEndSpeedyDeliveryGame res = new ResEndSpeedyDeliveryGame(Code.SUCCESS);
         if (round == null) {
-            res.code = Code.ERROR_REQ;
-        } else {
-            res.score = round.getScore();
-            if (round.getState() == RoundState.CLEARED) {
-                res.code = Code.REPEAT_OP;
-            } else if (round.getState() == RoundState.PLAYING
-                    && System.currentTimeMillis() > round.getEndTime() + END_TOLERANCE_MILLIS) {
-                res.code = Code.EXPIRE;
-            } else {
-                res.code = settle(ctx, round);
-                if (res.code == Code.SUCCESS) {
-                    res.rewards = ItemUtils.buildItemInfo(round.getRewards());
-                }
-            }
-            res.skillPoints = loadData(ctx).getSkillPoints();
+            return new ResEndSpeedyDeliveryGame(Code.ERROR_REQ);
         }
-        return res;
+        int code;
+        if (round.getState() == RoundState.CLEARED) {
+            code = Code.REPEAT_OP;
+        } else if (round.getState() == RoundState.PLAYING
+                && System.currentTimeMillis() > round.getEndTime() + END_TOLERANCE_MILLIS) {
+            code = Code.EXPIRE;
+        } else {
+            code = settle(ctx, round);
+        }
+        return endResponse(ctx, round, code);
     }
 
     public ResQuickClearSpeedyDeliveryGame quickClear(SimPlayerContext ctx) {
@@ -355,14 +357,19 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
         if (round != null && round.getState() == RoundState.PLAYING
                 && now > round.getEndTime() + END_TOLERANCE_MILLIS) {
-            ResEndSpeedyDeliveryGame res = new ResEndSpeedyDeliveryGame(settle(ctx, round));
-            res.score = round.getScore();
-            res.skillPoints = loadData(ctx).getSkillPoints();
-            if (res.code == Code.SUCCESS) {
-                res.rewards = ItemUtils.buildItemInfo(round.getRewards());
-            }
-            ctx.send(res);
+            ctx.send(endResponse(ctx, round, settle(ctx, round)));
         }
+    }
+
+    private ResEndSpeedyDeliveryGame endResponse(SimPlayerContext ctx, SpeedyDeliveryRound round, int code) {
+        ResEndSpeedyDeliveryGame res = new ResEndSpeedyDeliveryGame(code);
+        res.score = round.getScore();
+        res.skillPoints = loadData(ctx).getSkillPoints();
+        if (code == Code.SUCCESS) {
+            res.rewards = ItemUtils.buildItemInfo(round.getRewards());
+            res.extraRewards = ItemUtils.buildItemInfo(round.getDeliveredGoods());
+        }
+        return res;
     }
 
     public int onExit(SimPlayerContext ctx) {
@@ -426,6 +433,8 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         }
         long durationFlat = 0;
         long durationPermille = 0;
+        long capacityFlat = 0;
+        long capacityPermille = 0;
         var skillTree = configCacheService.getMinigameSpeedySkills();
         for (var skill : data.getSkillLevels().entrySet()) {
             MinigameSpeedySkilCfg cfg = skillTree.levelConfig(skill.getKey(), skill.getValue());
@@ -437,18 +446,35 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
             if (cfg.getType() == null) {
                 continue;
             }
+            int flat = cfg.getFlatValue();
+            int permille = cfg.getPermille();
             for (List<Integer> effect : cfg.getType()) {
                 if (effect.isEmpty()) {
                     continue;
                 }
-                int effectType = effect.getFirst();
-                if (effectType == DURATION_BONUS) {
-                    durationFlat += cfg.getFlatValue();
-                    durationPermille += cfg.getPermille();
-                } else if (effectType == SCORE_BONUS &&
-                        (effect.size() < 2 || !round.addScoreBonus(effect.get(1), cfg.getFlatValue(), cfg.getPermille()))) {
-                    log.warn("飞驰快送加分技能的车型配置无效 playerId={},skillId={},effect={},required=1..3",
-                            data.getPlayerId(), cfg.getId(), effect);
+                int target = effect.size() >= 2 ? effect.get(1) : 0;
+                switch (effect.getFirst()) {
+                    case DURATION_BONUS -> {
+                        durationFlat += flat;
+                        durationPermille += permille;
+                    }
+                    case SCORE_BONUS -> {
+                        if (!round.addScoreBonus(target, flat, permille)) {
+                            log.warn("飞驰快送加分技能的车型配置无效 playerId={},skillId={},effect={},required=1..3",
+                                    data.getPlayerId(), cfg.getId(), effect);
+                        }
+                    }
+                    case BACKPACK_CAPACITY_BONUS -> {
+                        if (target == 1) {
+                            capacityFlat += flat;
+                            capacityPermille += permille;
+                        }
+                    }
+                    case GOODS_REWARD_BONUS -> {
+                        if (target == 1) {
+                            round.addGoodsRewardBonus(flat, permille);
+                        }
+                    }
                 }
             }
         }
@@ -459,9 +485,12 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
             log.warn("飞驰快送技能加成后时长无效 playerId={},baseMillis={},durationMillis={}",
                     data.getPlayerId(), baseDuration, duration);
         }
+        int baseCapacity = round.getBackpackCapacity();
+        long capacity = baseCapacity + capacityFlat + MiniGameSkillEffect.scaleByPermille(baseCapacity, capacityPermille);
+        round.setBackpackCapacity(Math.clamp(capacity, baseCapacity, Integer.MAX_VALUE));
     }
 
-    /** 首次结算锁定奖励档位并入账技能积分，发奖失败时沿用本局结算结果。 */
+    /** 首次结算锁定奖励档位，入账技能积分和货物加成，发奖重试沿用本局结果。 */
     private int settle(SimPlayerContext ctx, SpeedyDeliveryRound round) {
         round.setState(RoundState.REWARD_PENDING);
         if (round.getRewards() == null) {
@@ -475,8 +504,13 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
             Map<Integer, Long> rewards = new HashMap<>(selected.size());
             selected.forEach((itemId, count) -> rewards.put(itemId, count.longValue()));
             round.setRewards(rewards);
+            SpeedyDeliveryData data = loadData(ctx);
+            Map<Integer, Long> deliveredGoods = round.getDeliveredGoods();
+            if (!deliveredGoods.isEmpty()) {
+                deliveredGoods.replaceAll((goodsId, count) ->
+                        count + data.addWarehouseGoods(goodsId, round.goodsRewardBonus(count)));
+            }
             if (round.getScore() > 0) {
-                SpeedyDeliveryData data = loadData(ctx);
                 data.setSkillPoints(data.getSkillPoints() + round.getScore());
                 autoSaveService.enqueueSave(data);
             }

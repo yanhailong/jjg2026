@@ -21,6 +21,8 @@ public class ResSimRandomEventAction extends AbstractResponse {
     public List<ItemInfo> rewards;
     @ProtoDesc("本次开箱的奖励类别，0空箱，1奖励A，2奖励B。仅开箱成功时有效")
     public int openedReward;
+    @ProtoDesc("结算文案的多语言ID，对应RandomEventDetails.result_AB中实际获得的A或B奖励。无对应文案时为0")
+    public int resultLanguageId;
 
     public ResSimRandomEventAction(int code) {
         super(code);

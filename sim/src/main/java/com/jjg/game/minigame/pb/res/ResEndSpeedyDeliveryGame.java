@@ -18,6 +18,8 @@ public class ResEndSpeedyDeliveryGame extends AbstractResponse {
     public List<ItemInfo> rewards;
     @ProtoDesc("结算后的可用技能积分")
     public long skillPoints;
+    @ProtoDesc("额外获得， itemId是Minigamegoods.id")
+    public List<ItemInfo> extraRewards;
 
     public ResEndSpeedyDeliveryGame(int code) {
         super(code);

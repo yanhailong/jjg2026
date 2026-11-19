@@ -1,5 +1,6 @@
 package com.jjg.game.sim.randomevent;
 
+import com.jjg.game.common.pb.ItemInfo;
 import com.jjg.game.common.utils.RandomUtils;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
@@ -15,6 +16,7 @@ import com.jjg.game.sim.pb.res.ResSimRandomEventAction;
 import com.jjg.game.sim.pb.res.ResSimRandomEventInfo;
 import com.jjg.game.sim.pb.res.ResSimRandomEventList;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
+import com.jjg.game.sim.pb.struct.RandomEventBoxInfo;
 import com.jjg.game.sim.pb.struct.RandomEventInfo;
 import com.jjg.game.sim.randomevent.RandomEventPlay.Outcome;
 import com.jjg.game.sim.randomevent.SimRandomEventState.SceneEvent;
@@ -157,7 +159,7 @@ public class SimRandomEventService {
                     return null;
                 }
                 SceneEvent event = scene.events.get(index);
-                Outcome outcome = Outcome.finish(event, cfg.getB_reward());
+                Outcome outcome = Outcome.finishB(event, cfg);
                 int code = grant(playerId, event, outcome.rewards(), false);
                 if (code != Code.SUCCESS) {
                     log.warn("房间游戏随机事件发奖失败，保留事件 playerId={},configId={},rewards={},code={}",
@@ -323,6 +325,7 @@ public class SimRandomEventService {
         response.event = info(outcome.event(), cfg, completion);
         response.completed = outcome.completed();
         response.rewards = ItemUtils.buildItemInfo(outcome.rewards());
+        response.resultLanguageId = outcome.resultLanguageId();
         return response;
     }
 
@@ -461,17 +464,29 @@ public class SimRandomEventService {
             } else if (info.eventType == RandomEventPlay.DICE) {
                 info.auxiliary = event.auxiliary();
                 info.dice = event.values();
-            } else if (info.eventType == RandomEventPlay.CHEST && !event.values().isEmpty()) {
-                List<Integer> boxes = new ArrayList<>(3);
-                for (int i = 0; i < 3; i++) {
-                    boxes.add((event.auxiliary() & (1 << i)) == 0 ? -1 : event.values().get(i));
-                }
-                info.openedBoxes = boxes;
+            } else if (info.eventType == RandomEventPlay.CHEST) {
+                info.openedBoxes = boxInfos(event, cfg);
             } else if (info.eventType == RandomEventPlay.SPY) {
                 info.auxiliary = event.auxiliary();
                 info.capturedTargets = event.values();
             }
         }
         return info;
+    }
+
+    private static List<RandomEventBoxInfo> boxInfos(SceneEvent event, RandomEventDetailsCfg cfg) {
+        List<List<ItemInfo>> rewardsByCategory = List.of(List.of(),
+                ItemUtils.buildItemInfo(RandomEventPlay.chestReward(cfg, 1)),
+                ItemUtils.buildItemInfo(RandomEventPlay.chestReward(cfg, 2)));
+        List<Integer> previewOrder = RandomEventPlay.CHEST_PREVIEW_ORDER;
+        List<RandomEventBoxInfo> boxes = new ArrayList<>(previewOrder.size());
+        for (int i = 0; i < previewOrder.size(); i++) {
+            RandomEventBoxInfo box = new RandomEventBoxInfo();
+            box.opened = (event.auxiliary() & (1 << i)) != 0;
+            box.previewRewards = rewardsByCategory.get(previewOrder.get(i));
+            box.actualRewards = box.opened ? rewardsByCategory.get(event.values().get(i)) : List.of();
+            boxes.add(box);
+        }
+        return boxes;
     }
 }

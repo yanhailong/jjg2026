@@ -24,8 +24,8 @@ public class RandomEventInfo {
     public long readyAt;
     @ProtoDesc("当前三颗骰子的点数，列表索引对应骰子位置，掷骰前为空")
     public List<Integer> dice;
-    @ProtoDesc("三个宝箱的开启结果，列表索引对应宝箱位置。-1未开，0空箱，1奖励A，2奖励B")
-    public List<Integer> openedBoxes;
+    @ProtoDesc("宝箱事件的三个箱子，列表索引0到2对应开箱操作的目标位置")
+    public List<RandomEventBoxInfo> openedBoxes;
     @ProtoDesc("已抓捕的间谍编号列表，编号从0开始")
     public List<Integer> capturedTargets;
     @ProtoDesc("今日已完成的随机事件数。自己的场景统计系统事件及好友投放，拜访时统计玩家在所有好友场景的完成数")

@@ -3,6 +3,7 @@ package com.jjg.game.minigame.data;
 import com.jjg.game.minigame.constant.MiniGameConstant.RoundState;
 import com.jjg.game.sampledata.bean.MinigameSpeedyDeliveryCfg;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /** 会话内单局；引用开局配置，避免热更新改变本局时长、容量和奖励规则。 */
@@ -14,16 +15,22 @@ public class SpeedyDeliveryRound {
 
     private final MinigameSpeedyDeliveryCfg config;
     private long endTime;
+    private int backpackCapacity;
     private int score;
     private int state = RoundState.PLAYING;
     private boolean quickClear;
     private Map<Integer, Long> rewards;
     private long[] scoreFlat;
     private long[] scorePermille;
+    private long goodsRewardFlat;
+    private long goodsRewardPermille;
+    // 按货物ID统计本局实际入仓数量，首次结算时计入技能增加的部分。
+    private Map<Integer, Long> deliveredGoods = Map.of();
 
     public SpeedyDeliveryRound(MinigameSpeedyDeliveryCfg config, long endTime) {
         this.config = config;
         this.endTime = endTime;
+        this.backpackCapacity = config.getBackpackCapacity();
     }
 
     public boolean addScoreBonus(int truckIndex, int flat, int permille) {
@@ -47,8 +54,36 @@ public class SpeedyDeliveryRound {
         return baseScore + scoreFlat[index] + MiniGameSkillEffect.scaleByPermille(baseScore, scorePermille[index]);
     }
 
+    public void recordDeliveredGood(int goodsId) {
+        if (deliveredGoods.isEmpty()) {
+            deliveredGoods = new HashMap<>();
+        }
+        deliveredGoods.merge(goodsId, 1L, Long::sum);
+    }
+
+    public Map<Integer, Long> getDeliveredGoods() {
+        return deliveredGoods;
+    }
+
+    public void addGoodsRewardBonus(int flat, int permille) {
+        goodsRewardFlat += flat;
+        goodsRewardPermille += permille;
+    }
+
+    public long goodsRewardBonus(long count) {
+        return goodsRewardFlat + MiniGameSkillEffect.scaleByPermille(count, goodsRewardPermille);
+    }
+
     public MinigameSpeedyDeliveryCfg getConfig() {
         return config;
+    }
+
+    public int getBackpackCapacity() {
+        return backpackCapacity;
+    }
+
+    public void setBackpackCapacity(int backpackCapacity) {
+        this.backpackCapacity = backpackCapacity;
     }
 
     public long getEndTime() {
