@@ -46,6 +46,10 @@ import com.jjg.game.sim.pb.res.ResBuyMiniShop;
 import com.jjg.game.sim.pb.res.ResTokenShop;
 import com.jjg.game.sim.pb.res.NotifyTogetherPlayInvite;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
+import com.jjg.game.sim.pb.req.ReqSimRandomEventAction;
+import com.jjg.game.sim.pb.res.ResSimRandomEventAction;
+import com.jjg.game.sim.pb.res.ResSimRandomEventList;
+import com.jjg.game.sim.randomevent.SimRandomEventService;
 import com.jjg.game.sim.service.SimCoopTaskService;
 import com.jjg.game.sim.service.SimEmployeeRedDotService;
 import com.jjg.game.sim.service.SimGuideService;
@@ -124,6 +128,8 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
     private SimGuestService simGuestService;
     @Autowired
     private SimVisitService simVisitService;
+    @Autowired
+    private SimRandomEventService randomEvents;
     @Autowired
     private SimEmployeeRedDotService simEmployeeRedDotService;
     @Autowired
@@ -417,6 +423,33 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
             return new ResVisitCasino(Code.NOT_FOUND);
         }
         return simVisitService.visit(ctx, targetPlayerId, casinoId);
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public ResSimRandomEventList randomEventList(long playerId) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
+        if (ctx == null) {
+            log.warn("跨节点查询随机事件失败，模拟经营上下文不存在 playerId={}", playerId);
+            return new ResSimRandomEventList(Code.NOT_FOUND);
+        }
+        return randomEvents.list(ctx);
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public ResSimRandomEventAction randomEventAction(long playerId, int configId, int action, int target) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
+        if (ctx == null) {
+            log.warn("跨节点处理随机事件失败，模拟经营上下文不存在 playerId={},configId={},action={},target={}",
+                    playerId, configId, action, target);
+            return new ResSimRandomEventAction(Code.NOT_FOUND);
+        }
+        ReqSimRandomEventAction request = new ReqSimRandomEventAction();
+        request.configId = configId;
+        request.action = action;
+        request.target = target;
+        return randomEvents.act(ctx, request);
     }
 
     @Override

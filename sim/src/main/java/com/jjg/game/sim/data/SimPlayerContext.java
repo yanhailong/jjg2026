@@ -14,6 +14,7 @@ import com.jjg.game.minigame.data.SpeedyDeliveryData;
 import com.jjg.game.minigame.data.SpeedyDeliveryRound;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.sim.constant.BuildingOutputType;
+import com.jjg.game.sim.randomevent.VisitRandomEvents;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -27,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class SimPlayerContext {
     private long playerId;
+    public VisitRandomEvents visitRandomEvents;
     private PlayerController playerController;
     private SimBaseData simBaseData;
     //技能 gameType -> data
@@ -130,6 +132,37 @@ public class SimPlayerContext {
     private HappyHappyFishRound happyHappyFishRound;
     private SpeedyDeliveryData speedyDeliveryData;
     private SpeedyDeliveryRound speedyDeliveryRound;
+    private int pendingRoomEventConfigId;
+
+    public void setPendingRoomEventConfigId(int configId) {
+        pendingRoomEventConfigId = configId;
+    }
+
+    public int pendingRoomEventConfigId(int requiredConfigId) {
+        return pendingRoomEventConfigId == requiredConfigId ? pendingRoomEventConfigId : 0;
+    }
+
+    public void clearPendingRoomEvent() {
+        pendingRoomEventConfigId = 0;
+    }
+
+    public void clearRoomEvent(int configId) {
+        if (pendingRoomEventConfigId == configId) {
+            clearPendingRoomEvent();
+        }
+        if (cheaterHuntRound != null && cheaterHuntRound.randomEventConfigId == configId) {
+            cheaterHuntRound.randomEventConfigId = 0;
+        }
+        if (godGamblersRound != null && godGamblersRound.randomEventConfigId == configId) {
+            godGamblersRound.randomEventConfigId = 0;
+        }
+        if (happyHappyFishRound != null && happyHappyFishRound.randomEventConfigId == configId) {
+            happyHappyFishRound.randomEventConfigId = 0;
+        }
+        if (speedyDeliveryRound != null && speedyDeliveryRound.randomEventConfigId == configId) {
+            speedyDeliveryRound.randomEventConfigId = 0;
+        }
+    }
 
     //标记客户端是不是空白页面
     private boolean blankPage;
@@ -490,6 +523,8 @@ public class SimPlayerContext {
     }
 
     public void setVisitTargetId(long visitTargetId) {
+        visitRandomEvents = null;
+        clearPendingRoomEvent();
         this.visitTargetId = visitTargetId;
     }
 

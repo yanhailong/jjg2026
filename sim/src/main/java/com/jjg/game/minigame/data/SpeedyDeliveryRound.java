@@ -7,6 +7,7 @@ import java.util.Map;
 
 /** 会话内单局；引用开局配置，避免热更新改变本局时长、容量和奖励规则。 */
 public class SpeedyDeliveryRound {
+    public int randomEventConfigId;
     // Type 4 的参数 1 至 3 依次对应 MinigameTruck.id 1001 至 1003。
     private static final int FIRST_SKILL_TRUCK_ID = 1001;
     private static final int SKILL_TRUCK_COUNT = 3;

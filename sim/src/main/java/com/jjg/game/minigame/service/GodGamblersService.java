@@ -22,6 +22,8 @@ import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.GlobalConfigCfg;
 import com.jjg.game.sampledata.bean.MinigameGodofGamblersRubbingCfg;
 import com.jjg.game.sim.data.SimPlayerContext;
+import com.jjg.game.sim.randomevent.SimRandomEventService;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.jjg.game.sim.service.SimAutoSaveService;
 import com.jjg.game.sim.service.SimChapterService;
 import org.slf4j.Logger;
@@ -38,6 +40,8 @@ import java.util.Map;
  */
 @Service
 public class GodGamblersService {
+    @Autowired
+    private SimRandomEventService randomEvents;
     private static final Logger log = LoggerFactory.getLogger(GodGamblersService.class);
     //扑克基本规则：每花色13张，2最小、A按14点比较，点差不含花色。
     private static final int RANKS_PER_SUIT = 13;
@@ -318,6 +322,9 @@ public class GodGamblersService {
             return reward.code;
         }
         round.setState(RoundState.CLEARED);
+        if (round.randomEventConfigId != 0) {
+            randomEvents.roomFinished(ctx, round.randomEventConfigId);
+        }
         return Code.SUCCESS;
     }
 

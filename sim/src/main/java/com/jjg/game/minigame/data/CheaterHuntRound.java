@@ -5,6 +5,7 @@ import java.util.List;
 
 /** 找老千单局内存状态，退出后丢弃，不保存进度。 */
 public class CheaterHuntRound {
+    public int randomEventConfigId;
     //本局ID，由玩家自己的对局序号生成
     private long roundId;
     //本局关卡配置ID，通关后仍保留用于返回结算信息

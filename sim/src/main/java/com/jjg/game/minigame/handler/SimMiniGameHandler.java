@@ -1,6 +1,7 @@
 package com.jjg.game.minigame.handler;
 
 import com.jjg.game.common.constant.MessageConst;
+import com.jjg.game.common.pb.AbstractResponse;
 import com.jjg.game.common.protostuff.Command;
 import com.jjg.game.common.protostuff.MessageType;
 import com.jjg.game.core.constant.Code;
@@ -69,11 +70,16 @@ import com.jjg.game.minigame.service.SpeedyDeliveryService;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.data.SimPlayerContext;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
+import com.jjg.game.sim.randomevent.SimRandomEventService;
 import com.jjg.game.sim.service.SimGuideService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import java.util.function.IntFunction;
+import java.util.function.IntConsumer;
+import java.util.function.Supplier;
 
 /** 小游戏请求入口，单局与道具逻辑由对应服务处理。 */
 @Component
@@ -83,6 +89,8 @@ public class SimMiniGameHandler {
 
     @Autowired
     private SimPlayerContextRegistry simPlayerContextRegistry;
+    @Autowired
+    private SimRandomEventService randomEvents;
     @Autowired
     private SimMiniGameService simMiniGameService;
     @Autowired
@@ -94,6 +102,42 @@ public class SimMiniGameHandler {
     @Autowired
     private SimGuideService guideService;
 
+    private <T extends AbstractResponse> T enterGame(SimPlayerContext ctx, int requiredConfigId, int configId,
+                                                   Supplier<T> enter, IntFunction<T> error) {
+        ctx.clearPendingRoomEvent();
+        if (configId == 0) {
+            return enter.get();
+        }
+        int code = randomEvents.validateRoomEntry(ctx, configId, requiredConfigId);
+        if (code != Code.SUCCESS) {
+            return error.apply(code);
+        }
+        T response = enter.get();
+        if (response.code == Code.SUCCESS) {
+            ctx.setPendingRoomEventConfigId(configId);
+        }
+        return response;
+    }
+
+    private <T extends AbstractResponse> T startGame(SimPlayerContext ctx, int requiredConfigId, Supplier<T> start,
+                                                   IntFunction<T> error, IntConsumer bindEvent) {
+        int configId = ctx.pendingRoomEventConfigId(requiredConfigId);
+        if (configId == 0) {
+            return start.get();
+        }
+        int code = randomEvents.validateRoomEntry(ctx, configId, requiredConfigId);
+        if (code != Code.SUCCESS) {
+            ctx.clearPendingRoomEvent();
+            return error.apply(code);
+        }
+        T response = start.get();
+        if (response.code == Code.SUCCESS) {
+            bindEvent.accept(configId);
+            ctx.clearPendingRoomEvent();
+        }
+        return response;
+    }
+
     /** 获取关卡列表及一键通关开放状态。 */
     @Command(MiniGameConstant.MsgBean.REQ_ENTER_CHEAT_HUNT_GAME)
     public void reqEnterCheaterHuntGame(PlayerController playerController, ReqEnterCheaterHuntGame req) {
@@ -103,7 +147,8 @@ public class SimMiniGameHandler {
             playerController.send(new ResEnterCheaterHuntGame(Code.NOT_FOUND));
             return;
         }
-        ResEnterCheaterHuntGame res = simMiniGameService.enter(ctx);
+        ResEnterCheaterHuntGame res = enterGame(ctx, 2003, req.randomEventConfigId,
+                () -> simMiniGameService.enter(ctx), ResEnterCheaterHuntGame::new);
         ctx.send(res);
         if (res.code == Code.SUCCESS) {
             guideService.trigger(ctx, SimConstant.GuideCondition.ENTER_MINI_GAME, 1, true);
@@ -119,7 +164,8 @@ public class SimMiniGameHandler {
             playerController.send(new ResCheaterHuntGameInfo(Code.NOT_FOUND));
             return;
         }
-        ctx.send(simMiniGameService.gameInfo(ctx));
+        ctx.send(startGame(ctx, 2003, () -> simMiniGameService.gameInfo(ctx), ResCheaterHuntGameInfo::new,
+                configId -> ctx.getCheaterHuntRound().randomEventConfigId = configId));
     }
 
     /** 按顺序解锁下一关，由服务校验并扣除解锁道具。 */
@@ -179,7 +225,8 @@ public class SimMiniGameHandler {
             playerController.send(new ResEnterGodGamblersGame(Code.NOT_FOUND));
             return;
         }
-        ResEnterGodGamblersGame res = godGamblersService.enter(ctx);
+        ResEnterGodGamblersGame res = enterGame(ctx, 2004, req.randomEventConfigId,
+                () -> godGamblersService.enter(ctx), ResEnterGodGamblersGame::new);
         ctx.send(res);
         if (res.code == Code.SUCCESS) {
             guideService.trigger(ctx, SimConstant.GuideCondition.ENTER_MINI_GAME, 2, true);
@@ -195,7 +242,8 @@ public class SimMiniGameHandler {
             playerController.send(new ResStartGodGamblersGame(Code.NOT_FOUND));
             return;
         }
-        ctx.send(godGamblersService.start(ctx));
+        ctx.send(startGame(ctx, 2004, () -> godGamblersService.start(ctx), ResStartGodGamblersGame::new,
+                configId -> ctx.getGodGamblersRound().randomEventConfigId = configId));
     }
 
     /** 获取自己的牌，由服务核对局号及次数并处理再次搓牌消耗。 */
@@ -241,7 +289,8 @@ public class SimMiniGameHandler {
             playerController.send(new ResEnterHappyHappyFishGame(Code.NOT_FOUND));
             return;
         }
-        ResEnterHappyHappyFishGame res = happyHappyFishService.enter(ctx);
+        ResEnterHappyHappyFishGame res = enterGame(ctx, 2002, req.randomEventConfigId,
+                () -> happyHappyFishService.enter(ctx), ResEnterHappyHappyFishGame::new);
         ctx.send(res);
         if (res.code == Code.SUCCESS) {
             guideService.trigger(ctx, SimConstant.GuideCondition.ENTER_MINI_GAME, 3, true);
@@ -255,7 +304,8 @@ public class SimMiniGameHandler {
             playerController.send(new ResStartHappyHappyFishGame(Code.NOT_FOUND));
             return;
         }
-        ctx.send(happyHappyFishService.start(ctx));
+        ctx.send(startGame(ctx, 2002, () -> happyHappyFishService.start(ctx), ResStartHappyHappyFishGame::new,
+                configId -> ctx.getHappyHappyFishRound().randomEventConfigId = configId));
     }
 
     @Command(MiniGameConstant.MsgBean.REQ_CATCH_HAPPY_HAPPY_FISH)
@@ -315,7 +365,8 @@ public class SimMiniGameHandler {
             playerController.send(new ResEnterSpeedyDeliveryGame(Code.NOT_FOUND));
             return;
         }
-        ResEnterSpeedyDeliveryGame res = speedyDeliveryService.enter(ctx);
+        ResEnterSpeedyDeliveryGame res = enterGame(ctx, 2001, req.randomEventConfigId,
+                () -> speedyDeliveryService.enter(ctx), ResEnterSpeedyDeliveryGame::new);
         ctx.send(res);
         if (res.code == Code.SUCCESS) {
             guideService.trigger(ctx, SimConstant.GuideCondition.ENTER_MINI_GAME, 4, true);
@@ -329,7 +380,8 @@ public class SimMiniGameHandler {
             playerController.send(new ResStartSpeedyDeliveryGame(Code.NOT_FOUND));
             return;
         }
-        ctx.send(speedyDeliveryService.start(ctx));
+        ctx.send(startGame(ctx, 2001, () -> speedyDeliveryService.start(ctx), ResStartSpeedyDeliveryGame::new,
+                configId -> ctx.getSpeedyDeliveryRound().randomEventConfigId = configId));
     }
 
     @Command(MiniGameConstant.MsgBean.REQ_DELIVER_SPEEDY_DELIVERY_GOODS)

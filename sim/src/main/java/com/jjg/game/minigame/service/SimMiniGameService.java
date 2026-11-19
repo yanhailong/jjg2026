@@ -21,6 +21,8 @@ import com.jjg.game.sampledata.bean.GlobalConfigCfg;
 import com.jjg.game.sampledata.bean.MinigameCheaterHuntLevelCfg;
 import com.jjg.game.sampledata.bean.MinigameCheaterHuntMapCfg;
 import com.jjg.game.sim.data.SimPlayerContext;
+import com.jjg.game.sim.randomevent.SimRandomEventService;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.jjg.game.sim.service.SimAutoSaveService;
 import com.jjg.game.sim.service.SimChapterService;
 import org.slf4j.Logger;
@@ -38,6 +40,8 @@ import java.util.Map;
  */
 @Service
 public class SimMiniGameService {
+    @Autowired
+    private SimRandomEventService randomEvents;
     private static final Logger log = LoggerFactory.getLogger(SimMiniGameService.class);
     private final CheaterHuntDao dao;
     private final SimAutoSaveService autoSaveService;
@@ -412,6 +416,9 @@ public class SimMiniGameService {
             return reward.code;
         }
         round.setFailureRewardGranted(true);
+        if (round.randomEventConfigId != 0) {
+            randomEvents.roomFinished(ctx, round.randomEventConfigId);
+        }
         log.info("找老千失败结算成功 playerId={},roundId={},levelId={}",
                 ctx.playerId(), round.getRoundId(), cfg.getId());
         return Code.SUCCESS;
@@ -431,6 +438,9 @@ public class SimMiniGameService {
             return reward.code;
         }
         round.setState(RoundState.CLEARED);
+        if (round.randomEventConfigId != 0) {
+            randomEvents.roomFinished(ctx, round.randomEventConfigId);
+        }
         data.setMaxPassedLevelId(cfg.getId());
         autoSaveService.enqueueSave(data);
         return Code.SUCCESS;

@@ -28,6 +28,7 @@ import com.jjg.game.sim.data.SkipGuideGroupRpcResult;
 import com.jjg.game.sim.logger.SimGuideLogger;
 import com.jjg.game.sim.manager.SimManager;
 import com.jjg.game.sim.manager.SimPlayerContextRegistry;
+import com.jjg.game.sim.randomevent.SimRandomEventService;
 import com.jjg.game.sim.pb.req.*;
 import com.jjg.game.sim.pb.res.*;
 import com.jjg.game.sim.service.*;
@@ -61,6 +62,8 @@ public class SimMessageHandler implements GmListener {
     private SimManager simManager;
     @Autowired
     private SimPlayerContextRegistry simPlayerContextRegistry;
+    @Autowired
+    private SimRandomEventService randomEvents;
     @Autowired
     private SimGuestService guestService;
     @Autowired
@@ -252,6 +255,10 @@ public class SimMessageHandler implements GmListener {
     @Command(SimConstant.MsgBean.REQ_EXIT_GAME)
     public void reqExitGame(PlayerController playerController, ReqSimExitGame req) {
         //退出 sim 界面不卸载 ctx, 场景后台继续运行直到玩家下线
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx != null) {
+            ctx.setVisitTargetId(0);
+        }
         playerController.setScene(null);
     }
 
@@ -1158,6 +1165,26 @@ public class SimMessageHandler implements GmListener {
 
     //--------------------------拜访相关 begin--------------------------
 
+    @Command(SimConstant.MsgBean.REQ_RANDOM_EVENT_LIST)
+    public void reqRandomEventList(PlayerController pc, ReqSimRandomEventList req) {
+        if (simPlayerContextRegistry.getContext(pc.playerId()) == null) {
+            pc.send(callVisitOwner(pc, "查询随机事件", bridge -> bridge.randomEventList(pc.playerId()), ResSimRandomEventList::new));
+            return;
+        }
+        executeVisit(pc, randomEvents::list, ResSimRandomEventList::new, ReqSimRandomEventList.class);
+    }
+
+    @Command(SimConstant.MsgBean.REQ_RANDOM_EVENT_ACTION)
+    public void reqRandomEventAction(PlayerController pc, ReqSimRandomEventAction req) {
+        if (simPlayerContextRegistry.getContext(pc.playerId()) == null) {
+            pc.send(callVisitOwner(pc, "处理随机事件 configId=" + req.configId + ",action=" + req.action,
+                    bridge -> bridge.randomEventAction(pc.playerId(), req.configId, req.action, req.target),
+                    ResSimRandomEventAction::new));
+            return;
+        }
+        executeVisit(pc, ctx -> randomEvents.act(ctx, req), ResSimRandomEventAction::new, ReqSimRandomEventAction.class);
+    }
+
     @Command(SimConstant.MsgBean.REQ_VISIT_CASINO)
     public void reqVisitCasino(PlayerController playerController, ReqVisitCasino req) {
         long playerId = playerController.playerId();
@@ -1167,17 +1194,17 @@ public class SimMessageHandler implements GmListener {
                     ResVisitCasino::new, ReqVisitCasino.class);
             return;
         }
-        playerController.send(visitCasinoRemotely(playerController, req.playerId, req.casinoId));
+        playerController.send(callVisitOwner(playerController, "拜访赌场 targetId=" + req.playerId + ",casinoId=" + req.casinoId,
+                bridge -> bridge.visitCasino(playerId, req.playerId, req.casinoId), ResVisitCasino::new));
     }
 
-    private ResVisitCasino visitCasinoRemotely(PlayerController playerController,
-                                               long targetPlayerId, int casinoId) {
+    private <T extends AbstractResponse> T callVisitOwner(PlayerController playerController, String operation,
+                                                         Function<ToSimBridge, T> call, IntFunction<T> error) {
         long playerId = playerController.playerId();
         ClusterClient client = simNodeService.getSimClusterClient(playerId, playerController.ipAddress());
         if (client == null) {
-            log.warn("跨节点拜访赌场失败，未找到玩家 sim 节点 playerId={},targetPlayerId={},casinoId={}",
-                    playerId, targetPlayerId, casinoId);
-            return new ResVisitCasino(Code.NOT_FOUND);
+            log.warn("跨节点场景请求失败，未找到玩家 sim 节点 playerId={},operation={}", playerId, operation);
+            return error.apply(Code.NOT_FOUND);
         }
 
         GameRpcContext rpcContext = GameRpcContext.getContext();
@@ -1185,12 +1212,11 @@ public class SimMessageHandler implements GmListener {
         try {
             rpcContext.withReqParameterBuilder(RpcReqParameterBuilder.create()
                     .addClusterClient(client).setTryMillisPerClient(1000));
-            ResVisitCasino response = toSimBridge.visitCasino(playerId, targetPlayerId, casinoId);
-            return response == null ? new ResVisitCasino(Code.EXCEPTION) : response;
+            T response = call.apply(toSimBridge);
+            return response == null ? error.apply(Code.EXCEPTION) : response;
         } catch (Exception e) {
-            log.error("跨节点拜访赌场异常 playerId={},targetPlayerId={},casinoId={}",
-                    playerId, targetPlayerId, casinoId, e);
-            return new ResVisitCasino(Code.EXCEPTION);
+            log.error("跨节点场景请求异常 playerId={},operation={}", playerId, operation, e);
+            return error.apply(Code.EXCEPTION);
         } finally {
             rpcContext.setReqParameterBuilder(previousBuilder);
         }

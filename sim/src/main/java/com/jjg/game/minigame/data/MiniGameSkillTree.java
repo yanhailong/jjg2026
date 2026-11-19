@@ -52,10 +52,6 @@ public final class MiniGameSkillTree<T extends BaseCfgBean> {
         return groupIds;
     }
 
-    public boolean isRoot(int groupId) {
-        return levels.containsKey(groupId) && !prerequisites.containsKey(groupId);
-    }
-
     public Upgrade checkUpgrade(long playerId, int groupId, Map<Integer, Integer> skillLevels,
                                 long points, IntPredicate initiallyUnlocked) {
         int level = skillLevels.getOrDefault(groupId, 0);

@@ -365,6 +365,8 @@ public enum AddType {
     SIM_SPEEDY_DELIVERY(1838),
     //雇员等级重置返还
     SIM_EMPLOYEE_LEVEL_RESET(1839),
+    //模拟经营随机事件奖励
+    SIM_RANDOM_EVENT_REWARD(1840),
 
     //创建联盟
     ALLIANCE_CREATE(2001),

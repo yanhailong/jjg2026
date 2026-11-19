@@ -23,6 +23,8 @@ public interface MiniGameConstant {
     int SPEEDY_DELIVERY_QUICK_CLEAR_SCORE_GLOBAL_ID = 362;
     /** 欢乐捉鱼初始解锁的技能组ID。 */
     int HAPPY_HAPPY_FISH_INITIAL_SKILLS_GLOBAL_ID = 363;
+    /** 飞驰快送初始解锁的技能组ID。 */
+    int SPEEDY_DELIVERY_INITIAL_SKILLS_GLOBAL_ID = 364;
     int SPEEDY_DELIVERY_SHELF_SLOT_COUNT = 15;
 
     /**

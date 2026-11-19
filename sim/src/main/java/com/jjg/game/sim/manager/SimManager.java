@@ -36,6 +36,7 @@ import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.dao.*;
 import com.jjg.game.sim.data.*;
 import com.jjg.game.sim.listener.SimPlayerTickListener;
+import com.jjg.game.sim.randomevent.SimRandomEventService;
 import com.jjg.game.sim.pb.SimPbConverter;
 import com.jjg.game.sim.pb.res.ResFinishGuide;
 import com.jjg.game.sim.pb.res.ResSimEnterGame;
@@ -89,6 +90,7 @@ public class SimManager {
 
     //玩家状态检查任务句柄
     private volatile Timeout checkPlayerDataTimeout;
+    private volatile Timeout randomEventRefreshTimeout;
     private final AtomicLong rejectedTickTaskCount = new AtomicLong();
     private final AtomicLong nextTickRejectLogTime = new AtomicLong();
     private static final long TICK_REJECT_LOG_INTERVAL_MS = 60_000L;
@@ -159,6 +161,8 @@ public class SimManager {
     @Autowired
     private SimPlayerContextRegistry simPlayerContextRegistry;
     @Autowired
+    private SimRandomEventService randomEvents;
+    @Autowired
     private SeasonPlayerDao seasonPlayerDao;
     @Autowired
     private ActivePassService activePassService;
@@ -201,6 +205,14 @@ public class SimManager {
         this.tickHandlers.sort(Comparator.comparingInt(SimPlayerTickListener::order));
         this.simEventBusManager.init();
         checkPlayerDataTimeout = WheelTimerUtil.scheduleAtFixedRate(this::checkPlayerDataTimer, 1, 2, TimeUnit.SECONDS);
+        var config = GameDataManager.getGlobalConfigCfg(402);
+        long intervalSeconds = config == null ? 0 : config.getLongValue();
+        if (intervalSeconds > 0) {
+            randomEventRefreshTimeout = WheelTimerUtil.scheduleAtFixedRate(
+                    this::refreshRandomEvents, intervalSeconds, intervalSeconds, TimeUnit.SECONDS);
+        } else {
+            log.warn("随机事件刷新未启动，刷新间隔无效 globalId=402,intervalSeconds={}", intervalSeconds);
+        }
     }
 
     /**
@@ -239,6 +251,7 @@ public class SimManager {
                 ctx.getSimBaseData().setLastOfflineTime(0);
             }
             playerController.setScene(ctx);
+            ctx.setVisitTargetId(0);
             // 条件3使用模拟经营所有场景等级之和 allLevel，进入大厅时补扫后台直改和旧玩家漏触发。
             int allLevel = ctx.getSimBaseData().getAllLevel();
             List<Integer> sceneLevelTriggeredGroups = guideService.triggerSceneTotalLevelReached(ctx, allLevel, false);
@@ -536,6 +549,12 @@ public class SimManager {
         SimPlayerContext ctx = createContextByPlayerId(playerController.playerId(), playerController);
         if (ctx != null) {
             ctx.setPlayerController(playerController);
+            ctx.setVisitTargetId(0);
+            try {
+                randomEvents.onLogin(ctx);
+            } catch (Exception e) {
+                log.error("登录初始化随机事件失败 playerId={}", ctx.playerId(), e);
+            }
             smallDrawService.onLogin(ctx);
             //上下文及玩家已就绪，结算小游戏当日系统赠送。
             simMiniGameService.onLogin(ctx);
@@ -620,6 +639,9 @@ public class SimManager {
     public void shutdown() {
         if (this.checkPlayerDataTimeout != null) {
             this.checkPlayerDataTimeout.cancel();
+        }
+        if (randomEventRefreshTimeout != null) {
+            randomEventRefreshTimeout.cancel();
         }
         //先等异步落库排空, 避免在途旧快照覆盖后续退出落库
         this.autoSaveService.awaitPending();
@@ -765,6 +787,24 @@ public class SimManager {
                     }
                 }
             }.setHandlerParamWithSelf("sim check playerdata timer"));
+            if (!published) {
+                recordRejectedTickTask(ctx.playerId(), now);
+            }
+        }
+    }
+
+    private void refreshRandomEvents() {
+        long now = System.currentTimeMillis();
+        var executor = PlayerExecutorGroupDisruptor.getDefaultExecutor();
+        for (SimPlayerContext ctx : simPlayerContextRegistry.getContextMap().values()) {
+            boolean published = executor.tryPublish(ctx.playerId(), 0, new BaseHandler<String>() {
+                @Override
+                public void action() {
+                    if (isCurrentContext(ctx)) {
+                        randomEvents.onScheduledRefresh(ctx);
+                    }
+                }
+            }.setHandlerParamWithSelf("sim random event refresh"));
             if (!published) {
                 recordRejectedTickTask(ctx.playerId(), now);
             }

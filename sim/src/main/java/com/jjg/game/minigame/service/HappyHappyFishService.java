@@ -24,6 +24,8 @@ import com.jjg.game.sampledata.bean.MinigameFishCfg;
 import com.jjg.game.sampledata.bean.MinigameFishSkilCfg;
 import com.jjg.game.sampledata.bean.MinigameHappyHappyFishCfg;
 import com.jjg.game.sim.data.SimPlayerContext;
+import com.jjg.game.sim.randomevent.SimRandomEventService;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.jjg.game.sim.service.SimAutoSaveService;
 import com.jjg.game.sim.service.SimChapterService;
 import com.jjg.game.sim.service.SimConfigCacheService;
@@ -36,6 +38,8 @@ import java.util.*;
 /** 欢乐捉鱼：客户端负责操作，服务器负责单局时限、积分和道具结算。 */
 @Service
 public class HappyHappyFishService {
+    @Autowired
+    private SimRandomEventService randomEvents;
     private static final Logger log = LoggerFactory.getLogger(HappyHappyFishService.class);
     private static final long END_TOLERANCE_MILLIS = 2000L;
     private static final int DURATION_BONUS = 1;
@@ -241,6 +245,7 @@ public class HappyHappyFishService {
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
         if (round != null) {
             if (round.getState() != RoundState.CLEARED) {
+                round.randomEventConfigId = 0;
                 int code = settle(ctx, round);
                 if (code != Code.SUCCESS) {
                     return code;
@@ -359,6 +364,9 @@ public class HappyHappyFishService {
                 ctx.playerId(), round.getRewards(), AddType.SIM_HAPPY_HAPPY_FISH, true);
         if (result.success()) {
             round.setState(RoundState.CLEARED);
+            if (round.randomEventConfigId != 0) {
+                randomEvents.roomFinished(ctx, round.randomEventConfigId);
+            }
         } else {
             log.warn("欢乐捉鱼发奖失败 playerId={},roundId={},score={},code={}",
                     ctx.playerId(), round.getRoundId(), round.getScore(), result.code);

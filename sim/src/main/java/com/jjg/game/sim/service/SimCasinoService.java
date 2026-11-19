@@ -28,6 +28,7 @@ import com.jjg.game.sim.pb.res.ResSwitchCasino;
 import com.jjg.game.sim.pb.res.ResUnlockCasino;
 import com.jjg.game.sim.pb.struct.BuildLevelMaxInfo;
 import com.jjg.game.sim.pb.struct.CasinoUpgradeCondition;
+import com.jjg.game.sim.randomevent.SimRandomEventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,6 +86,8 @@ public class SimCasinoService implements SimTaskStateReporter {
     private SimEmployeeRedDotService employeeRedDotService;
     @Autowired
     private TogetherPlayReconnectDao togetherPlayReconnectDao;
+    @Autowired
+    private SimRandomEventService randomEvents;
 
 
     /**
@@ -221,6 +224,7 @@ public class SimCasinoService implements SimTaskStateReporter {
             base.resetOnlineRewardDay(Integer.parseInt(TimeHelper.getDate(now, "yyyyMMdd")));
             res.adCdEndTime = base.getOnlineRewardAdCdEndTime() > now ? base.getOnlineRewardAdCdEndTime() : 0;
             res.noads = base.isNoads();
+            res.randomEvents = randomEvents.ownEvents(ctx);
         } catch (Exception e) {
             log.error("", e);
             res.code = Code.EXCEPTION;

@@ -7,6 +7,7 @@ import java.util.Map;
 
 /** 会话内单局，初始结束时间作为局号，捕获积分加成在开局时确定。 */
 public class HappyHappyFishRound {
+    public int randomEventConfigId;
     private static final int FIRST_FISH_ID = 101;
     private static final int ALL_FISH_TARGET = 6;
     private static final int FISH_TYPE = 1;

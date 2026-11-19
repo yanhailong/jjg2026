@@ -366,6 +366,12 @@ public interface SimConstant {
         //重置雇员等级
         int REQ_RESET_EMPLOYEE_LEVEL = BASE_MSG_PREFIX | 0xBC;
         int RES_RESET_EMPLOYEE_LEVEL = BASE_MSG_PREFIX | 0xBD;
+
+        int REQ_RANDOM_EVENT_LIST = BASE_MSG_PREFIX | 0xBE;
+        int RES_RANDOM_EVENT_LIST = BASE_MSG_PREFIX | 0xBF;
+        int REQ_RANDOM_EVENT_ACTION = BASE_MSG_PREFIX | 0xC0;
+        int RES_RANDOM_EVENT_ACTION = BASE_MSG_PREFIX | 0xC1;
+        int NOTIFY_RANDOM_EVENTS = BASE_MSG_PREFIX | 0xC2;
     }
 
     interface SpecialGuest {

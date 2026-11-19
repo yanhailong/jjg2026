@@ -27,6 +27,8 @@ import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.data.BuildingData;
 import com.jjg.game.sim.data.SimCasinoData;
 import com.jjg.game.sim.data.SimPlayerContext;
+import com.jjg.game.sim.randomevent.SimRandomEventService;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.jjg.game.sim.listener.SimPlayerTickListener;
 import com.jjg.game.sim.service.SimAutoSaveService;
 import com.jjg.game.sim.service.SimChapterService;
@@ -43,6 +45,8 @@ import java.util.Map;
 /** 飞驰快送：客户端负责操作，服务器负责时限、计分、扣费和发奖。 */
 @Service
 public class SpeedyDeliveryService implements SimPlayerTickListener {
+    @Autowired
+    private SimRandomEventService randomEvents;
     private static final Logger log = LoggerFactory.getLogger(SpeedyDeliveryService.class);
     private static final long END_TOLERANCE_MILLIS = 2000L;
     private static final int DURATION_BONUS = 1;
@@ -135,7 +139,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         int level = data.getSkillLevel(groupId);
         var skillTree = configCacheService.getMinigameSpeedySkills();
         MiniGameSkillTree.Upgrade upgrade = skillTree.checkUpgrade(ctx.playerId(), groupId,
-                data.getSkillLevels(), data.getSkillPoints(), skillTree::isRoot);
+                data.getSkillLevels(), data.getSkillPoints(), configCacheService.getMinigameSpeedyInitialSkillGroupIds()::contains);
         if (upgrade.code() == Code.SUCCESS) {
             data.setSkillPoints(data.getSkillPoints() - upgrade.cost());
             data.setSkillLevel(groupId, ++level);
@@ -364,6 +368,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
     public int onExit(SimPlayerContext ctx) {
         SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
         if (round != null && round.getState() != RoundState.CLEARED) {
+            round.randomEventConfigId = 0;
             int code = settle(ctx, round);
             if (code != Code.SUCCESS) {
                 return code;
@@ -480,6 +485,9 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                 ctx.playerId(), round.getRewards(), AddType.SIM_SPEEDY_DELIVERY, true);
         if (result.success()) {
             round.setState(RoundState.CLEARED);
+            if (round.randomEventConfigId != 0) {
+                randomEvents.roomFinished(ctx, round.randomEventConfigId);
+            }
         } else {
             log.warn("飞驰快送发奖失败 playerId={},score={},code={}", ctx.playerId(), round.getScore(), result.code);
         }

@@ -190,6 +190,7 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private volatile MiniGameSkillTree<MinigameFishSkilCfg> minigameFishSkills = fishSkillTree(List.of());
     private volatile Set<Integer> minigameFishInitialSkillGroupIds = Set.of();
     private volatile MiniGameSkillTree<MinigameSpeedySkilCfg> minigameSpeedySkills = speedySkillTree(List.of());
+    private volatile Set<Integer> minigameSpeedyInitialSkillGroupIds = Set.of();
 
     @Autowired
     public SimConfigCacheService(ConditionRuleRegistry conditionRules,
@@ -622,7 +623,8 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
     private void loadGlobalConfig() {
         loadSpecialGuestGlobalConfig();
         loadOnlineRewardDiamondCosts();
-        loadMinigameFishInitialSkillGroupIds();
+        minigameFishInitialSkillGroupIds = readInitialSkillGroupIds(MiniGameConstant.HAPPY_HAPPY_FISH_INITIAL_SKILLS_GLOBAL_ID);
+        minigameSpeedyInitialSkillGroupIds = readInitialSkillGroupIds(MiniGameConstant.SPEEDY_DELIVERY_INITIAL_SKILLS_GLOBAL_ID);
         //广告收益倍数配置
         GlobalConfigCfg adCfg = GameDataManager.getGlobalConfigCfg(SimConstant.Common.GLOBAL_AD_MULTIPLIER_ID);
         if (adCfg != null && adCfg.getValue() != null && !adCfg.getValue().isEmpty()) {
@@ -1012,13 +1014,11 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
                 MinigameSpeedySkilCfg::getLevel, MinigameSpeedySkilCfg::getCost, MinigameSpeedySkilCfg::getLinkedSkillID);
     }
 
-    private void loadMinigameFishInitialSkillGroupIds() {
-        int globalId = MiniGameConstant.HAPPY_HAPPY_FISH_INITIAL_SKILLS_GLOBAL_ID;
+    private Set<Integer> readInitialSkillGroupIds(int globalId) {
         GlobalConfigCfg cfg = GameDataManager.getGlobalConfigCfg(globalId);
         String value = cfg == null ? null : cfg.getValue();
         if (StringUtils.isBlank(value)) {
-            minigameFishInitialSkillGroupIds = Set.of();
-            return;
+            return Set.of();
         }
 
         Set<Integer> ids = new HashSet<>();
@@ -1026,10 +1026,10 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
             try {
                 ids.add(Integer.parseInt(token.trim()));
             } catch (NumberFormatException e) {
-                log.warn("欢乐捉鱼初始技能组ID格式错误 globalId={},value={},token={}", globalId, value, token);
+                log.warn("小游戏初始技能组ID格式错误 globalId={},value={},token={}", globalId, value, token);
             }
         }
-        minigameFishInitialSkillGroupIds = Set.copyOf(ids);
+        return Set.copyOf(ids);
     }
 
     @Override
@@ -1788,5 +1788,9 @@ public class SimConfigCacheService implements ConfigExcelChangeListener {
 
     public MiniGameSkillTree<MinigameSpeedySkilCfg> getMinigameSpeedySkills() {
         return minigameSpeedySkills;
+    }
+
+    public Set<Integer> getMinigameSpeedyInitialSkillGroupIds() {
+        return minigameSpeedyInitialSkillGroupIds;
     }
 }

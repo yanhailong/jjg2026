@@ -6,6 +6,7 @@ import java.util.Map;
 
 /** 赌神搓牌单局，只保存在玩家会话；重新进入或退出会话即放弃。 */
 public class GodGamblersRound {
+    public int randomEventConfigId;
     //服务器局号，拒绝上一局迟到的取牌、结算请求
     private long roundId;
     //对手的牌开局固定，ID按黑桃、红桃、梅花、方块各13张，花色内2到A递增

@@ -7,6 +7,7 @@ import com.jjg.game.common.proto.ProtobufMessage;
 import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.pb.struct.CasinoUpgradeCondition;
 import com.jjg.game.sim.pb.struct.CoopTaskInfo;
+import com.jjg.game.sim.pb.struct.RandomEventInfo;
 
 import java.util.List;
 
@@ -45,6 +46,8 @@ public class ResSimCasinoInfo extends AbstractResponse {
     public long adCdEndTime;
     @ProtoDesc("是否拥有永久免广告权益")
     public boolean noads;
+    @ProtoDesc("自己场景中当前存在的系统事件和好友投放事件")
+    public List<RandomEventInfo> randomEvents;
 
     public ResSimCasinoInfo(int code) {
         super(code);

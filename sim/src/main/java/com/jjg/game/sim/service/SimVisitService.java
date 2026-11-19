@@ -43,6 +43,8 @@ import com.jjg.game.sim.pb.struct.VisitCasinoInfo;
 import com.jjg.game.sim.pb.struct.VisitCommentInfo;
 import com.jjg.game.sim.pb.struct.VisitGameInfo;
 import com.jjg.game.sim.pb.struct.VisitRecordInfo;
+import com.jjg.game.sim.randomevent.SimRandomEventService;
+import com.jjg.game.social.service.FriendService;
 import com.jjg.game.social.service.SimRobotService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,6 +113,10 @@ public class SimVisitService implements IRedDotService {
     private RedDotManager redDotManager;
     @Autowired
     private SimRobotService simRobotService;
+    @Autowired
+    private FriendService friendService;
+    @Autowired
+    private SimRandomEventService randomEvents;
 
 
     public ResVisitCasino visit(SimPlayerContext ctx, long playerId, int casinoId) {
@@ -174,6 +180,13 @@ public class SimVisitService implements IRedDotService {
             res.unreadComments = self == null ? 0 : self.getUnreadCommentCount();
             res.commentUnlocked = canComment(ctx.playerId());
             res.commissionRate = configService.getCommissionRate();
+            if (!robot && friendService.isFriend(ctx.playerId(), playerId)) {
+                try {
+                    randomEvents.onFriendVisit(ctx, playerId, res);
+                } catch (Exception e) {
+                    log.error("拜访随机事件初始化失败 visitorId={},ownerId={}", ctx.playerId(), playerId, e);
+                }
+            }
         } catch (Exception e) {
             log.error("拜访赌场失败 visitorId={},ownerId={},casinoId={}", ctx.playerId(), playerId, casinoId, e);
             res.code = Code.EXCEPTION;

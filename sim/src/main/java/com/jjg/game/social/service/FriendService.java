@@ -70,6 +70,10 @@ public class FriendService implements IRedDotService {
      * @param playerId
      * @return
      */
+    public boolean isFriend(long playerId, long friendId) {
+        return friendDao.getOrEmpty(playerId).isFriend(friendId);
+    }
+
     public ResFriendList friendList(long playerId) {
         ResFriendList res = new ResFriendList(Code.SUCCESS);
         try {

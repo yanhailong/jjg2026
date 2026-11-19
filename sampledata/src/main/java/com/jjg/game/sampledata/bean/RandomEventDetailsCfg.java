@@ -33,6 +33,8 @@ public class RandomEventDetailsCfg extends BaseCfgBean {
   protected String character;
   /** 事件人物形象 */
   protected String character_2d;
+  /** 拜访好友-好友场景中随到此事件的权重值 */
+  protected int f_EventWeight;
   /** 其他参数：老千初始刷新数量_老千需求数量 */
   protected List<Integer> parameter1;
   /** 其他参数：投资倒计时（秒） */
@@ -41,6 +43,8 @@ public class RandomEventDetailsCfg extends BaseCfgBean {
   protected List<Integer> redirectsID_AB;
   /** 事件结算_多语言ID_A|B */
   protected List<Integer> result_AB;
+  /** 自己场景中，随到此事件的权重值 */
+  protected int s_EventWeight;
   /** 事件描述多语言ID */
   protected List<Integer> unlockCondition;
 
@@ -79,6 +83,11 @@ public class RandomEventDetailsCfg extends BaseCfgBean {
     return character_2d;
   }
 
+  /** 返回拜访好友-好友场景中随到此事件的权重值 */
+  public int getF_EventWeight() {
+    return f_EventWeight;
+  }
+
   /** 返回其他参数：老千初始刷新数量_老千需求数量 */
   public List<Integer> getParameter1() {
     return parameter1;
@@ -97,6 +106,11 @@ public class RandomEventDetailsCfg extends BaseCfgBean {
   /** 返回事件结算_多语言ID_A|B */
   public List<Integer> getResult_AB() {
     return result_AB;
+  }
+
+  /** 返回自己场景中，随到此事件的权重值 */
+  public int getS_EventWeight() {
+    return s_EventWeight;
   }
 
   /** 返回事件描述多语言ID */

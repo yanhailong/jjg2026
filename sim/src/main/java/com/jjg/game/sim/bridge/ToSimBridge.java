@@ -13,6 +13,8 @@ import com.jjg.game.sim.data.*;
 import com.jjg.game.sim.pb.res.ResActivePass;
 import com.jjg.game.sim.pb.res.ResBuyMiniShop;
 import com.jjg.game.sim.pb.res.ResTokenShop;
+import com.jjg.game.sim.pb.res.ResSimRandomEventAction;
+import com.jjg.game.sim.pb.res.ResSimRandomEventList;
 import com.jjg.game.sim.pb.res.ResSimTaskReward;
 import com.jjg.game.sim.pb.res.ResSlotsStatistics;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
@@ -97,6 +99,10 @@ public interface ToSimBridge extends IGameRpc {
      * 在玩家所属 SIM 节点执行指定赌场拜访。
      */
     ResVisitCasino visitCasino(long playerId, long targetPlayerId, int casinoId);
+
+    ResSimRandomEventList randomEventList(long playerId);
+
+    ResSimRandomEventAction randomEventAction(long playerId, int configId, int action, int target);
 
     /**
      * 斗仙牌完成一次大结算后，批量推进真人玩家当前已接取的对应任务。
