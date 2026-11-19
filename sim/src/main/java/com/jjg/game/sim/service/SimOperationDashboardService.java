@@ -232,11 +232,13 @@ public class SimOperationDashboardService implements IRedDotService, SimPlayerTi
             data.interactionCount = receptionBuilding ? building.getReceptCount() : 0;
             data.exposure = values.getOrDefault(BuildingOutputType.EXPOSURE, 0L);
             data.awareness = values.getOrDefault(BuildingOutputType.AWARENESS, 0L);
-            // 客户端运营部沿用 Service 展示项；它对应运营部用于获客计算的曝光度。
-            data.serviceCapacity = building.getId() == operationBuildingId ? data.exposure : 0L;
 
             if (receptionBuilding) {
+                data.serviceCapacity = values.getOrDefault(BuildingOutputType.SERVICE, 0L);
                 data.satisfactionRate = overview.satisfactionRate;
+            } else if (building.getId() == operationBuildingId) {
+                // 运营部的 Service 展示值对应曝光度。
+                data.serviceCapacity = data.exposure;
             }
             if (data.exposure > 0) {
                 data.operationRate = overview.operationRate;
