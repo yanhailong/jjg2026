@@ -1174,6 +1174,16 @@ public class SimMessageHandler implements GmListener {
         executeVisit(pc, randomEvents::list, ResSimRandomEventList::new, ReqSimRandomEventList.class);
     }
 
+    @Command(SimConstant.MsgBean.REQ_RANDOM_EVENT_INFO)
+    public void reqRandomEventInfo(PlayerController pc, ReqSimRandomEventInfo req) {
+        if (simPlayerContextRegistry.getContext(pc.playerId()) == null) {
+            pc.send(callVisitOwner(pc, "查询随机事件详情 configId=" + req.configId,
+                    bridge -> bridge.randomEventInfo(pc.playerId(), req.configId), ResSimRandomEventInfo::new));
+            return;
+        }
+        executeVisit(pc, ctx -> randomEvents.detail(ctx, req.configId), ResSimRandomEventInfo::new, ReqSimRandomEventInfo.class);
+    }
+
     @Command(SimConstant.MsgBean.REQ_RANDOM_EVENT_ACTION)
     public void reqRandomEventAction(PlayerController pc, ReqSimRandomEventAction req) {
         if (simPlayerContextRegistry.getContext(pc.playerId()) == null) {

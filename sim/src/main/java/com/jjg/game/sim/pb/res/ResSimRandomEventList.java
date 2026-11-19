@@ -14,12 +14,8 @@ import java.util.List;
 public class ResSimRandomEventList extends AbstractResponse {
     @ProtoDesc("被拜访好友的玩家ID，0表示自己的场景")
     public long visitTargetId;
-    @ProtoDesc("当前玩家今日还能在好友场景完成的事件数，自己的场景为0")
-    public int remainingVisitCompletions;
     @ProtoDesc("当前场景可见的随机事件列表")
     public List<RandomEventInfo> events;
-    @ProtoDesc("当日事件处理上限。自己的场景为系统事件上限加今日已接收的好友投放数，拜访场景为访客每日处理上限")
-    public int dailyCompletionLimit;
 
     public ResSimRandomEventList(int code) {
         super(code);

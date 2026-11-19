@@ -14,6 +14,7 @@ import com.jjg.game.sim.pb.res.ResActivePass;
 import com.jjg.game.sim.pb.res.ResBuyMiniShop;
 import com.jjg.game.sim.pb.res.ResTokenShop;
 import com.jjg.game.sim.pb.res.ResSimRandomEventAction;
+import com.jjg.game.sim.pb.res.ResSimRandomEventInfo;
 import com.jjg.game.sim.pb.res.ResSimRandomEventList;
 import com.jjg.game.sim.pb.res.ResSimTaskReward;
 import com.jjg.game.sim.pb.res.ResSlotsStatistics;
@@ -101,6 +102,8 @@ public interface ToSimBridge extends IGameRpc {
     ResVisitCasino visitCasino(long playerId, long targetPlayerId, int casinoId);
 
     ResSimRandomEventList randomEventList(long playerId);
+
+    ResSimRandomEventInfo randomEventInfo(long playerId, int configId);
 
     ResSimRandomEventAction randomEventAction(long playerId, int configId, int action, int target);
 

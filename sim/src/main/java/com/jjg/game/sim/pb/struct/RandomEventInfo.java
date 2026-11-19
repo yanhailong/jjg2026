@@ -28,4 +28,8 @@ public class RandomEventInfo {
     public List<Integer> openedBoxes;
     @ProtoDesc("已抓捕的间谍编号列表，编号从0开始")
     public List<Integer> capturedTargets;
+    @ProtoDesc("今日已完成的随机事件数。自己的场景统计系统事件及好友投放，拜访时统计玩家在所有好友场景的完成数")
+    public int dailyCompletedCount;
+    @ProtoDesc("当日事件处理上限。自己的场景为系统事件上限加今日已接收的好友投放数，拜访场景为访客每日处理上限")
+    public int dailyCompletionLimit;
 }

@@ -372,6 +372,8 @@ public interface SimConstant {
         int REQ_RANDOM_EVENT_ACTION = BASE_MSG_PREFIX | 0xC0;
         int RES_RANDOM_EVENT_ACTION = BASE_MSG_PREFIX | 0xC1;
         int NOTIFY_RANDOM_EVENTS = BASE_MSG_PREFIX | 0xC2;
+        int REQ_RANDOM_EVENT_INFO = BASE_MSG_PREFIX | 0xC3;
+        int RES_RANDOM_EVENT_INFO = BASE_MSG_PREFIX | 0xC4;
     }
 
     interface SpecialGuest {

@@ -48,6 +48,7 @@ import com.jjg.game.sim.pb.res.NotifyTogetherPlayInvite;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
 import com.jjg.game.sim.pb.req.ReqSimRandomEventAction;
 import com.jjg.game.sim.pb.res.ResSimRandomEventAction;
+import com.jjg.game.sim.pb.res.ResSimRandomEventInfo;
 import com.jjg.game.sim.pb.res.ResSimRandomEventList;
 import com.jjg.game.sim.randomevent.SimRandomEventService;
 import com.jjg.game.sim.service.SimCoopTaskService;
@@ -434,6 +435,17 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
             return new ResSimRandomEventList(Code.NOT_FOUND);
         }
         return randomEvents.list(ctx);
+    }
+
+    @Override
+    @RpcCallSetting(processorModKey = "#arg0")
+    public ResSimRandomEventInfo randomEventInfo(long playerId, int configId) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
+        if (ctx == null) {
+            log.warn("跨节点查询随机事件详情失败，模拟经营上下文不存在 playerId={},configId={}", playerId, configId);
+            return new ResSimRandomEventInfo(Code.NOT_FOUND);
+        }
+        return randomEvents.detail(ctx, configId);
     }
 
     @Override

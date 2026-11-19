@@ -13,8 +13,10 @@ class SimRandomEventState {
     final long playerId;
     long day;
     long receiveDay;
+    long completionDay;
     int refills;
     int received;
+    int completions;
     List<Long> pendingDonors = new ArrayList<>();
     List<SceneEvent> events = new ArrayList<>();
 
@@ -24,6 +26,16 @@ class SimRandomEventState {
 
     int receivedOn(long currentDay) {
         return receiveDay == currentDay ? received : 0;
+    }
+
+    int completedOn(long currentDay) {
+        return completionDay == currentDay ? completions : 0;
+    }
+
+    void completeEvent(int index, long currentDay) {
+        events.remove(index);
+        completions = completedOn(currentDay) + 1;
+        completionDay = currentDay;
     }
 
     boolean startDay(long currentDay) {
