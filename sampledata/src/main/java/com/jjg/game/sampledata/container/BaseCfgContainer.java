@@ -140,7 +140,7 @@ public abstract class BaseCfgContainer<T extends BaseCfgBean> {
         // 获取子类中字段信息
         Map<String, Field> cfgBeanFieldMap = getAllFieldsMap();
         // 单元格跳过列表
-        Set<Integer> skipCellList = getSkipCellList(sheet);
+        Set<Integer> skipCellList = getSkipCellList(sheet, excelFieldInfoMap.keySet());
         // 检查是否所有字段都在配置表中, 如果没有则抛出异常
         checkExcelFieldMatchBeanField(excelFieldInfoMap, cfgBeanFieldMap, sheet, file);
         // 是否有异常
@@ -316,13 +316,16 @@ public abstract class BaseCfgContainer<T extends BaseCfgBean> {
    *
    * @return 是否跳过
    */
-  private Set<Integer> getSkipCellList(Sheet sheet) {
+  private Set<Integer> getSkipCellList(Sheet sheet, Set<Integer> fieldColumns) {
     Set<Integer> skipCellList = new HashSet<>();
-    Row dataFieldRangeRow = sheet.getRow(getDataStartRow());
+    Row dataFieldRangeRow = sheet.getRow(getFieldDataRangeRow());
     if (dataFieldRangeRow == null || dataFieldRangeRow.getLastCellNum() <= 0) {
       return skipCellList;
     }
     for (Cell cell : dataFieldRangeRow) {
+      if (!fieldColumns.contains(cell.getColumnIndex())) {
+        continue;
+      }
       String cellValue = getCellValue(cell);
       if (!isEmptyString(cellValue) && "client".equalsIgnoreCase(cellValue)) {
         skipCellList.add(cell.getColumnIndex());

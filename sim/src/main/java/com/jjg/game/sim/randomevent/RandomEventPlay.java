@@ -199,17 +199,17 @@ final class RandomEventPlay {
         return Map.of(Integer.parseInt(item[0]), Math.multiplyExact(Long.parseLong(item[1]), multiplier));
     }
 
-    record Outcome(int code, SceneEvent event, boolean completed, Map<Integer, Long> rewards, int resultLanguageId) {
+    record Outcome(int code, SceneEvent event, boolean completed, Map<Integer, Long> rewards, List<Integer> resultLanguageId) {
         static Outcome update(SceneEvent event) {
-            return new Outcome(Code.SUCCESS, event, false, Map.of(), 0);
+            return new Outcome(Code.SUCCESS, event, false, Map.of(), List.of());
         }
 
         static Outcome finish(SceneEvent event, Map<Integer, Long> rewards) {
-            return finish(event, rewards, 0);
+            return finish(event, rewards, List.of());
         }
 
         static Outcome finishA(SceneEvent event, RandomEventDetailsCfg cfg) {
-            return finish(event, cfg.getA_reward(), resultLanguageId(cfg, 0));
+            return finish(event, cfg.getA_reward(), resultLanguageIds(cfg, 0));
         }
 
         static Outcome finishB(SceneEvent event, RandomEventDetailsCfg cfg) {
@@ -217,21 +217,21 @@ final class RandomEventPlay {
         }
 
         static Outcome finishB(SceneEvent event, RandomEventDetailsCfg cfg, Map<Integer, Long> rewards) {
-            return finish(event, rewards, resultLanguageId(cfg, 1));
+            return finish(event, rewards, resultLanguageIds(cfg, 1));
         }
 
-        private static Outcome finish(SceneEvent event, Map<Integer, Long> rewards, int resultLanguageId) {
+        private static Outcome finish(SceneEvent event, Map<Integer, Long> rewards, List<Integer> resultLanguageId) {
             return new Outcome(Code.SUCCESS, event, true, rewards == null ? Map.of() : rewards, resultLanguageId);
         }
 
-        private static int resultLanguageId(RandomEventDetailsCfg cfg, int rewardIndex) {
-            List<Integer> ids = cfg.getResult_AB();
-            Integer languageId = ids != null && rewardIndex < ids.size() ? ids.get(rewardIndex) : null;
-            return languageId == null ? 0 : languageId;
+        private static List<Integer> resultLanguageIds(RandomEventDetailsCfg cfg, int rewardIndex) {
+            List<List<Integer>> groups = cfg.getResult_AB();
+            List<Integer> ids = groups != null && rewardIndex < groups.size() ? groups.get(rewardIndex) : null;
+            return ids == null ? List.of() : ids;
         }
 
         static Outcome reject(SceneEvent event, int code) {
-            return new Outcome(code, event, false, Map.of(), 0);
+            return new Outcome(code, event, false, Map.of(), List.of());
         }
     }
 }

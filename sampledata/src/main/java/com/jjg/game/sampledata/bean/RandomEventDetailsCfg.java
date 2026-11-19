@@ -31,8 +31,6 @@ public class RandomEventDetailsCfg extends BaseCfgBean {
   protected int areaId;
   /** 事件人物形象 */
   protected String character;
-  /** 事件人物形象 */
-  protected String character_2d;
   /** 拜访好友-好友场景中随到此事件的权重值 */
   protected int f_EventWeight;
   /** 其他参数：老千初始刷新数量_老千需求数量 */
@@ -42,7 +40,7 @@ public class RandomEventDetailsCfg extends BaseCfgBean {
   /** 按钮跳转功能 A|B */
   protected List<Integer> redirectsID_AB;
   /** 事件结算_多语言ID_A|B */
-  protected List<Integer> result_AB;
+  protected List<List<Integer>> result_AB;
   /** 自己场景中，随到此事件的权重值 */
   protected int s_EventWeight;
   /** 事件描述多语言ID */
@@ -78,11 +76,6 @@ public class RandomEventDetailsCfg extends BaseCfgBean {
     return character;
   }
 
-  /** 返回事件人物形象 */
-  public String getCharacter_2d() {
-    return character_2d;
-  }
-
   /** 返回拜访好友-好友场景中随到此事件的权重值 */
   public int getF_EventWeight() {
     return f_EventWeight;
@@ -104,7 +97,7 @@ public class RandomEventDetailsCfg extends BaseCfgBean {
   }
 
   /** 返回事件结算_多语言ID_A|B */
-  public List<Integer> getResult_AB() {
+  public List<List<Integer>> getResult_AB() {
     return result_AB;
   }
 

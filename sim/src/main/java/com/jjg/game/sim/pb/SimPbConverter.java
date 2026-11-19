@@ -14,7 +14,6 @@ import com.jjg.game.sim.service.SimBuildingService;
 import com.jjg.game.sim.service.SimConfigCacheService;
 import com.jjg.game.sim.service.SimEmployeeAttributeService;
 import com.jjg.game.sim.service.SimEmployeeService;
-import com.jjg.game.sim.service.SimOperationDashboardService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +82,7 @@ public final class SimPbConverter {
                 ? toBuildingUpgradeConditonInfo(simConfigCacheService, buildingData, 10) : null;
 
         //交互次数
-        info.interactCount = buildingData.getReceptCount();
+//        info.interactCount = buildingData.getReceptCount();
         int operateBuildId = simConfigCacheService.getCasinoManageBuildId(ctx.getCurrentCasino().getCasinoId(), ServerBuildingType.OPERATIONS);
         if (operateBuildId == info.id) {
             //交互次数
@@ -91,8 +90,7 @@ public final class SimPbConverter {
                 CasinoStatsSheetCfg casinoCfg = simConfigCacheService.getCasinoStatsSheetCfg(
                         ctx.getCurrentCasino().getCasinoId(), ctx.getCurrentCasino().getCasinoLevel());
                 //运营看板每分钟获客量
-                info.interactCount = Math.toIntExact(CommonUtil.getContext()
-                        .getBean(SimOperationDashboardService.class).customerAcquisitionPerMinute(ctx, casinoCfg, ctx.getCurrentCasino(), System.currentTimeMillis()));
+//                info.interactCount = Math.toIntExact(CommonUtil.getContext().getBean(SimOperationDashboardService.class).customerAcquisitionPerMinute(ctx, casinoCfg, ctx.getCurrentCasino(), System.currentTimeMillis()));
             }
         }
 
