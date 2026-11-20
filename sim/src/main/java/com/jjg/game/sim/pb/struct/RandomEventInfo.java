@@ -47,7 +47,7 @@ public class RandomEventInfo {
     @ProtobufMessage
     @ProtoDesc("宝箱随机事件")
     public static class RandomEventBoxInfo {
-        @ProtoDesc("剩余广告开箱次数")
+        @ProtoDesc("除首次免费开箱外，剩余可开的宝箱数量")
         public int remainingAdOpens;
         @ProtoDesc("三个宝箱，列表索引0到2对应开箱操作的目标位置")
         public List<RandomEventBoxSlotInfo> boxes;

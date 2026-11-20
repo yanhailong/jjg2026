@@ -272,6 +272,10 @@ public class SimRandomEventService {
 
     public ResSimRandomEventAction act(SimPlayerContext ctx, ReqSimRandomEventAction request) {
         long playerId = ctx.playerId();
+        if (request.action < RandomEventPlay.VIEW
+                || (request.action > RandomEventPlay.TARGET && request.action != RandomEventPlay.CLAIM)) {
+            return reject(playerId, request, Code.PARAM_ERROR, "不支持的随机事件操作");
+        }
         if (ctx.getVisitTargetId() != 0) {
             if (ctx.visitRandomEvents == null) {
                 return reject(playerId, request, Code.NOT_FOUND, "没有好友随机事件会话");
@@ -508,7 +512,7 @@ public class SimRandomEventService {
                 ItemUtils.buildItemInfo(RandomEventPlay.chestReward(cfg, 2)));
         List<Integer> previewOrder = RandomEventPlay.CHEST_PREVIEW_ORDER;
         RandomEventBoxInfo info = new RandomEventBoxInfo();
-        info.remainingAdOpens = event.progress();
+        info.remainingAdOpens = previewOrder.size() - Math.max(1, Integer.bitCount(event.auxiliary()));
         info.boxes = new ArrayList<>(previewOrder.size());
         for (int i = 0; i < previewOrder.size(); i++) {
             RandomEventBoxSlotInfo box = new RandomEventBoxSlotInfo();

@@ -31,7 +31,6 @@ final class RandomEventPlay {
     static final int CHOOSE_B = 3;
     static final int START = 4;
     static final int TARGET = 5;
-    static final int AD = 6;
     static final int CLAIM = 7;
 
     static final List<Integer> CHEST_PREVIEW_ORDER = List.of(1, 2, 0);
@@ -74,16 +73,11 @@ final class RandomEventPlay {
         if (action == CLAIM && event.auxiliary() != 0) {
             return Outcome.finish(event, chestRewards(event, cfg));
         }
-        if (action == AD && event.auxiliary() != 0
-                && event.progress() < 3 - Integer.bitCount(event.auxiliary())) {
-            return Outcome.update(event.advance(event.progress() + 1, event.auxiliary(), 0, event.values()));
-        }
-        if (action != TARGET || target < 0 || target >= 3 || (event.auxiliary() & (1 << target)) != 0
-                || (event.auxiliary() != 0 && event.progress() <= 0)) {
+        if (action != TARGET || target < 0 || target >= 3 || (event.auxiliary() & (1 << target)) != 0) {
             return Outcome.reject(event, Code.FORBID);
         }
         int opened = event.auxiliary() | (1 << target);
-        SceneEvent updated = event.advance(Math.max(0, event.progress() - 1), opened, 0, event.values());
+        SceneEvent updated = event.advance(0, opened, 0, event.values());
         return opened == 7 ? Outcome.finish(updated, chestRewards(updated, cfg)) : Outcome.update(updated);
     }
 
@@ -107,7 +101,7 @@ final class RandomEventPlay {
     }
 
     private static Outcome spy(SceneEvent event, RandomEventDetailsCfg cfg, int action, int target) {
-        if (action == AD) {
+        if (action == CHOOSE_A) {
             return Outcome.finishA(event, cfg);
         }
         List<Integer> limits = cfg.getParameter1();
@@ -140,10 +134,10 @@ final class RandomEventPlay {
             }
             return Outcome.update(event.advance(1, 0, now + TimeUnit.SECONDS.toMillis(duration.getFirst()), List.of()));
         }
-        if (action == CLAIM && event.readyAt() > 0 && now >= event.readyAt()) {
-            return Outcome.finishB(event, cfg);
-        }
-        if (action == AD && event.readyAt() > now) {
+        if (action == CLAIM && event.readyAt() > 0) {
+            if (now >= event.readyAt()) {
+                return Outcome.finishB(event, cfg);
+            }
             Map<Integer, Long> rewards = new HashMap<>();
             if (cfg.getB_reward() != null) {
                 cfg.getB_reward().forEach((item, count) -> rewards.put(item, Math.multiplyExact(count, 2)));
