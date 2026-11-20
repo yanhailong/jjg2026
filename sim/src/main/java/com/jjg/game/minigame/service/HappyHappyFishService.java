@@ -1,5 +1,6 @@
 package com.jjg.game.minigame.service;
 
+import com.alibaba.fastjson.JSON;
 import com.jjg.game.common.utils.TimeHelper;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
@@ -115,7 +116,10 @@ public class HappyHappyFishService {
                 .map(groupId -> new HappyHappyFishSkillInfo(groupId, data.getSkillLevel(groupId)))
                 .toList();
         res.skillPoints = data.getSkillPoints();
-        log.debug("欢乐捉鱼查询技能 playerId={},skillCount={},skillPoints={}", ctx.playerId(), res.skills.size(), res.skillPoints);
+        if (log.isInfoEnabled()) {
+            log.info("欢乐捉鱼查询技能 playerId={},skillCount={},skillPoints={},skills={}",
+                    ctx.playerId(), res.skills.size(), res.skillPoints, JSON.toJSONString(res.skills));
+        }
         return res;
     }
 

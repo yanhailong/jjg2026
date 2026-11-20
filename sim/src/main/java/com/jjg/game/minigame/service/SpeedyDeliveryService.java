@@ -1,8 +1,10 @@
 package com.jjg.game.minigame.service;
 
+import com.alibaba.fastjson.JSON;
 import com.jjg.game.common.utils.TimeHelper;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
+import com.jjg.game.core.constant.GameConstant;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
 import com.jjg.game.core.service.PlayerPackService;
@@ -133,6 +135,10 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                 .map(groupId -> new SpeedyDeliverySkillInfo(groupId, data.getSkillLevel(groupId)))
                 .toList();
         res.skillPoints = data.getSkillPoints();
+        if (log.isInfoEnabled()) {
+            log.info("飞驰快送查询技能 playerId={},skillCount={},skillPoints={},skills={}",
+                    ctx.playerId(), res.skills.size(), res.skillPoints, JSON.toJSONString(res.skills));
+        }
         return res;
     }
 
@@ -155,7 +161,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         return res;
     }
 
-    /** 整批货物的基础分合计后向上取整，再按车型应用一次技能加成。 */
+    /** 按货物类别加分后乘以技能提升后的货车匹配倍率，整批合计再向上取整。 */
     public ResDeliverSpeedyDeliveryGoods deliver(SimPlayerContext ctx, List<Integer> goodsIds, int truckId) {
         SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
         ResDeliverSpeedyDeliveryGoods res = new ResDeliverSpeedyDeliveryGoods(checkPlaying(round));
@@ -182,7 +188,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
             return res;
         }
         long numerator = 0;
-        long limit = (Integer.MAX_VALUE - (long) round.getScore()) * 100;
+        long limit = (Integer.MAX_VALUE - (long) round.getScore()) * GameConstant.TEN_THOUSAND;
         for (Integer goodsId : goodsIds) {
             MinigamegoodsCfg goods = goodsId == null ? null : GameDataManager.getMinigamegoodsCfg(goodsId);
             if (goods == null) {
@@ -191,35 +197,36 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                 return res;
             }
             // Minigamegoods.type：1 糕点、2 酒水、3 生鲜。
-            int multiplier = switch (goods.getType()) {
+            int goodsType = goods.getType();
+            int baseMultiplier = switch (goodsType) {
                 case 1 -> truck.getFragileMultiplier();
                 case 2 -> truck.getDangerMultiplier();
                 case 3 -> truck.getNormalMultiplier();
                 default -> -1;
             };
-            if (goods.getScore() < 0 || multiplier < 0) {
+            if (goods.getScore() < 0 || baseMultiplier < 0) {
                 log.warn("飞驰快送交货失败，计分配置无效 playerId={},truckId={},goodsId={},type={},score={},multiplier={}",
-                        ctx.playerId(), truckId, goodsId, goods.getType(), goods.getScore(), multiplier);
+                        ctx.playerId(), truckId, goodsId, goodsType, goods.getScore(), baseMultiplier);
                 res.code = Code.SAMPLE_ERROR;
                 return res;
             }
-            long value = (long) goods.getScore() * multiplier;
-            if (value > limit - numerator) {
-                log.warn("飞驰快送交货失败，积分超出上限 playerId={},truckId={},goodsId={},score={},required={},remaining={}",
-                        ctx.playerId(), truckId, goodsId, round.getScore(), value, limit - numerator);
+            long goodsScore = round.scoreForGoods(goodsType, goods.getScore());
+            long multiplier = round.truckMultiplier(truckId, goodsType, baseMultiplier);
+            if (goodsScore < 0 || multiplier < 0) {
+                log.warn("飞驰快送交货失败，技能加成后计分配置无效 playerId={},truckId={},goodsId={},type={},baseScore={},baseMultiplier={},goodsScore={},multiplierBasisPoints={}",
+                        ctx.playerId(), truckId, goodsId, goodsType, goods.getScore(), baseMultiplier, goodsScore, multiplier);
+                res.code = Code.SAMPLE_ERROR;
+                return res;
+            }
+            if (goodsScore > 0 && multiplier > (limit - numerator) / goodsScore) {
+                log.warn("飞驰快送交货失败，积分超出上限 playerId={},truckId={},goodsId={},score={},goodsScore={},multiplierBasisPoints={},remainingNumerator={}",
+                        ctx.playerId(), truckId, goodsId, round.getScore(), goodsScore, multiplier, limit - numerator);
                 res.code = Code.PARAM_ERROR;
                 return res;
             }
-            numerator += value;
+            numerator += goodsScore * multiplier;
         }
-        long baseScore = (numerator + 99) / 100;
-        long deliveryScore = round.scoreForTruck(truckId, baseScore);
-        if (deliveryScore < 0 || deliveryScore > Integer.MAX_VALUE - round.getScore()) {
-            log.warn("飞驰快送交货失败，技能加成后积分超出范围 playerId={},truckId={},roundScore={},baseScore={},deliveryScore={}",
-                    ctx.playerId(), truckId, round.getScore(), baseScore, deliveryScore);
-            res.code = Code.PARAM_ERROR;
-            return res;
-        }
+        long deliveryScore = Math.ceilDiv(numerator, GameConstant.TEN_THOUSAND);
         SpeedyDeliveryData data = loadData(ctx);
         for (int goodsId : goodsIds) {
             if (data.addWarehouseGoods(goodsId, 1) > 0) {
@@ -229,8 +236,8 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         res.deliveryScore = (int) deliveryScore;
         round.setScore(round.getScore() + res.deliveryScore);
         res.score = round.getScore();
-        log.debug("飞驰快送交货成功 playerId={},truckId={},count={},baseScore={},deliveryScore={},score={},endTime={}",
-                ctx.playerId(), truckId, goodsIds.size(), baseScore, res.deliveryScore, res.score, round.getEndTime());
+        log.debug("飞驰快送交货成功 playerId={},truckId={},count={},goodsIds={},deliveryScore={},score={},endTime={}",
+                ctx.playerId(), truckId, goodsIds.size(), goodsIds, res.deliveryScore, res.score, round.getEndTime());
         return res;
     }
 
@@ -519,6 +526,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                                     data.getPlayerId(), cfg.getId(), effect);
                         }
                     }
+                    case 1001, 1002, 1003 -> round.addTruckMultiplierBonus(effect.getFirst(), flat, permille);
                     case BACKPACK_CAPACITY_BONUS -> {
                         if (target == 1) {
                             capacityFlat += flat;

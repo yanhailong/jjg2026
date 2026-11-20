@@ -18,6 +18,7 @@ public class SpeedyDeliveryRound extends TimedMiniGameRound {
     private Map<Integer, Long> rewards;
     private long[] scoreFlat;
     private long[] scorePermille;
+    private final Map<Integer, Long> truckMultiplierBonuses = new HashMap<>();
     private long goodsRewardFlat;
     private long goodsRewardPermille;
     // 按货物ID统计本局实际入仓数量，首次结算时计入技能增加的部分。
@@ -42,18 +43,28 @@ public class SpeedyDeliveryRound extends TimedMiniGameRound {
         return true;
     }
 
-    public long scoreForTruck(int truckId, long baseScore) {
-        int category = switch (truckId) {
+    public long scoreForGoods(int category, int baseScore) {
+        if (scoreFlat == null) {
+            return baseScore;
+        }
+        int index = category - 1;
+        return baseScore + scoreFlat[index] + MiniGameSkillEffect.scaleByPermille(baseScore, scorePermille[index]);
+    }
+
+    public void addTruckMultiplierBonus(int truckId, int flat, int permille) {
+        truckMultiplierBonuses.merge(truckId, flat * 100L + permille, Long::sum);
+    }
+
+    /** 配置表倍率以百分比填写，换算到万分比以保留技能倍率的小数。 */
+    public long truckMultiplier(int truckId, int goodsCategory, int baseMultiplier) {
+        int matchingCategory = switch (truckId) {
             case 1002 -> 1;
             case 1003 -> 2;
             case 1001 -> 3;
             default -> 0;
         };
-        if (scoreFlat == null || category == 0) {
-            return baseScore;
-        }
-        int index = category - 1;
-        return baseScore + scoreFlat[index] + MiniGameSkillEffect.scaleByPermille(baseScore, scorePermille[index]);
+        long bonus = goodsCategory == matchingCategory ? truckMultiplierBonuses.getOrDefault(truckId, 0L) : 0;
+        return baseMultiplier * 100L + bonus;
     }
 
     public void recordDeliveredGood(int goodsId) {
