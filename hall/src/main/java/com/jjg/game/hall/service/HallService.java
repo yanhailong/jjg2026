@@ -38,6 +38,7 @@ import com.jjg.game.hall.pb.struct.WarePoolInfo;
 import com.jjg.game.hall.utils.HallTool;
 import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.*;
+import com.jjg.game.sim.constant.BuildingOutputType;
 import com.jjg.game.sim.data.SimCasinoUnlock;
 import com.jjg.game.sim.listener.SimSpecialItemBalanceListener;
 import com.jjg.game.sim.service.SimCasinoService;
@@ -678,9 +679,9 @@ public class HallService implements ConfigExcelChangeListener, TimerListener {
             if (simSpecialItemBalanceListeners != null && !simSpecialItemBalanceListeners.isEmpty()) {
                 Map<Integer, Long> onlineRewardItemsMap = null;
                 if (itemCfg.getItemType() == GameConstant.Item.ITEM_TYPE_CASINO_EXP) {
-                    onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 12);
+                    onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), BuildingOutputType.CASINO_LEVEL_EXP.getItemId());
                 } else if (itemCfg.getItemType() == GameConstant.Item.ITEM_TYPE_GOLD) {
-                    onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 1);
+                    onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), BuildingOutputType.GOLD.getItemId());
                 } else if (itemCfg.getItemType() == GameConstant.Item.ITEM_TYPE_ONLINE_REWARD) {
                     onlineRewardItemsMap = simSpecialItemBalanceListeners.getFirst().output(player.getId(), 0);
                 }
