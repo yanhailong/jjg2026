@@ -113,8 +113,8 @@ public class SimMiniGameService {
                                 ctx.getPlayer(), cfg.getCostItemID(), AddType.SIM_CHEATER_HUNT);
                         res.code = cost.code;
                         if (!cost.success()) {
-                            log.warn("找老千开局道具扣除失败 playerId={},levelId={},code={}",
-                                    ctx.playerId(), data.getLevelId(), cost.code);
+                            log.warn("找老千开局道具扣除失败 playerId={},levelId={},mapId={},costItems={},code={}",
+                                    ctx.playerId(), cfg.getId(), mapId, cfg.getCostItemID(), cost.code);
                         } else {
                             CheaterHuntRound round = newRound(ctx, data);
                             round.setMapId(mapId);
@@ -129,6 +129,9 @@ public class SimMiniGameService {
                             round.setEndTime(cfg.getTimeLimit() == -1 ? -1
                                     : System.currentTimeMillis() + cfg.getTimeLimit() * 1000L
                                     + (round.getRoundId() == 1 ? 120_000L : 0));
+                            log.info("找老千开局成功 playerId={},roundId={},levelId={},mapId={},targetCount={},endTime={},costItems={}",
+                                    ctx.playerId(), round.getRoundId(), cfg.getId(), mapId, cfg.getTargetCount(),
+                                    round.getEndTime(), cfg.getCostItemID());
                             conditionService.onRoundStarted(ctx, 1);
                         }
                     }
@@ -151,9 +154,14 @@ public class SimMiniGameService {
         if (index < 0) {
             log.warn("找老千解锁进度配置不存在 playerId={},levelId={}", ctx.playerId(), data.getLevelId());
             res.code = Code.SAMPLE_ERROR;
-        } else if (index + 1 >= levels.size() || !canStart(ctx)) {
+        } else if (index + 1 >= levels.size()) {
+            log.warn("找老千解锁下一关被拒绝，已到最后一关 playerId={},levelId={}", ctx.playerId(), data.getLevelId());
+            res.code = Code.REPEAT_OP;
+        } else if (!canStart(ctx)) {
             res.code = Code.REPEAT_OP;
         } else if (data.getMaxPassedLevelId() != data.getLevelId()) {
+            log.warn("找老千解锁下一关被拒绝，当前关卡尚未通关 playerId={},levelId={},maxPassedLevelId={}",
+                    ctx.playerId(), data.getLevelId(), data.getMaxPassedLevelId());
             res.code = Code.NOT_UNLOCKED;
         } else {
             MinigameCheaterHuntLevelCfg next = level(ctx, levels.get(index + 1).getId());
@@ -167,9 +175,11 @@ public class SimMiniGameService {
                 if (cost.success()) {
                     data.setLevelId(next.getId());
                     autoSaveService.enqueueSave(data);
+                    log.info("找老千解锁下一关成功 playerId={},previousLevelId={},levelId={},costItems={}",
+                            ctx.playerId(), current.getId(), next.getId(), next.getClearCount());
                 } else {
-                    log.warn("找老千解锁道具扣除失败 playerId={},levelId={},code={}",
-                            ctx.playerId(), next.getId(), cost.code);
+                    log.warn("找老千解锁道具扣除失败 playerId={},levelId={},costItems={},code={}",
+                            ctx.playerId(), next.getId(), next.getClearCount(), cost.code);
                 }
             }
         }
@@ -205,6 +215,8 @@ public class SimMiniGameService {
                 }
                 if (res.code == Code.SUCCESS) {
                     res.hit = round.getCheaterSpots().contains(spotId);
+                    log.debug("找老千处理点位 playerId={},roundId={},levelId={},mapId={},spotId={},hit={}",
+                            ctx.playerId(), roundId, cfg.getId(), map.getId(), spotId, res.hit);
                     if (res.hit) {
                         round.getFoundSpots().add(spotId);
                         if (round.getFoundSpots().size() >= cfg.getTargetCount()) {
@@ -248,6 +260,11 @@ public class SimMiniGameService {
                 res.code = Code.REPEAT_OP;
             }
             if (res.code == Code.SUCCESS && !openOneClickPass(ctx)) {
+                GlobalConfigCfg gate = GameDataManager.getGlobalConfigCfg(MiniGameConstant.QUICK_CLEAR_CHAPTER_GLOBAL_ID);
+                log.warn("找老千一键通关未开放 playerId={},levelId={},globalId={},chapterLevelId={},requiredLevelId={}",
+                        ctx.playerId(), data.getLevelId(), MiniGameConstant.QUICK_CLEAR_CHAPTER_GLOBAL_ID,
+                        ctx.getSimChapterData() == null ? null : ctx.getSimChapterData().getLevelId(),
+                        gate == null ? null : gate.getIntValue());
                 res.code = Code.NOT_UNLOCKED;
             }
             if (res.code == Code.SUCCESS) {
@@ -259,12 +276,14 @@ public class SimMiniGameService {
                             ctx.getPlayer(), cfg.getCostItemID(), AddType.SIM_CHEATER_HUNT);
                     res.code = cost.code;
                     if (!cost.success()) {
-                        log.warn("找老千一键通关扣除失败 playerId={},levelId={},code={}",
-                                ctx.playerId(), data.getLevelId(), cost.code);
+                        log.warn("找老千一键通关扣除失败 playerId={},levelId={},costItems={},code={}",
+                                ctx.playerId(), cfg.getId(), cfg.getCostItemID(), cost.code);
                     } else {
                         //跳过场景与点位生成，避免为一键通关分配无用的随机数据。
                         round = newRound(ctx, data);
                         round.setState(RoundState.REWARD_PENDING);
+                        log.info("找老千一键通关扣费成功 playerId={},roundId={},levelId={},costItems={}",
+                                ctx.playerId(), round.getRoundId(), cfg.getId(), cfg.getCostItemID());
                         conditionService.onRoundStarted(ctx, 1);
                     }
                 }
@@ -286,7 +305,9 @@ public class SimMiniGameService {
         ResExitCheaterHuntGame res = new ResExitCheaterHuntGame(Code.SUCCESS);
         CheaterHuntRound round = ctx.getCheaterHuntRound();
         if (round == null || roundId != round.getRoundId()) {
-            log.warn("找老千退出局号不匹配 playerId={},roundId={}", ctx.playerId(), roundId);
+            log.warn("找老千退出局号不匹配 playerId={},roundId={},currentRoundId={},state={}",
+                    ctx.playerId(), roundId, round == null ? null : round.getRoundId(),
+                    round == null ? RoundState.NONE : round.getState());
             res.code = Code.ERROR_REQ;
         } else {
             expire(ctx, round, System.currentTimeMillis());
@@ -298,6 +319,8 @@ public class SimMiniGameService {
             }
             if (res.code == Code.SUCCESS) {
                 ctx.setCheaterHuntRound(null);
+                log.info("找老千退出成功 playerId={},roundId={},levelId={},state={}",
+                        ctx.playerId(), roundId, round.getLevelId(), round.getState());
             }
         }
         res.info = assemble(ctx, data);
@@ -331,7 +354,8 @@ public class SimMiniGameService {
         CommonResult<ItemOperationResult> result = MiniGameDailyItems.replenish(
                 ctx, cfg.getDailyFreeItemCount(), AddType.SIM_CHEATER_HUNT, playerPackService);
         if (!result.success()) {
-            log.warn("找老千每日补足失败 playerId={},levelId={},code={}", ctx.playerId(), cfg.getId(), result.code);
+            log.warn("找老千每日补足失败 playerId={},levelId={},targetItems={},code={}",
+                    ctx.playerId(), cfg.getId(), cfg.getDailyFreeItemCount(), result.code);
             return result.code;
         }
         data.setLastDailyGrantTime(now);
@@ -367,7 +391,9 @@ public class SimMiniGameService {
     /** 寻找前校验局号和状态，倒计时结束后交由find结算，不再处理点位。 */
     private int checkRound(SimPlayerContext ctx, CheaterHuntRound round, long roundId) {
         if (round == null || round.getRoundId() != roundId) {
-            log.warn("找老千寻找局号不匹配 playerId={},roundId={}", ctx.playerId(), roundId);
+            log.warn("找老千寻找局号不匹配 playerId={},roundId={},currentRoundId={},state={}",
+                    ctx.playerId(), roundId, round == null ? null : round.getRoundId(),
+                    round == null ? RoundState.NONE : round.getState());
             return Code.ERROR_REQ;
         }
         expire(ctx, round, System.currentTimeMillis());
@@ -411,16 +437,16 @@ public class SimMiniGameService {
         CommonResult<ItemOperationResult> reward = playerPackService.addItems(
                 ctx.playerId(), cfg.getLoseReward(), AddType.SIM_CHEATER_HUNT, true);
         if (!reward.success()) {
-            log.warn("找老千失败奖励发放失败 playerId={},roundId={},levelId={},code={}",
-                    ctx.playerId(), round.getRoundId(), cfg.getId(), reward.code);
+            log.warn("找老千失败奖励发放失败 playerId={},roundId={},levelId={},rewards={},code={}",
+                    ctx.playerId(), round.getRoundId(), cfg.getId(), cfg.getLoseReward(), reward.code);
             return reward.code;
         }
         round.setFailureRewardGranted(true);
         if (round.randomEventConfigId != 0) {
             randomEvents.roomFinished(ctx, round.randomEventConfigId);
         }
-        log.info("找老千失败结算成功 playerId={},roundId={},levelId={}",
-                ctx.playerId(), round.getRoundId(), cfg.getId());
+        log.info("找老千失败结算成功 playerId={},roundId={},levelId={},randomEventConfigId={},rewards={}",
+                ctx.playerId(), round.getRoundId(), cfg.getId(), round.randomEventConfigId, cfg.getLoseReward());
         return Code.SUCCESS;
     }
 
@@ -433,8 +459,8 @@ public class SimMiniGameService {
         CommonResult<ItemOperationResult> reward = playerPackService.addItems(
                 ctx.playerId(), cfg.getClearReward(), AddType.SIM_CHEATER_HUNT, true);
         if (!reward.success()) {
-            log.warn("找老千通关发奖失败 playerId={},roundId={},levelId={},code={}",
-                    ctx.playerId(), round.getRoundId(), cfg.getId(), reward.code);
+            log.warn("找老千通关发奖失败 playerId={},roundId={},levelId={},rewards={},code={}",
+                    ctx.playerId(), round.getRoundId(), cfg.getId(), cfg.getClearReward(), reward.code);
             return reward.code;
         }
         round.setState(RoundState.CLEARED);
@@ -443,6 +469,8 @@ public class SimMiniGameService {
         }
         data.setMaxPassedLevelId(cfg.getId());
         autoSaveService.enqueueSave(data);
+        log.info("找老千通关结算成功 playerId={},roundId={},levelId={},randomEventConfigId={},rewards={}",
+                ctx.playerId(), round.getRoundId(), cfg.getId(), round.randomEventConfigId, cfg.getClearReward());
         return Code.SUCCESS;
     }
 

@@ -1,6 +1,5 @@
 package com.jjg.game.minigame.service;
 
-import com.alibaba.fastjson.JSON;
 import com.jjg.game.common.utils.TimeHelper;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
@@ -41,7 +40,8 @@ public class HappyHappyFishService {
     @Autowired
     private SimRandomEventService randomEvents;
     private static final Logger log = LoggerFactory.getLogger(HappyHappyFishService.class);
-    private static final long END_TOLERANCE_MILLIS = 2000L;
+    private static final long END_TOLERANCE_MILLIS = 10_000L;
+    private static final long CATCH_TOLERANCE_MILLIS = 2000L;
     private static final int DURATION_BONUS = 1;
     private static final int SCORE_BONUS = 3;
 
@@ -81,7 +81,7 @@ public class HappyHappyFishService {
     /** 进入只获取费用、持有量及章节解锁状态，不重置已有单局。 */
     public ResEnterHappyHappyFishGame enter(SimPlayerContext ctx) {
         ResEnterHappyHappyFishGame res = new ResEnterHappyHappyFishGame(grantDaily(ctx, System.currentTimeMillis()));
-        MinigameHappyHappyFishCfg cfg = config();
+        MinigameHappyHappyFishCfg cfg = config(ctx);
         if (cfg == null) {
             res.code = Code.SAMPLE_ERROR;
             return res;
@@ -115,7 +115,7 @@ public class HappyHappyFishService {
                 .map(groupId -> new HappyHappyFishSkillInfo(groupId, data.getSkillLevel(groupId)))
                 .toList();
         res.skillPoints = data.getSkillPoints();
-        log.warn("打印捉鱼技能 playerId={},res={}",ctx.playerId(), JSON.toJSONString(res));
+        log.debug("欢乐捉鱼查询技能 playerId={},skillCount={},skillPoints={}", ctx.playerId(), res.skills.size(), res.skillPoints);
         return res;
     }
 
@@ -128,6 +128,8 @@ public class HappyHappyFishService {
             data.setSkillPoints(data.getSkillPoints() - upgrade.cost());
             data.getSkillLevels().put(groupId, ++level);
             autoSaveService.enqueueSave(data);
+            log.info("欢乐捉鱼技能升级成功 playerId={},groupId={},level={},cost={},skillPoints={}",
+                    ctx.playerId(), groupId, level, upgrade.cost(), data.getSkillPoints());
         }
         ResUpgradeHappyHappyFishSkill res = new ResUpgradeHappyHappyFishSkill(upgrade.code());
         res.skill = new HappyHappyFishSkillInfo(groupId, level);
@@ -137,7 +139,7 @@ public class HappyHappyFishService {
 
     public ResStartHappyHappyFishGame start(SimPlayerContext ctx) {
         ResStartHappyHappyFishGame res = new ResStartHappyHappyFishGame(Code.SUCCESS);
-        MinigameHappyHappyFishCfg cfg = config();
+        MinigameHappyHappyFishCfg cfg = config(ctx);
         if (cfg == null) {
             res.code = Code.SAMPLE_ERROR;
         } else if (!canStart(ctx)) {
@@ -160,6 +162,8 @@ public class HappyHappyFishService {
             res.paused = round.isPaused();
             res.remainingMillis = round.getRemainingMillis(now);
             res.endTime = res.paused ? 0 : round.getEndTime();
+            log.debug("欢乐捉鱼切换暂停状态成功 playerId={},roundId={},paused={},remainingMillis={},endTime={}",
+                    ctx.playerId(), round.getRoundId(), res.paused, res.remainingMillis, res.endTime);
         } else {
             log.warn("欢乐捉鱼切换暂停状态失败 playerId={},paused={},currentRoundId={},state={},endTime={},now={},code={}",
                     ctx.playerId(), paused, round == null ? 0 : round.getRoundId(),
@@ -174,6 +178,9 @@ public class HappyHappyFishService {
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
         res.code = checkRound(round, roundId);
         if (res.code != Code.SUCCESS) {
+            log.warn("欢乐捉鱼捕获被拒绝，{} playerId={},roundId={},currentRoundId={},fishId={},state={},code={}",
+                    res.code == Code.ERROR_REQ ? "局号不匹配" : "对局已结算", ctx.playerId(), roundId,
+                    round == null ? null : round.getRoundId(), fishId, round == null ? RoundState.NONE : round.getState(), res.code);
             return res;
         }
         res.endTime = round.getEndTime();
@@ -185,11 +192,16 @@ public class HappyHappyFishService {
             return res;
         }
         MinigameFishCfg fish = GameDataManager.getMinigameFishCfg(fishId);
-        if (isExpired(round)) {
+        if (System.currentTimeMillis() > round.getEndTime() + CATCH_TOLERANCE_MILLIS) {
+            log.warn("欢乐捉鱼捕获失败，对局已超时 playerId={},roundId={},fishId={},endTime={}",
+                    ctx.playerId(), roundId, fishId, round.getEndTime());
             res.code = Code.EXPIRE;
         } else if (fish == null) {
+            log.warn("欢乐捉鱼捕获失败，鱼配置不存在 playerId={},roundId={},fishId={}", ctx.playerId(), roundId, fishId);
             res.code = Code.PARAM_ERROR;
         } else if (fish.getScore() < 0 || fish.getMaxCount() <= 0) {
+            log.warn("欢乐捉鱼捕获失败，鱼配置无效 playerId={},roundId={},fishId={},fishScore={},maxCount={}",
+                    ctx.playerId(), roundId, fishId, fish.getScore(), fish.getMaxCount());
             res.code = Code.SAMPLE_ERROR;
         } else {
             long score = round.scoreFor(fishId, fish.getType(), fish.getScore());
@@ -198,10 +210,14 @@ public class HappyHappyFishService {
                         ctx.playerId(), roundId, fishId, round.getScore(), score);
                 res.code = Code.PARAM_ERROR;
             } else if (round.getCaughtCounts().getOrDefault(fishId, 0) >= fish.getMaxCount()) {
+                log.warn("欢乐捉鱼捕获失败，已达该鱼数量上限 playerId={},roundId={},fishId={},caughtCount={},maxCount={}",
+                        ctx.playerId(), roundId, fishId, round.getCaughtCounts().get(fishId), fish.getMaxCount());
                 res.code = Code.PARAM_ERROR;
             } else {
                 round.setScore(round.getScore() + (int) score);
                 round.getCaughtCounts().merge(fishId, 1, Integer::sum);
+                log.debug("欢乐捉鱼捕获成功 playerId={},roundId={},fishId={},catchScore={},score={}",
+                        ctx.playerId(), roundId, fishId, score, round.getScore());
             }
         }
         res.score = round.getScore();
@@ -214,10 +230,15 @@ public class HappyHappyFishService {
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
         res.code = checkRound(round, roundId);
         if (res.code != Code.SUCCESS) {
+            log.warn("欢乐捉鱼结束请求被拒绝，{} playerId={},roundId={},currentRoundId={},state={},code={}",
+                    res.code == Code.ERROR_REQ ? "局号不匹配" : "对局已结算", ctx.playerId(), roundId,
+                    round == null ? null : round.getRoundId(), round == null ? RoundState.NONE : round.getState(), res.code);
             return res;
         }
-        if (round.getState() == RoundState.PLAYING && isExpired(round)) {
+        if (round.getState() == RoundState.PLAYING && isSettlementExpired(round)) {
             creditScore(ctx, round);
+            log.warn("欢乐捉鱼结束请求超时 playerId={},roundId={},score={},endTime={}",
+                    ctx.playerId(), roundId, round.getScore(), round.getEndTime());
             res.code = Code.EXPIRE;
         } else {
             res.code = settle(ctx, round);
@@ -235,13 +256,21 @@ public class HappyHappyFishService {
         ResQuickClearHappyHappyFishGame res = new ResQuickClearHappyHappyFishGame(Code.SUCCESS);
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
         if (round == null || round.getState() != RoundState.REWARD_PENDING || !round.isQuickClear()) {
-            MinigameHappyHappyFishCfg cfg = config();
+            MinigameHappyHappyFishCfg cfg = config(ctx);
             GlobalConfigCfg scoreCfg = GameDataManager.getGlobalConfigCfg(MiniGameConstant.HAPPY_HAPPY_FISH_QUICK_CLEAR_SCORE_GLOBAL_ID);
             if (cfg == null || scoreCfg == null || scoreCfg.getIntValue() < 0) {
+                log.warn("欢乐捉鱼一键通关配置无效 playerId={},gameConfigValid={},globalId={},configuredScore={}",
+                        ctx.playerId(), cfg != null, MiniGameConstant.HAPPY_HAPPY_FISH_QUICK_CLEAR_SCORE_GLOBAL_ID,
+                        scoreCfg == null ? null : scoreCfg.getIntValue());
                 res.code = Code.SAMPLE_ERROR;
             } else if (!canStart(ctx)) {
                 res.code = Code.REPEAT_OP;
             } else if (!openOneClickPass(ctx)) {
+                GlobalConfigCfg gate = GameDataManager.getGlobalConfigCfg(MiniGameConstant.HAPPY_HAPPY_FISH_QUICK_CLEAR_CHAPTER_GLOBAL_ID);
+                log.warn("欢乐捉鱼一键通关未开放 playerId={},globalId={},chapterLevelId={},requiredLevelId={}",
+                        ctx.playerId(), MiniGameConstant.HAPPY_HAPPY_FISH_QUICK_CLEAR_CHAPTER_GLOBAL_ID,
+                        ctx.getSimChapterData() == null ? null : ctx.getSimChapterData().getLevelId(),
+                        gate == null ? null : gate.getIntValue());
                 res.code = Code.NOT_UNLOCKED;
             } else {
                 res.code = prepareStart(ctx, cfg);
@@ -267,6 +296,8 @@ public class HappyHappyFishService {
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
         if (round != null) {
             if (round.getState() != RoundState.CLEARED) {
+                log.debug("欢乐捉鱼退出时触发结算 playerId={},roundId={},state={},score={}",
+                        ctx.playerId(), round.getRoundId(), round.getState(), round.getScore());
                 round.randomEventConfigId = 0;
                 int code = settle(ctx, round);
                 if (code != Code.SUCCESS) {
@@ -290,17 +321,25 @@ public class HappyHappyFishService {
         code = playerPackService.removeItems(ctx.getPlayer(), cfg.getConsumeCount(), AddType.SIM_HAPPY_HAPPY_FISH).code;
         if (code == Code.SUCCESS) {
             conditionService.onRoundStarted(ctx, 3);
+        } else {
+            log.warn("欢乐捉鱼开局道具扣除失败 playerId={},costItems={},code={}",
+                    ctx.playerId(), cfg.getConsumeCount(), code);
         }
         return code;
     }
 
     private boolean canStart(SimPlayerContext ctx) {
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
-        return round == null || round.getState() == RoundState.CLEARED
-                || (round.getState() == RoundState.PLAYING && isExpired(round));
+        if (round == null || round.getState() == RoundState.CLEARED
+                || (round.getState() == RoundState.PLAYING && isSettlementExpired(round))) {
+            return true;
+        }
+        log.warn("欢乐捉鱼已有未结束单局 playerId={},roundId={},state={},endTime={}",
+                ctx.playerId(), round.getRoundId(), round.getState(), round.getEndTime());
+        return false;
     }
 
-    private boolean isExpired(HappyHappyFishRound round) {
+    private boolean isSettlementExpired(HappyHappyFishRound round) {
         return System.currentTimeMillis() > round.getEndTime() + END_TOLERANCE_MILLIS;
     }
 
@@ -317,6 +356,8 @@ public class HappyHappyFishService {
         round.setRoundId(previous == null ? endTime : Math.max(endTime, previous.getRoundId() + 1));
         round.setEndTime(round.getRoundId());
         ctx.setHappyHappyFishRound(round);
+        log.info("欢乐捉鱼开局成功 playerId={},roundId={},quickClear={},endTime={},costItems={}",
+                ctx.playerId(), round.getRoundId(), quickClear, round.getEndTime(), cfg.getConsumeCount());
         return round;
     }
 
@@ -368,7 +409,7 @@ public class HappyHappyFishService {
         creditScore(ctx, round);
         round.setState(RoundState.REWARD_PENDING);
         if (round.getRewards() == null) {
-            MinigameHappyHappyFishCfg cfg = config();
+            MinigameHappyHappyFishCfg cfg = config(ctx);
             if (cfg == null) {
                 return Code.SAMPLE_ERROR;
             }
@@ -381,17 +422,22 @@ public class HappyHappyFishService {
             Map<Integer, Long> rewards = new HashMap<>(cfg.getReward().get(threshold).size());
             cfg.getReward().get(threshold).forEach((itemId, count) -> rewards.put(itemId, count.longValue()));
             round.setRewards(rewards);
+            log.debug("欢乐捉鱼锁定奖励档位 playerId={},roundId={},score={},rewardThreshold={}",
+                    ctx.playerId(), round.getRoundId(), round.getScore(), threshold);
         }
         CommonResult<ItemOperationResult> result = playerPackService.addItems(
                 ctx.playerId(), round.getRewards(), AddType.SIM_HAPPY_HAPPY_FISH, true);
         if (result.success()) {
             round.setState(RoundState.CLEARED);
+            log.info("欢乐捉鱼结算成功 playerId={},roundId={},quickClear={},score={},randomEventConfigId={},rewards={}",
+                    ctx.playerId(), round.getRoundId(), round.isQuickClear(), round.getScore(),
+                    round.randomEventConfigId, round.getRewards());
             if (round.randomEventConfigId != 0) {
                 randomEvents.roomFinished(ctx, round.randomEventConfigId);
             }
         } else {
-            log.warn("欢乐捉鱼发奖失败 playerId={},roundId={},score={},code={}",
-                    ctx.playerId(), round.getRoundId(), round.getScore(), result.code);
+            log.warn("欢乐捉鱼发奖失败 playerId={},roundId={},score={},rewards={},code={}",
+                    ctx.playerId(), round.getRoundId(), round.getScore(), round.getRewards(), result.code);
         }
         return result.code;
     }
@@ -426,14 +472,20 @@ public class HappyHappyFishService {
         if (data.getLastDailyGrantTime() >= now || TimeHelper.inSameDay(data.getLastDailyGrantTime(), now)) {
             return Code.SUCCESS;
         }
-        MinigameHappyHappyFishCfg cfg = config();
-        if (cfg == null || !validItems(cfg.getGrantCount())) {
+        MinigameHappyHappyFishCfg cfg = config(ctx);
+        if (cfg == null) {
+            return Code.SAMPLE_ERROR;
+        }
+        if (!validItems(cfg.getGrantCount())) {
+            log.warn("欢乐捉鱼每日补足配置无效 playerId={},configId={},targetItems={}",
+                    ctx.playerId(), cfg.getId(), cfg.getGrantCount());
             return Code.SAMPLE_ERROR;
         }
         CommonResult<ItemOperationResult> result = MiniGameDailyItems.replenish(
                 ctx, cfg.getGrantCount(), AddType.SIM_HAPPY_HAPPY_FISH, playerPackService);
         if (!result.success()) {
-            log.warn("欢乐捉鱼每日补足失败 playerId={},code={}", ctx.playerId(), result.code);
+            log.warn("欢乐捉鱼每日补足失败 playerId={},targetItems={},code={}",
+                    ctx.playerId(), cfg.getGrantCount(), result.code);
             return result.code;
         }
         data.setLastDailyGrantTime(now);
@@ -442,19 +494,25 @@ public class HappyHappyFishService {
     }
 
     /** 单行配置按需读取，扣费前保证零分奖励及各档奖励合法。 */
-    private MinigameHappyHappyFishCfg config() {
+    private MinigameHappyHappyFishCfg config(SimPlayerContext ctx) {
         Map<Integer, MinigameHappyHappyFishCfg> configs = GameDataManager.getMinigameHappyHappyFishCfgMap();
         if (configs.size() != 1) {
+            log.warn("欢乐捉鱼配置行数无效 playerId={},configCount={},required=1", ctx.playerId(), configs.size());
             return null;
         }
         MinigameHappyHappyFishCfg cfg = configs.values().iterator().next();
         if (cfg.getDuration() <= 0 || !validItems(cfg.getConsumeCount())
                 || cfg.getConsumeCount().isEmpty() || cfg.getReward() == null || !cfg.getReward().containsKey(0)) {
+            log.warn("欢乐捉鱼基础配置无效 playerId={},configId={},duration={},costItems={},hasZeroScoreReward={}",
+                    ctx.playerId(), cfg.getId(), cfg.getDuration(), cfg.getConsumeCount(),
+                    cfg.getReward() != null && cfg.getReward().containsKey(0));
             return null;
         }
         for (Map.Entry<Integer, Map<Integer, Integer>> entry : cfg.getReward().entrySet()) {
             if (entry.getKey() < 0 || entry.getValue() == null || entry.getValue().entrySet().stream().anyMatch(e ->
                     e.getKey() <= 0 || e.getValue() <= 0)) {
+                log.warn("欢乐捉鱼奖励档位配置无效 playerId={},configId={},rewardThreshold={},rewards={}",
+                        ctx.playerId(), cfg.getId(), entry.getKey(), entry.getValue());
                 return null;
             }
         }

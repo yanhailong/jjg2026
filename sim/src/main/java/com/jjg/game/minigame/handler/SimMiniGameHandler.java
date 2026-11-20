@@ -108,6 +108,8 @@ public class SimMiniGameHandler {
 
     private <T extends AbstractResponse> T enterGame(SimPlayerContext ctx, int requiredConfigId, int configId,
                                                    Supplier<T> enter, IntFunction<T> error) {
+        log.debug("进入模拟经营小游戏 playerId={},requiredConfigId={},randomEventConfigId={}",
+                ctx.playerId(), requiredConfigId, configId);
         ctx.clearPendingRoomEvent();
         if (configId == 0) {
             return enter.get();
@@ -138,6 +140,7 @@ public class SimMiniGameHandler {
         if (response.code == Code.SUCCESS) {
             bindEvent.accept(configId);
             ctx.clearPendingRoomEvent();
+            log.debug("小游戏开局绑定随机事件 playerId={},randomEventConfigId={}", ctx.playerId(), configId);
         }
         return response;
     }
@@ -147,7 +150,8 @@ public class SimMiniGameHandler {
     public void reqEnterCheaterHuntGame(PlayerController playerController, ReqEnterCheaterHuntGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
-            log.warn("进入找老千失败，模拟经营上下文不存在，playerId={}", playerController.playerId());
+            log.warn("进入找老千失败，模拟经营上下文不存在 playerId={},randomEventConfigId={}",
+                    playerController.playerId(), req.randomEventConfigId);
             playerController.send(new ResEnterCheaterHuntGame(Code.NOT_FOUND));
             return;
         }
@@ -189,7 +193,8 @@ public class SimMiniGameHandler {
     public void reqFindCheaterHuntSpot(PlayerController playerController, ReqFindCheaterHuntSpot req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
-            log.warn("寻找作弊点位失败，模拟经营上下文不存在，playerId={}", playerController.playerId());
+            log.warn("找老千寻找点位失败，模拟经营上下文不存在 playerId={},roundId={},spotId={}",
+                    playerController.playerId(), req.roundId, req.spotId);
             playerController.send(new ResFindCheaterHuntSpot(Code.NOT_FOUND));
             return;
         }
@@ -201,7 +206,7 @@ public class SimMiniGameHandler {
     public void reqExitCheaterHuntGame(PlayerController playerController, ReqExitCheaterHuntGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
-            log.warn("退出找老千失败，模拟经营上下文不存在，playerId={}", playerController.playerId());
+            log.warn("退出找老千失败，模拟经营上下文不存在 playerId={},roundId={}", playerController.playerId(), req.roundId);
             playerController.send(new ResExitCheaterHuntGame(Code.NOT_FOUND));
             return;
         }
@@ -225,7 +230,8 @@ public class SimMiniGameHandler {
     public void reqEnterGodGamblersGame(PlayerController playerController, ReqEnterGodGamblersGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
-            log.warn("进入赌神搓牌失败，模拟经营上下文不存在，playerId={}", playerController.playerId());
+            log.warn("进入赌神搓牌失败，模拟经营上下文不存在 playerId={},randomEventConfigId={}",
+                    playerController.playerId(), req.randomEventConfigId);
             playerController.send(new ResEnterGodGamblersGame(Code.NOT_FOUND));
             return;
         }
@@ -255,7 +261,8 @@ public class SimMiniGameHandler {
     public void reqGodGamblersSelfPoker(PlayerController playerController, ReqGodGamblersSelfPoker req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
-            log.warn("获取赌神搓牌自己牌失败，模拟经营上下文不存在，playerId={}", playerController.playerId());
+            log.warn("获取赌神搓牌自己牌失败，模拟经营上下文不存在 playerId={},roundId={},rubCount={}",
+                    playerController.playerId(), req.roundId, req.rubCount);
             playerController.send(new ResGodGamblersSelfPoker(Code.NOT_FOUND));
             return;
         }
@@ -267,7 +274,7 @@ public class SimMiniGameHandler {
     public void reqGodGamblersConfirmBattle(PlayerController playerController, ReqGodGamblersConfirmBattle req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
-            log.warn("确认赌神搓牌比拼失败，模拟经营上下文不存在，playerId={}", playerController.playerId());
+            log.warn("确认赌神搓牌比拼失败，模拟经营上下文不存在 playerId={},roundId={}", playerController.playerId(), req.roundId);
             playerController.send(new ResGodGamblersConfirmBattle(Code.NOT_FOUND));
             return;
         }
@@ -290,6 +297,8 @@ public class SimMiniGameHandler {
     public void reqEnterHappyHappyFishGame(PlayerController playerController, ReqEnterHappyHappyFishGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("进入欢乐捉鱼失败，模拟经营上下文不存在 playerId={},randomEventConfigId={}",
+                    playerController.playerId(), req.randomEventConfigId);
             playerController.send(new ResEnterHappyHappyFishGame(Code.NOT_FOUND));
             return;
         }
@@ -305,6 +314,7 @@ public class SimMiniGameHandler {
     public void reqStartHappyHappyFishGame(PlayerController playerController, ReqStartHappyHappyFishGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("开始欢乐捉鱼失败，模拟经营上下文不存在 playerId={}", playerController.playerId());
             playerController.send(new ResStartHappyHappyFishGame(Code.NOT_FOUND));
             return;
         }
@@ -328,6 +338,8 @@ public class SimMiniGameHandler {
     public void reqCatchHappyHappyFish(PlayerController playerController, ReqCatchHappyHappyFish req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("欢乐捉鱼捕获失败，模拟经营上下文不存在 playerId={},roundId={},fishId={}",
+                    playerController.playerId(), req.roundId, req.fishId);
             playerController.send(new ResCatchHappyHappyFish(Code.NOT_FOUND));
             return;
         }
@@ -338,6 +350,7 @@ public class SimMiniGameHandler {
     public void reqEndHappyHappyFishGame(PlayerController playerController, ReqEndHappyHappyFishGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("结束欢乐捉鱼失败，模拟经营上下文不存在 playerId={},roundId={}", playerController.playerId(), req.roundId);
             playerController.send(new ResEndHappyHappyFishGame(Code.NOT_FOUND));
             return;
         }
@@ -348,6 +361,7 @@ public class SimMiniGameHandler {
     public void reqQuickClearHappyHappyFishGame(PlayerController playerController, ReqQuickClearHappyHappyFishGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("欢乐捉鱼一键通关失败，模拟经营上下文不存在 playerId={}", playerController.playerId());
             playerController.send(new ResQuickClearHappyHappyFishGame(Code.NOT_FOUND));
             return;
         }
@@ -358,6 +372,7 @@ public class SimMiniGameHandler {
     public void reqHappyHappyFishSkills(PlayerController playerController, ReqHappyHappyFishSkills req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("查询欢乐捉鱼技能失败，模拟经营上下文不存在 playerId={}", playerController.playerId());
             playerController.send(new ResHappyHappyFishSkills(Code.NOT_FOUND));
             return;
         }
@@ -368,6 +383,8 @@ public class SimMiniGameHandler {
     public void reqUpgradeHappyHappyFishSkill(PlayerController playerController, ReqUpgradeHappyHappyFishSkill req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("升级欢乐捉鱼技能失败，模拟经营上下文不存在 playerId={},groupId={}",
+                    playerController.playerId(), req.groupId);
             playerController.send(new ResUpgradeHappyHappyFishSkill(Code.NOT_FOUND));
             return;
         }
@@ -378,6 +395,8 @@ public class SimMiniGameHandler {
     public void reqEnterSpeedyDeliveryGame(PlayerController playerController, ReqEnterSpeedyDeliveryGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("进入飞驰快送失败，模拟经营上下文不存在 playerId={},randomEventConfigId={}",
+                    playerController.playerId(), req.randomEventConfigId);
             playerController.send(new ResEnterSpeedyDeliveryGame(Code.NOT_FOUND));
             return;
         }
@@ -393,6 +412,7 @@ public class SimMiniGameHandler {
     public void reqStartSpeedyDeliveryGame(PlayerController playerController, ReqStartSpeedyDeliveryGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("开始飞驰快送失败，模拟经营上下文不存在 playerId={}", playerController.playerId());
             playerController.send(new ResStartSpeedyDeliveryGame(Code.NOT_FOUND));
             return;
         }
@@ -416,6 +436,8 @@ public class SimMiniGameHandler {
     public void reqDeliverSpeedyDeliveryGoods(PlayerController playerController, ReqDeliverSpeedyDeliveryGoods req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("飞驰快送交货失败，模拟经营上下文不存在 playerId={},truckId={},count={}",
+                    playerController.playerId(), req.truckId, req.goodsIds == null ? 0 : req.goodsIds.size());
             playerController.send(new ResDeliverSpeedyDeliveryGoods(Code.NOT_FOUND));
             return;
         }
@@ -426,6 +448,7 @@ public class SimMiniGameHandler {
     public void reqDeductSpeedyDeliveryTime(PlayerController playerController, ReqDeductSpeedyDeliveryTime req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("飞驰快送扣时失败，模拟经营上下文不存在 playerId={},seconds={}", playerController.playerId(), req.seconds);
             playerController.send(new ResDeductSpeedyDeliveryTime(Code.NOT_FOUND));
             return;
         }
@@ -436,6 +459,7 @@ public class SimMiniGameHandler {
     public void reqEndSpeedyDeliveryGame(PlayerController playerController, ReqEndSpeedyDeliveryGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("结束飞驰快送失败，模拟经营上下文不存在 playerId={}", playerController.playerId());
             playerController.send(new ResEndSpeedyDeliveryGame(Code.NOT_FOUND));
             return;
         }
@@ -446,6 +470,7 @@ public class SimMiniGameHandler {
     public void reqQuickClearSpeedyDeliveryGame(PlayerController playerController, ReqQuickClearSpeedyDeliveryGame req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx == null) {
+            log.warn("飞驰快送一键通关失败，模拟经营上下文不存在 playerId={}", playerController.playerId());
             playerController.send(new ResQuickClearSpeedyDeliveryGame(Code.NOT_FOUND));
             return;
         }

@@ -48,7 +48,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
     @Autowired
     private SimRandomEventService randomEvents;
     private static final Logger log = LoggerFactory.getLogger(SpeedyDeliveryService.class);
-    private static final long END_TOLERANCE_MILLIS = 2000L;
+    private static final long END_TOLERANCE_MILLIS = 10_000L;
     private static final int DURATION_BONUS = 1;
     private static final int SCORE_BONUS = 4;
     private static final int BACKPACK_CAPACITY_BONUS = 5;
@@ -79,17 +79,17 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         if (round != null && round.getState() == RoundState.REWARD_PENDING) {
             onExit(ctx);
         }
-        grantDaily(ctx, config(), System.currentTimeMillis());
+        grantDaily(ctx, config(ctx), System.currentTimeMillis());
     }
 
     public void onDaily(SimPlayerContext ctx, long now) {
         if (ctx.getPlayerController() != null && ctx.getPlayerController().isOnline()) {
-            grantDaily(ctx, config(), now);
+            grantDaily(ctx, config(ctx), now);
         }
     }
 
     public ResEnterSpeedyDeliveryGame enter(SimPlayerContext ctx) {
-        MinigameSpeedyDeliveryCfg cfg = config();
+        MinigameSpeedyDeliveryCfg cfg = config(ctx);
         ResEnterSpeedyDeliveryGame res = new ResEnterSpeedyDeliveryGame(grantDaily(ctx, cfg, System.currentTimeMillis()));
         if (res.code != Code.SUCCESS) {
             return res;
@@ -115,7 +115,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
 
     public ResStartSpeedyDeliveryGame start(SimPlayerContext ctx) {
         ResStartSpeedyDeliveryGame res = new ResStartSpeedyDeliveryGame(Code.SUCCESS);
-        MinigameSpeedyDeliveryCfg cfg = config();
+        MinigameSpeedyDeliveryCfg cfg = config(ctx);
         res.code = cfg == null ? Code.SAMPLE_ERROR : prepareStart(ctx);
         if (res.code == Code.SUCCESS) {
             res.code = charge(ctx, cfg, false);
@@ -146,6 +146,8 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
             data.setSkillPoints(data.getSkillPoints() - upgrade.cost());
             data.setSkillLevel(groupId, ++level);
             autoSaveService.enqueueSave(data);
+            log.info("飞驰快送技能升级成功 playerId={},groupId={},level={},cost={},skillPoints={}",
+                    ctx.playerId(), groupId, level, upgrade.cost(), data.getSkillPoints());
         }
         ResUpgradeSpeedyDeliverySkill res = new ResUpgradeSpeedyDeliverySkill(upgrade.code());
         res.skill = new SpeedyDeliverySkillInfo(groupId, level);
@@ -188,10 +190,11 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                 res.code = Code.PARAM_ERROR;
                 return res;
             }
+            // Minigamegoods.type：1 糕点、2 酒水、3 生鲜。
             int multiplier = switch (goods.getType()) {
-                case 1 -> truck.getNormalMultiplier();
-                case 2 -> truck.getFragileMultiplier();
-                case 3 -> truck.getDangerMultiplier();
+                case 1 -> truck.getFragileMultiplier();
+                case 2 -> truck.getDangerMultiplier();
+                case 3 -> truck.getNormalMultiplier();
                 default -> -1;
             };
             if (goods.getScore() < 0 || multiplier < 0) {
@@ -226,6 +229,8 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         res.deliveryScore = (int) deliveryScore;
         round.setScore(round.getScore() + res.deliveryScore);
         res.score = round.getScore();
+        log.debug("飞驰快送交货成功 playerId={},truckId={},count={},baseScore={},deliveryScore={},score={},endTime={}",
+                ctx.playerId(), truckId, goodsIds.size(), baseScore, res.deliveryScore, res.score, round.getEndTime());
         return res;
     }
 
@@ -254,6 +259,8 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                     ctx.playerId(), type, slotId, goodsId, tavern.getLevel());
             return new ResStockSpeedyDeliveryShelf(Code.NOT_ENOUGH_ITEM);
         }
+        log.debug("飞驰快送货物上架成功 playerId={},casinoId={},type={},slotId={},goodsId={},capacity={}",
+                ctx.playerId(), casino.getCasinoId(), type, slotId, goodsId, tavern.getLevel());
         return new ResStockSpeedyDeliveryShelf(Code.SUCCESS);
     }
 
@@ -293,6 +300,8 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
             res.paused = round.isPaused();
             res.remainingMillis = round.getRemainingMillis(now);
             res.endTime = res.paused ? 0 : round.getEndTime();
+            log.debug("飞驰快送切换暂停状态成功 playerId={},paused={},remainingMillis={},endTime={}",
+                    ctx.playerId(), res.paused, res.remainingMillis, round.getEndTime());
         } else {
             log.warn("飞驰快送切换暂停状态失败 playerId={},paused={},state={},endTime={},now={},code={}",
                     ctx.playerId(), paused,
@@ -309,6 +318,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                 res.code = Code.PARAM_ERROR;
             } else {
                 round.setEndTime(Math.max(System.currentTimeMillis(), round.getEndTime() - seconds * 1000L));
+                log.debug("飞驰快送扣时成功 playerId={},seconds={},endTime={}", ctx.playerId(), seconds, round.getEndTime());
             }
         }
         if (round != null) {
@@ -325,13 +335,17 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
     public ResEndSpeedyDeliveryGame end(SimPlayerContext ctx) {
         SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
         if (round == null) {
+            log.warn("飞驰快送结束请求被拒绝，当前没有对局 playerId={}", ctx.playerId());
             return new ResEndSpeedyDeliveryGame(Code.ERROR_REQ);
         }
         int code;
         if (round.getState() == RoundState.CLEARED) {
+            log.warn("飞驰快送结束请求被拒绝，对局已结算 playerId={},score={},endTime={}",
+                    ctx.playerId(), round.getScore(), round.getEndTime());
             code = Code.REPEAT_OP;
         } else if (round.getState() == RoundState.PLAYING
                 && System.currentTimeMillis() > round.getEndTime() + END_TOLERANCE_MILLIS) {
+            log.warn("飞驰快送结束请求超时 playerId={},score={},endTime={}", ctx.playerId(), round.getScore(), round.getEndTime());
             code = Code.EXPIRE;
         } else {
             code = settle(ctx, round);
@@ -343,11 +357,19 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         ResQuickClearSpeedyDeliveryGame res = new ResQuickClearSpeedyDeliveryGame(Code.SUCCESS);
         SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
         if (round == null || round.getState() != RoundState.REWARD_PENDING || !round.isQuickClear()) {
-            MinigameSpeedyDeliveryCfg cfg = config();
+            MinigameSpeedyDeliveryCfg cfg = config(ctx);
             GlobalConfigCfg scoreCfg = GameDataManager.getGlobalConfigCfg(MiniGameConstant.SPEEDY_DELIVERY_QUICK_CLEAR_SCORE_GLOBAL_ID);
             if (cfg == null || scoreCfg == null || scoreCfg.getIntValue() < 0) {
+                log.warn("飞驰快送一键通关配置无效 playerId={},gameConfigValid={},globalId={},configuredScore={}",
+                        ctx.playerId(), cfg != null, MiniGameConstant.SPEEDY_DELIVERY_QUICK_CLEAR_SCORE_GLOBAL_ID,
+                        scoreCfg == null ? null : scoreCfg.getIntValue());
                 res.code = Code.SAMPLE_ERROR;
             } else if (!openOneClickPass(ctx)) {
+                GlobalConfigCfg gate = GameDataManager.getGlobalConfigCfg(MiniGameConstant.SPEEDY_DELIVERY_QUICK_CLEAR_CHAPTER_GLOBAL_ID);
+                log.warn("飞驰快送一键通关未开放 playerId={},globalId={},chapterLevelId={},requiredLevelId={}",
+                        ctx.playerId(), MiniGameConstant.SPEEDY_DELIVERY_QUICK_CLEAR_CHAPTER_GLOBAL_ID,
+                        ctx.getSimChapterData() == null ? null : ctx.getSimChapterData().getLevelId(),
+                        gate == null ? null : gate.getIntValue());
                 res.code = Code.NOT_UNLOCKED;
             } else {
                 res.code = prepareStart(ctx);
@@ -371,12 +393,14 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         return res;
     }
 
-    /** 复用玩家tick，在两秒宽限结束后兜底结算；失败保留状态供结束协议或退出重试。 */
+    /** 复用玩家tick，在十秒宽限结束后兜底结算；失败保留状态供结束协议或退出重试。 */
     @Override
     public void onTick(SimPlayerContext ctx, long now) {
         SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
         if (round != null && round.getState() == RoundState.PLAYING
                 && now > round.getEndTime() + END_TOLERANCE_MILLIS) {
+            log.info("飞驰快送对局超时，触发自动结算 playerId={},score={},endTime={},now={}",
+                    ctx.playerId(), round.getScore(), round.getEndTime(), now);
             ctx.send(endResponse(ctx, round, settle(ctx, round)));
         }
     }
@@ -395,6 +419,8 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
     public int onExit(SimPlayerContext ctx) {
         SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
         if (round != null && round.getState() != RoundState.CLEARED) {
+            log.debug("飞驰快送退出时触发结算 playerId={},state={},score={},endTime={}",
+                    ctx.playerId(), round.getState(), round.getScore(), round.getEndTime());
             round.randomEventConfigId = 0;
             int code = settle(ctx, round);
             if (code != Code.SUCCESS) {
@@ -423,8 +449,12 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         }
         if (round.getState() == RoundState.PLAYING
                 && System.currentTimeMillis() > round.getEndTime() + END_TOLERANCE_MILLIS) {
+            log.info("飞驰快送开新局前结算超时旧局 playerId={},score={},endTime={}",
+                    ctx.playerId(), round.getScore(), round.getEndTime());
             return settle(ctx, round);
         }
+        log.warn("飞驰快送已有未结束单局 playerId={},state={},score={},endTime={}",
+                ctx.playerId(), round.getState(), round.getScore(), round.getEndTime());
         return Code.REPEAT_OP;
     }
 
@@ -442,7 +472,12 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                 applySkillEffects(loadData(ctx), round, baseDuration);
             }
             ctx.setSpeedyDeliveryRound(round);
+            log.info("飞驰快送开局成功 playerId={},quickClear={},endTime={},capacity={},costItems={}",
+                    ctx.playerId(), quickClear, round.getEndTime(), round.getBackpackCapacity(), cfg.getConsumeCount());
             conditionService.onRoundStarted(ctx, 4);
+        } else {
+            log.warn("飞驰快送开局道具扣除失败 playerId={},quickClear={},costItems={},code={}",
+                    ctx.playerId(), quickClear, cfg.getConsumeCount(), code);
         }
         return code;
     }
@@ -480,7 +515,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                     }
                     case SCORE_BONUS -> {
                         if (!round.addScoreBonus(target, flat, permille)) {
-                            log.warn("飞驰快送加分技能的车型配置无效 playerId={},skillId={},effect={},required=1..3",
+                            log.warn("飞驰快送加分技能的类别配置无效 playerId={},skillId={},effect={},required=1..3",
                                     data.getPlayerId(), cfg.getId(), effect);
                         }
                     }
@@ -524,6 +559,8 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
             Map<Integer, Long> rewards = new HashMap<>(selected.size());
             selected.forEach((itemId, count) -> rewards.put(itemId, count.longValue()));
             round.setRewards(rewards);
+            log.debug("飞驰快送锁定奖励档位 playerId={},score={},rewardThreshold={},endTime={}",
+                    ctx.playerId(), round.getScore(), threshold, round.getEndTime());
             SpeedyDeliveryData data = loadData(ctx);
             Map<Integer, Long> deliveredGoods = round.getDeliveredGoods();
             if (!deliveredGoods.isEmpty()) {
@@ -539,11 +576,15 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
                 ctx.playerId(), round.getRewards(), AddType.SIM_SPEEDY_DELIVERY, true);
         if (result.success()) {
             round.setState(RoundState.CLEARED);
+            log.info("飞驰快送结算成功 playerId={},quickClear={},score={},endTime={},randomEventConfigId={},rewards={},extraRewards={}",
+                    ctx.playerId(), round.isQuickClear(), round.getScore(), round.getEndTime(),
+                    round.randomEventConfigId, round.getRewards(), round.getDeliveredGoods());
             if (round.randomEventConfigId != 0) {
                 randomEvents.roomFinished(ctx, round.randomEventConfigId);
             }
         } else {
-            log.warn("飞驰快送发奖失败 playerId={},score={},code={}", ctx.playerId(), round.getScore(), result.code);
+            log.warn("飞驰快送发奖失败 playerId={},quickClear={},score={},endTime={},rewards={},code={}",
+                    ctx.playerId(), round.isQuickClear(), round.getScore(), round.getEndTime(), round.getRewards(), result.code);
         }
         return result.code;
     }
@@ -571,7 +612,7 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         CommonResult<ItemOperationResult> result = MiniGameDailyItems.replenish(
                 ctx, cfg.getGrantCount(), AddType.SIM_SPEEDY_DELIVERY, playerPackService);
         if (!result.success()) {
-            log.warn("飞驰快送每日补足失败 playerId={},code={}", ctx.playerId(), result.code);
+            log.warn("飞驰快送每日补足失败 playerId={},targetItems={},code={}", ctx.playerId(), cfg.getGrantCount(), result.code);
             return result.code;
         }
         data.setLastDailyGrantTime(now);
@@ -593,19 +634,25 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         return data;
     }
 
-    private MinigameSpeedyDeliveryCfg config() {
+    private MinigameSpeedyDeliveryCfg config(SimPlayerContext ctx) {
         Map<Integer, MinigameSpeedyDeliveryCfg> configs = GameDataManager.getMinigameSpeedyDeliveryCfgMap();
         if (configs.size() != 1) {
+            log.warn("飞驰快送配置行数无效 playerId={},configCount={},required=1", ctx.playerId(), configs.size());
             return null;
         }
         MinigameSpeedyDeliveryCfg cfg = configs.values().iterator().next();
         if (cfg.getDuration() <= 0 || cfg.getBackpackCapacity() <= 0 || !validItems(cfg.getConsumeCount())
                 || cfg.getConsumeCount().isEmpty() || !validItems(cfg.getGrantCount())
                 || cfg.getReward() == null || !cfg.getReward().containsKey(0)) {
+            log.warn("飞驰快送基础配置无效 playerId={},configId={},duration={},capacity={},costItems={},targetItems={},hasZeroScoreReward={}",
+                    ctx.playerId(), cfg.getId(), cfg.getDuration(), cfg.getBackpackCapacity(), cfg.getConsumeCount(),
+                    cfg.getGrantCount(), cfg.getReward() != null && cfg.getReward().containsKey(0));
             return null;
         }
         for (var entry : cfg.getReward().entrySet()) {
             if (entry.getKey() < 0 || !validItems(entry.getValue())) {
+                log.warn("飞驰快送奖励档位配置无效 playerId={},configId={},rewardThreshold={},rewards={}",
+                        ctx.playerId(), cfg.getId(), entry.getKey(), entry.getValue());
                 return null;
             }
         }

@@ -87,7 +87,12 @@ public class GodGamblersService {
      * 重新进入视为放弃旧局，不返还消耗，不发放旧局奖励。
      */
     public ResEnterGodGamblersGame enter(SimPlayerContext ctx) {
+        GodGamblersRound previous = ctx.getGodGamblersRound();
         ctx.setGodGamblersRound(null);
+        if (previous != null && previous.getState() != RoundState.CLEARED) {
+            log.info("赌神搓牌重新进入时放弃旧局 playerId={},roundId={},state={},rubCount={}",
+                    ctx.playerId(), previous.getRoundId(), previous.getState(), previous.getRubCount());
+        }
         ResEnterGodGamblersGame res = new ResEnterGodGamblersGame(grantDaily(ctx, System.currentTimeMillis()));
         MinigameGodofGamblersRubbingCfg cfg = config(ctx);
         if (cfg == null) {
@@ -106,7 +111,7 @@ public class GodGamblersService {
      */
     public ResStartGodGamblersGame start(SimPlayerContext ctx) {
         ResStartGodGamblersGame res = new ResStartGodGamblersGame(Code.SUCCESS);
-        res.code = startRound(ctx);
+        res.code = startRound(ctx, false);
         res.info = info(ctx.getGodGamblersRound());
         MinigameGodofGamblersRubbingCfg cfg = GameDataManager.getMinigameGodofGamblersRubbingCfg(MiniGameConstant.GOD_GAMBLERS_CONFIG_ID);
         if (cfg != null) {
@@ -143,12 +148,15 @@ public class GodGamblersService {
             if (difference < 0) {
                 res.code = Code.SAMPLE_ERROR;
             } else {
-                res.code = charge(ctx, cfg);
+                res.code = charge(ctx, cfg, round);
                 if (res.code == Code.SUCCESS) {
                     setSelfPoker(round, cfg, difference);
                     round.setRubCount(round.getRubCount() + 1);
                 }
             }
+        }
+        if (res.code == Code.SUCCESS) {
+            log.debug("赌神搓牌取牌成功 playerId={},roundId={},rubCount={}", ctx.playerId(), roundId, round.getRubCount());
         }
         res.info = info(round);
         if (cfg != null) {
@@ -193,7 +201,7 @@ public class GodGamblersService {
                     unlockCfg == null ? null : unlockCfg.getIntValue());
             res.code = Code.NOT_UNLOCKED;
         } else {
-            res.code = startRound(ctx);
+            res.code = startRound(ctx, true);
         }
         GodGamblersRound round = ctx.getGodGamblersRound();
         if (res.code == Code.SUCCESS) {
@@ -214,7 +222,7 @@ public class GodGamblersService {
     /**
      * 先校验并准备合法结果，扣费成功后才发布新局，失败不覆盖原局。
      */
-    private int startRound(SimPlayerContext ctx) {
+    private int startRound(SimPlayerContext ctx, boolean quickClear) {
         GodGamblersRound current = ctx.getGodGamblersRound();
         if (current != null && current.getState() != RoundState.CLEARED) {
             log.warn("赌神已有未结束单局 playerId={},roundId={},state={}",
@@ -235,9 +243,11 @@ public class GodGamblersService {
         int opponentRank = RandomUtils.randomMinMax(MIN_RANK, MAX_RANK - difference);
         round.setOpponentPoker(poker(opponentRank));
         setSelfPoker(round, cfg, difference);
-        int code = charge(ctx, cfg);
+        int code = charge(ctx, cfg, round);
         if (code == Code.SUCCESS) {
             ctx.setGodGamblersRound(round);
+            log.info("赌神搓牌开局成功 playerId={},roundId={},quickClear={},costItems={}",
+                    ctx.playerId(), round.getRoundId(), quickClear, cfg.getItemCost());
             conditionService.onRoundStarted(ctx, 2);
         }
         return code;
@@ -246,10 +256,11 @@ public class GodGamblersService {
     /**
      * 开局与重搓共用配置费用，扣费失败不改变牌及已用次数。
      */
-    private int charge(SimPlayerContext ctx, MinigameGodofGamblersRubbingCfg cfg) {
+    private int charge(SimPlayerContext ctx, MinigameGodofGamblersRubbingCfg cfg, GodGamblersRound round) {
         CommonResult<ItemOperationResult> cost = playerPackService.removeItems(ctx.getPlayer(), cfg.getItemCost(), AddType.SIM_GOD_GAMBLERS);
         if (!cost.success()) {
-            log.warn("赌神道具扣除失败 playerId={},code={}", ctx.playerId(), cost.code);
+            log.warn("赌神搓牌道具扣除失败 playerId={},roundId={},rubCount={},costItems={},code={}",
+                    ctx.playerId(), round.getRoundId(), round.getRubCount(), cfg.getItemCost(), cost.code);
         }
         return cost.code;
     }
@@ -300,7 +311,9 @@ public class GodGamblersService {
      */
     private int checkRound(SimPlayerContext ctx, GodGamblersRound round, long roundId) {
         if (round == null || round.getRoundId() != roundId) {
-            log.warn("赌神局号不匹配 playerId={},roundId={}", ctx.playerId(), roundId);
+            log.warn("赌神局号不匹配 playerId={},roundId={},currentRoundId={},state={}",
+                    ctx.playerId(), roundId, round == null ? null : round.getRoundId(),
+                    round == null ? RoundState.NONE : round.getState());
             return Code.ERROR_REQ;
         }
         if (round.getState() == RoundState.CLEARED) {
@@ -318,10 +331,13 @@ public class GodGamblersService {
         CommonResult<ItemOperationResult> reward = playerPackService.addItems(
                 ctx.playerId(), round.getRewards(), AddType.SIM_GOD_GAMBLERS, true);
         if (!reward.success()) {
-            log.warn("赌神比拼发奖失败 playerId={},roundId={},code={}", ctx.playerId(), round.getRoundId(), reward.code);
+            log.warn("赌神比拼发奖失败 playerId={},roundId={},rewards={},code={}",
+                    ctx.playerId(), round.getRoundId(), round.getRewards(), reward.code);
             return reward.code;
         }
         round.setState(RoundState.CLEARED);
+        log.info("赌神搓牌结算成功 playerId={},roundId={},rubCount={},randomEventConfigId={},rewards={}",
+                ctx.playerId(), round.getRoundId(), round.getRubCount(), round.randomEventConfigId, round.getRewards());
         if (round.randomEventConfigId != 0) {
             randomEvents.roomFinished(ctx, round.randomEventConfigId);
         }
@@ -437,7 +453,7 @@ public class GodGamblersService {
         CommonResult<ItemOperationResult> result = MiniGameDailyItems.replenish(
                 ctx, cfg.getItemGift(), AddType.SIM_GOD_GAMBLERS, playerPackService);
         if (!result.success()) {
-            log.warn("赌神每日补足失败 playerId={},code={}", ctx.playerId(), result.code);
+            log.warn("赌神每日补足失败 playerId={},targetItems={},code={}", ctx.playerId(), cfg.getItemGift(), result.code);
             return result.code;
         }
         data.setLastDailyGrantTime(now);

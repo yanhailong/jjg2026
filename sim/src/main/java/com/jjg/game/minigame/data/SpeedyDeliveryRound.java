@@ -8,9 +8,8 @@ import java.util.Map;
 /** 会话内单局；引用开局配置，避免热更新改变本局时长、容量和奖励规则。 */
 public class SpeedyDeliveryRound extends TimedMiniGameRound {
     public int randomEventConfigId;
-    // Type 4 的参数 1 至 3 依次对应 MinigameTruck.id 1001 至 1003。
-    private static final int FIRST_SKILL_TRUCK_ID = 1001;
-    private static final int SKILL_TRUCK_COUNT = 3;
+    // Type 4 的参数 1/2/3 分别表示糕点、酒水、生鲜。
+    private static final int SCORE_BONUS_CATEGORY_COUNT = 3;
 
     private final MinigameSpeedyDeliveryCfg config;
     private int backpackCapacity;
@@ -30,24 +29,30 @@ public class SpeedyDeliveryRound extends TimedMiniGameRound {
         this.backpackCapacity = config.getBackpackCapacity();
     }
 
-    public boolean addScoreBonus(int truckIndex, int flat, int permille) {
-        if (truckIndex < 1 || truckIndex > SKILL_TRUCK_COUNT) {
+    public boolean addScoreBonus(int category, int flat, int permille) {
+        if (category < 1 || category > SCORE_BONUS_CATEGORY_COUNT) {
             return false;
         }
         if (scoreFlat == null) {
-            scoreFlat = new long[SKILL_TRUCK_COUNT];
-            scorePermille = new long[SKILL_TRUCK_COUNT];
+            scoreFlat = new long[SCORE_BONUS_CATEGORY_COUNT];
+            scorePermille = new long[SCORE_BONUS_CATEGORY_COUNT];
         }
-        scoreFlat[truckIndex - 1] += flat;
-        scorePermille[truckIndex - 1] += permille;
+        scoreFlat[category - 1] += flat;
+        scorePermille[category - 1] += permille;
         return true;
     }
 
     public long scoreForTruck(int truckId, long baseScore) {
-        int index = truckId - FIRST_SKILL_TRUCK_ID;
-        if (scoreFlat == null || index < 0 || index >= SKILL_TRUCK_COUNT) {
+        int category = switch (truckId) {
+            case 1002 -> 1;
+            case 1003 -> 2;
+            case 1001 -> 3;
+            default -> 0;
+        };
+        if (scoreFlat == null || category == 0) {
             return baseScore;
         }
+        int index = category - 1;
         return baseScore + scoreFlat[index] + MiniGameSkillEffect.scaleByPermille(baseScore, scorePermille[index]);
     }
 
