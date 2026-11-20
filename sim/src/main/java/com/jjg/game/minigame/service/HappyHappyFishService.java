@@ -151,6 +151,23 @@ public class HappyHappyFishService {
         return res;
     }
 
+    public ResSetHappyHappyFishPaused setPaused(SimPlayerContext ctx, boolean paused) {
+        HappyHappyFishRound round = ctx.getHappyHappyFishRound();
+        long now = System.currentTimeMillis();
+        int code = round == null ? Code.ERROR_REQ : round.setPaused(paused, now);
+        ResSetHappyHappyFishPaused res = new ResSetHappyHappyFishPaused(code);
+        if (code == Code.SUCCESS) {
+            res.paused = round.isPaused();
+            res.remainingMillis = round.getRemainingMillis(now);
+            res.endTime = res.paused ? 0 : round.getEndTime();
+        } else {
+            log.warn("欢乐捉鱼切换暂停状态失败 playerId={},paused={},currentRoundId={},state={},endTime={},now={},code={}",
+                    ctx.playerId(), paused, round == null ? 0 : round.getRoundId(),
+                    round == null ? RoundState.NONE : round.getState(), round == null ? 0 : round.getEndTime(), now, code);
+        }
+        return res;
+    }
+
     /** 每次合法捕获按鱼表累加积分；仅保存各配置的累计次数，不模拟鱼群。 */
     public ResCatchHappyHappyFish catchFish(SimPlayerContext ctx, long roundId, int fishId) {
         ResCatchHappyHappyFish res = new ResCatchHappyHappyFish(Code.SUCCESS);
@@ -159,10 +176,16 @@ public class HappyHappyFishService {
         if (res.code != Code.SUCCESS) {
             return res;
         }
-        MinigameFishCfg fish = GameDataManager.getMinigameFishCfg(fishId);
+        res.endTime = round.getEndTime();
         if (round.getState() != RoundState.PLAYING) {
+            log.warn("欢乐捉鱼当前对局不可捕获 playerId={},roundId={},fishId={},state={},endTime={}",
+                    ctx.playerId(), roundId, fishId, round.getState(), round.getEndTime());
             res.code = Code.REPEAT_OP;
-        } else if (isExpired(round)) {
+            res.score = round.getScore();
+            return res;
+        }
+        MinigameFishCfg fish = GameDataManager.getMinigameFishCfg(fishId);
+        if (isExpired(round)) {
             res.code = Code.EXPIRE;
         } else if (fish == null) {
             res.code = Code.PARAM_ERROR;
@@ -182,7 +205,6 @@ public class HappyHappyFishService {
             }
         }
         res.score = round.getScore();
-        res.endTime = round.getEndTime();
         return res;
     }
 

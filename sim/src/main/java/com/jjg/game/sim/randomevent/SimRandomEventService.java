@@ -16,8 +16,15 @@ import com.jjg.game.sim.pb.res.ResSimRandomEventAction;
 import com.jjg.game.sim.pb.res.ResSimRandomEventInfo;
 import com.jjg.game.sim.pb.res.ResSimRandomEventList;
 import com.jjg.game.sim.pb.res.ResVisitCasino;
-import com.jjg.game.sim.pb.struct.RandomEventBoxInfo;
+import com.jjg.game.sim.pb.struct.RandomEventBoxSlotInfo;
 import com.jjg.game.sim.pb.struct.RandomEventInfo;
+import com.jjg.game.sim.pb.struct.RandomEventInfo.RandomEventBoxInfo;
+import com.jjg.game.sim.pb.struct.RandomEventInfo.RandomEventDiceInfo;
+import com.jjg.game.sim.pb.struct.RandomEventInfo.RandomEventInvestmentInfo;
+import com.jjg.game.sim.pb.struct.RandomEventInfo.RandomEventQuizInfo;
+import com.jjg.game.sim.pb.struct.RandomEventInfo.RandomEventRoomInfo;
+import com.jjg.game.sim.pb.struct.RandomEventInfo.RandomEventSpyInfo;
+import com.jjg.game.sim.randomevent.RandomEventPlay.DicePrizes;
 import com.jjg.game.sim.randomevent.RandomEventPlay.Outcome;
 import com.jjg.game.sim.randomevent.SimRandomEventState.SceneEvent;
 import com.jjg.game.sim.service.SimVisitQuotaService;
@@ -314,7 +321,7 @@ public class SimRandomEventService {
         DailyCompletion completion = scene == null ? visitCompletion(playerId) : ownCompletion(scene, today);
         ResSimRandomEventAction response = actionResponse(outcome, cfg, completion);
         if (cfg.getAreaId() == RandomEventPlay.CHEST && request.action == RandomEventPlay.TARGET) {
-            response.openedReward = outcome.event().values().get(request.target);
+            response.event.boxInfo.openedReward = outcome.event().values().get(request.target);
         }
         return response;
     }
@@ -454,39 +461,62 @@ public class SimRandomEventService {
         info.configId = event.configId();
         info.position = event.position();
         info.donorId = event.donorId();
-        info.progress = event.progress();
         info.dailyCompletedCount = completion.completed();
         info.dailyCompletionLimit = completion.limit();
-        if (cfg != null) {
-            info.eventType = cfg.getAreaId();
-            if (info.eventType == RandomEventPlay.INVESTMENT) {
-                info.readyAt = event.readyAt();
-            } else if (info.eventType == RandomEventPlay.DICE) {
-                info.auxiliary = event.auxiliary();
-                info.dice = event.values();
-            } else if (info.eventType == RandomEventPlay.CHEST) {
-                info.openedBoxes = boxInfos(event, cfg);
-            } else if (info.eventType == RandomEventPlay.SPY) {
-                info.auxiliary = event.auxiliary();
-                info.capturedTargets = event.values();
+        if (cfg == null) {
+            return info;
+        }
+        info.eventType = cfg.getAreaId();
+        switch (info.eventType) {
+            case RandomEventPlay.QUIZ -> info.quizInfo = new RandomEventQuizInfo();
+            case RandomEventPlay.ROOM -> info.roomInfo = new RandomEventRoomInfo();
+            case RandomEventPlay.CHEST -> info.boxInfo = boxInfo(event, cfg);
+            case RandomEventPlay.SPY -> {
+                RandomEventSpyInfo spy = new RandomEventSpyInfo();
+                spy.started = event.auxiliary() != 0;
+                spy.capturedCount = event.progress();
+                spy.capturedTargets = event.values();
+                info.spyInfo = spy;
+            }
+            case RandomEventPlay.INVESTMENT -> {
+                RandomEventInvestmentInfo investment = new RandomEventInvestmentInfo();
+                investment.started = event.progress() != 0;
+                investment.readyAt = event.readyAt();
+                info.investmentInfo = investment;
+            }
+            case RandomEventPlay.DICE -> {
+                RandomEventDiceInfo dice = new RandomEventDiceInfo();
+                dice.consecutiveWins = event.progress();
+                dice.remainingRerolls = event.auxiliary();
+                dice.dice = event.values();
+                DicePrizes prizes = RandomEventPlay.dicePrizes();
+                if (prizes != null) {
+                    dice.baseReward = new ItemInfo();
+                    dice.baseReward.itemId = prizes.itemId();
+                    dice.baseReward.count = prizes.baseAmount();
+                    dice.currentReward = prizes.currentAmount(event);
+                }
+                info.diceInfo = dice;
             }
         }
         return info;
     }
 
-    private static List<RandomEventBoxInfo> boxInfos(SceneEvent event, RandomEventDetailsCfg cfg) {
+    private static RandomEventBoxInfo boxInfo(SceneEvent event, RandomEventDetailsCfg cfg) {
         List<List<ItemInfo>> rewardsByCategory = List.of(List.of(),
                 ItemUtils.buildItemInfo(RandomEventPlay.chestReward(cfg, 1)),
                 ItemUtils.buildItemInfo(RandomEventPlay.chestReward(cfg, 2)));
         List<Integer> previewOrder = RandomEventPlay.CHEST_PREVIEW_ORDER;
-        List<RandomEventBoxInfo> boxes = new ArrayList<>(previewOrder.size());
+        RandomEventBoxInfo info = new RandomEventBoxInfo();
+        info.remainingAdOpens = event.progress();
+        info.boxes = new ArrayList<>(previewOrder.size());
         for (int i = 0; i < previewOrder.size(); i++) {
-            RandomEventBoxInfo box = new RandomEventBoxInfo();
+            RandomEventBoxSlotInfo box = new RandomEventBoxSlotInfo();
             box.opened = (event.auxiliary() & (1 << i)) != 0;
             box.previewRewards = rewardsByCategory.get(previewOrder.get(i));
             box.actualRewards = box.opened ? rewardsByCategory.get(event.values().get(i)) : List.of();
-            boxes.add(box);
+            info.boxes.add(box);
         }
-        return boxes;
+        return info;
     }
 }

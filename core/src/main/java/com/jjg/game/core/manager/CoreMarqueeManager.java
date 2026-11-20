@@ -1,7 +1,6 @@
 package com.jjg.game.core.manager;
 
 import cn.hutool.core.util.NumberUtil;
-import com.alibaba.fastjson.JSON;
 import com.jjg.game.common.cluster.ClusterSystem;
 import com.jjg.game.common.constant.CoreConst;
 import com.jjg.game.common.curator.MarsCurator;
@@ -22,7 +21,9 @@ import com.jjg.game.core.data.Marquee;
 import com.jjg.game.core.listener.ConfigExcelChangeListener;
 import com.jjg.game.core.pb.*;
 import com.jjg.game.sampledata.GameDataManager;
-import com.jjg.game.sampledata.bean.*;
+import com.jjg.game.sampledata.bean.GlobalConfigCfg;
+import com.jjg.game.sampledata.bean.RobotCfg;
+import com.jjg.game.sampledata.bean.RunninglightCfg;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -314,7 +315,7 @@ public class CoreMarqueeManager implements TimerListener, IGameClusterLeaderList
         if (e == this.checkEvent) {
             check();
         } else if (e == this.robotEvent) {
-            handleRobotMarqueeEvent();
+//            handleRobotMarqueeEvent();
         } else {
             String[] arr = e.getParameter().toString().split("_");
             if (arr.length > 1) {

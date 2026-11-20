@@ -6,6 +6,8 @@ import com.jjg.game.sampledata.GameDataManager;
 import com.jjg.game.sampledata.bean.GlobalConfigCfg;
 import com.jjg.game.sampledata.bean.RandomEventDetailsCfg;
 import com.jjg.game.sim.randomevent.SimRandomEventState.SceneEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,9 +15,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 final class RandomEventPlay {
+    private static final Logger log = LoggerFactory.getLogger(RandomEventPlay.class);
+
     static final int QUIZ = 1;
     static final int ROOM = 2;
     static final int CHEST = 3;
@@ -151,17 +154,19 @@ final class RandomEventPlay {
     }
 
     private static Outcome dice(SceneEvent event, int action, int target) {
-        GlobalConfigCfg base = GameDataManager.getGlobalConfigCfg(421);
-        GlobalConfigCfg multipliers = GameDataManager.getGlobalConfigCfg(422);
-        if (base == null || multipliers == null || base.getValue() == null || multipliers.getValue() == null) {
+        DicePrizes prizes = dicePrizes();
+        if (prizes == null) {
             return Outcome.reject(event, Code.SAMPLE_ERROR);
         }
-        String[] item = base.getValue().split("_");
-        List<Long> odds = Stream.of(multipliers.getValue().split("_")).map(Long::valueOf).toList();
-        boolean big = isBig(event.values());
-        if (action == CLAIM) {
-            return Outcome.finish(event, big ? diceReward(item, odds.get(event.progress() - 1)) : Map.of());
+        if (event.progress() > prizes.amounts().length) {
+            log.warn("摇骰子连胜次数超出奖金配置档位 configId={},wins={},tierCount={},action={}",
+                    event.configId(), event.progress(), prizes.amounts().length, action);
+            return Outcome.reject(event, Code.SAMPLE_ERROR);
         }
+        if (action == CLAIM) {
+            return Outcome.finish(event, prizes.payout(prizes.currentAmount(event)));
+        }
+        boolean big = isBig(event.values());
         boolean first = event.values().isEmpty();
         List<Integer> values;
         int rerolls = event.auxiliary();
@@ -181,10 +186,38 @@ final class RandomEventPlay {
         boolean won = isBig(values);
         int wins = event.progress() + (won ? 1 : 0);
         SceneEvent updated = event.advance(wins, rerolls, 0, values);
-        if (won && wins == odds.size()) {
-            return Outcome.finish(updated, diceReward(item, odds.getLast()));
+        if (won && wins == prizes.amounts().length) {
+            return Outcome.finish(updated, prizes.payout(prizes.amountAt(wins)));
         }
         return !won && rerolls == 0 ? Outcome.finish(updated, Map.of()) : Outcome.update(updated);
+    }
+
+    static DicePrizes dicePrizes() {
+        GlobalConfigCfg base = GameDataManager.getGlobalConfigCfg(421);
+        GlobalConfigCfg multipliers = GameDataManager.getGlobalConfigCfg(422);
+        String baseValue = base == null ? null : base.getValue();
+        String multiplierValue = multipliers == null ? null : multipliers.getValue();
+        if (baseValue == null || multiplierValue == null) {
+            log.warn("摇骰子奖金配置缺失 base421={},multipliers422={}", baseValue, multiplierValue);
+            return null;
+        }
+        try {
+            String[] item = baseValue.split("_", -1);
+            if (item.length != 2) {
+                throw new IllegalArgumentException("基础奖金应为道具ID_数量");
+            }
+            int itemId = Integer.parseInt(item[0]);
+            long baseAmount = Long.parseLong(item[1]);
+            String[] odds = multiplierValue.split("_", -1);
+            long[] amounts = new long[odds.length];
+            for (int i = 0; i < odds.length; i++) {
+                amounts[i] = Math.multiplyExact(baseAmount, Long.parseLong(odds[i]));
+            }
+            return new DicePrizes(itemId, baseAmount, amounts);
+        } catch (IllegalArgumentException | ArithmeticException e) {
+            log.warn("摇骰子奖金配置无效 base421={},multipliers422={},reason={}", baseValue, multiplierValue, e.getMessage());
+            return null;
+        }
     }
 
     private static boolean isBig(List<Integer> values) {
@@ -195,8 +228,19 @@ final class RandomEventPlay {
         return RandomUtils.randomInt(6) + 1;
     }
 
-    private static Map<Integer, Long> diceReward(String[] item, long multiplier) {
-        return Map.of(Integer.parseInt(item[0]), Math.multiplyExact(Long.parseLong(item[1]), multiplier));
+    record DicePrizes(int itemId, long baseAmount, long[] amounts) {
+        long currentAmount(SceneEvent event) {
+            int wins = event.progress();
+            return wins > 0 && wins <= amounts.length && isBig(event.values()) ? amountAt(wins) : 0;
+        }
+
+        private long amountAt(int wins) {
+            return amounts[wins - 1];
+        }
+
+        private Map<Integer, Long> payout(long amount) {
+            return amount == 0 ? Map.of() : Map.of(itemId, amount);
+        }
     }
 
     record Outcome(int code, SceneEvent event, boolean completed, Map<Integer, Long> rewards, List<Integer> resultLanguageId) {

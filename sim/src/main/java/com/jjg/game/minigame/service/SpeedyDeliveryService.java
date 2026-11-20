@@ -284,6 +284,23 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
         return res;
     }
 
+    public ResSetSpeedyDeliveryPaused setPaused(SimPlayerContext ctx, boolean paused) {
+        SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
+        long now = System.currentTimeMillis();
+        int code = round == null ? Code.ERROR_REQ : round.setPaused(paused, now);
+        ResSetSpeedyDeliveryPaused res = new ResSetSpeedyDeliveryPaused(code);
+        if (code == Code.SUCCESS) {
+            res.paused = round.isPaused();
+            res.remainingMillis = round.getRemainingMillis(now);
+            res.endTime = res.paused ? 0 : round.getEndTime();
+        } else {
+            log.warn("飞驰快送切换暂停状态失败 playerId={},paused={},state={},endTime={},now={},code={}",
+                    ctx.playerId(), paused,
+                    round == null ? RoundState.NONE : round.getState(), round == null ? 0 : round.getEndTime(), now, code);
+        }
+        return res;
+    }
+
     public ResDeductSpeedyDeliveryTime deductTime(SimPlayerContext ctx, int seconds) {
         SpeedyDeliveryRound round = ctx.getSpeedyDeliveryRound();
         ResDeductSpeedyDeliveryTime res = new ResDeductSpeedyDeliveryTime(checkPlaying(round));
@@ -291,12 +308,15 @@ public class SpeedyDeliveryService implements SimPlayerTickListener {
             if (seconds <= 0) {
                 res.code = Code.PARAM_ERROR;
             } else {
-                //转long后换算，扣至过去的截止时间仍按原值保留，不延长结算宽限。
-                round.setEndTime(round.getEndTime() - seconds * 1000L);
+                round.setEndTime(Math.max(System.currentTimeMillis(), round.getEndTime() - seconds * 1000L));
             }
         }
         if (round != null) {
             res.endTime = round.getEndTime();
+        }
+        if (res.code != Code.SUCCESS) {
+            log.warn("飞驰快送扣时失败 playerId={},seconds={},state={},endTime={},code={}",
+                    ctx.playerId(), seconds, round == null ? RoundState.NONE : round.getState(), res.endTime, res.code);
         }
         return res;
     }

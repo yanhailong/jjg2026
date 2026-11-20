@@ -1,23 +1,20 @@
 package com.jjg.game.minigame.data;
 
-import com.jjg.game.minigame.constant.MiniGameConstant.RoundState;
 import com.jjg.game.sampledata.bean.MinigameSpeedyDeliveryCfg;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /** 会话内单局；引用开局配置，避免热更新改变本局时长、容量和奖励规则。 */
-public class SpeedyDeliveryRound {
+public class SpeedyDeliveryRound extends TimedMiniGameRound {
     public int randomEventConfigId;
     // Type 4 的参数 1 至 3 依次对应 MinigameTruck.id 1001 至 1003。
     private static final int FIRST_SKILL_TRUCK_ID = 1001;
     private static final int SKILL_TRUCK_COUNT = 3;
 
     private final MinigameSpeedyDeliveryCfg config;
-    private long endTime;
     private int backpackCapacity;
     private int score;
-    private int state = RoundState.PLAYING;
     private boolean quickClear;
     private Map<Integer, Long> rewards;
     private long[] scoreFlat;
@@ -29,7 +26,7 @@ public class SpeedyDeliveryRound {
 
     public SpeedyDeliveryRound(MinigameSpeedyDeliveryCfg config, long endTime) {
         this.config = config;
-        this.endTime = endTime;
+        setEndTime(endTime);
         this.backpackCapacity = config.getBackpackCapacity();
     }
 
@@ -86,28 +83,12 @@ public class SpeedyDeliveryRound {
         this.backpackCapacity = backpackCapacity;
     }
 
-    public long getEndTime() {
-        return endTime;
-    }
-
-    public void setEndTime(long endTime) {
-        this.endTime = endTime;
-    }
-
     public int getScore() {
         return score;
     }
 
     public void setScore(int score) {
         this.score = score;
-    }
-
-    public int getState() {
-        return state;
-    }
-
-    public void setState(int state) {
-        this.state = state;
     }
 
     public boolean isQuickClear() {

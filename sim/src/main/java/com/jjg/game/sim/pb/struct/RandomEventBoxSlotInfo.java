@@ -8,7 +8,7 @@ import java.util.List;
 
 @ProtobufMessage
 @ProtoDesc("随机事件中的单个宝箱")
-public class RandomEventBoxInfo {
+public class RandomEventBoxSlotInfo {
     @ProtoDesc("宝箱是否已开启")
     public boolean opened;
     @ProtoDesc("打乱前展示的预览奖励，空列表表示预览为空箱")

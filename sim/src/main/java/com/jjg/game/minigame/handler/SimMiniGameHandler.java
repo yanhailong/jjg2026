@@ -20,6 +20,7 @@ import com.jjg.game.minigame.pb.req.ReqStartGodGamblersGame;
 import com.jjg.game.minigame.pb.req.ReqUnlockNextLevel;
 import com.jjg.game.minigame.pb.req.ReqEnterHappyHappyFishGame;
 import com.jjg.game.minigame.pb.req.ReqStartHappyHappyFishGame;
+import com.jjg.game.minigame.pb.req.ReqSetHappyHappyFishPaused;
 import com.jjg.game.minigame.pb.req.ReqCatchHappyHappyFish;
 import com.jjg.game.minigame.pb.req.ReqEndHappyHappyFishGame;
 import com.jjg.game.minigame.pb.req.ReqQuickClearHappyHappyFishGame;
@@ -27,6 +28,7 @@ import com.jjg.game.minigame.pb.req.ReqHappyHappyFishSkills;
 import com.jjg.game.minigame.pb.req.ReqUpgradeHappyHappyFishSkill;
 import com.jjg.game.minigame.pb.req.ReqEnterSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.req.ReqStartSpeedyDeliveryGame;
+import com.jjg.game.minigame.pb.req.ReqSetSpeedyDeliveryPaused;
 import com.jjg.game.minigame.pb.req.ReqDeliverSpeedyDeliveryGoods;
 import com.jjg.game.minigame.pb.req.ReqDeductSpeedyDeliveryTime;
 import com.jjg.game.minigame.pb.req.ReqEndSpeedyDeliveryGame;
@@ -48,6 +50,7 @@ import com.jjg.game.minigame.pb.res.ResStartGodGamblersGame;
 import com.jjg.game.minigame.pb.res.ResUnlockNextLevel;
 import com.jjg.game.minigame.pb.res.ResEnterHappyHappyFishGame;
 import com.jjg.game.minigame.pb.res.ResStartHappyHappyFishGame;
+import com.jjg.game.minigame.pb.res.ResSetHappyHappyFishPaused;
 import com.jjg.game.minigame.pb.res.ResCatchHappyHappyFish;
 import com.jjg.game.minigame.pb.res.ResEndHappyHappyFishGame;
 import com.jjg.game.minigame.pb.res.ResQuickClearHappyHappyFishGame;
@@ -55,6 +58,7 @@ import com.jjg.game.minigame.pb.res.ResHappyHappyFishSkills;
 import com.jjg.game.minigame.pb.res.ResUpgradeHappyHappyFishSkill;
 import com.jjg.game.minigame.pb.res.ResEnterSpeedyDeliveryGame;
 import com.jjg.game.minigame.pb.res.ResStartSpeedyDeliveryGame;
+import com.jjg.game.minigame.pb.res.ResSetSpeedyDeliveryPaused;
 import com.jjg.game.minigame.pb.res.ResDeliverSpeedyDeliveryGoods;
 import com.jjg.game.minigame.pb.res.ResDeductSpeedyDeliveryTime;
 import com.jjg.game.minigame.pb.res.ResEndSpeedyDeliveryGame;
@@ -308,6 +312,18 @@ public class SimMiniGameHandler {
                 configId -> ctx.getHappyHappyFishRound().randomEventConfigId = configId));
     }
 
+    @Command(MiniGameConstant.MsgBean.REQ_SET_HAPPY_HAPPY_FISH_PAUSED)
+    public void reqSetHappyHappyFishPaused(PlayerController playerController, ReqSetHappyHappyFishPaused req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            log.warn("欢乐捉鱼切换暂停状态失败，玩家会话不存在 playerId={},paused={}",
+                    playerController.playerId(), req.paused);
+            playerController.send(new ResSetHappyHappyFishPaused(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(happyHappyFishService.setPaused(ctx, req.paused));
+    }
+
     @Command(MiniGameConstant.MsgBean.REQ_CATCH_HAPPY_HAPPY_FISH)
     public void reqCatchHappyHappyFish(PlayerController playerController, ReqCatchHappyHappyFish req) {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
@@ -382,6 +398,18 @@ public class SimMiniGameHandler {
         }
         ctx.send(startGame(ctx, 2001, () -> speedyDeliveryService.start(ctx), ResStartSpeedyDeliveryGame::new,
                 configId -> ctx.getSpeedyDeliveryRound().randomEventConfigId = configId));
+    }
+
+    @Command(MiniGameConstant.MsgBean.REQ_SET_SPEEDY_DELIVERY_PAUSED)
+    public void reqSetSpeedyDeliveryPaused(PlayerController playerController, ReqSetSpeedyDeliveryPaused req) {
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
+        if (ctx == null) {
+            log.warn("飞驰快送切换暂停状态失败，玩家会话不存在 playerId={},paused={}",
+                    playerController.playerId(), req.paused);
+            playerController.send(new ResSetSpeedyDeliveryPaused(Code.NOT_FOUND));
+            return;
+        }
+        ctx.send(speedyDeliveryService.setPaused(ctx, req.paused));
     }
 
     @Command(MiniGameConstant.MsgBean.REQ_DELIVER_SPEEDY_DELIVERY_GOODS)

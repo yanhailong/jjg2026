@@ -1,21 +1,17 @@
 package com.jjg.game.minigame.data;
 
-import com.jjg.game.minigame.constant.MiniGameConstant.RoundState;
-
 import java.util.HashMap;
 import java.util.Map;
 
 /** 会话内单局，初始结束时间作为局号，捕获积分加成在开局时确定。 */
-public class HappyHappyFishRound {
+public class HappyHappyFishRound extends TimedMiniGameRound {
     public int randomEventConfigId;
     private static final int FIRST_FISH_ID = 101;
     private static final int ALL_FISH_TARGET = 6;
     private static final int FISH_TYPE = 1;
 
     private long roundId;
-    private long endTime;
     private int score;
-    private int state = RoundState.PLAYING;
     private boolean quickClear;
     private boolean scoreCredited;
     private final Map<Integer, Integer> caughtCounts = new HashMap<>();
@@ -61,28 +57,12 @@ public class HappyHappyFishRound {
         this.roundId = roundId;
     }
 
-    public long getEndTime() {
-        return endTime;
-    }
-
-    public void setEndTime(long endTime) {
-        this.endTime = endTime;
-    }
-
     public int getScore() {
         return score;
     }
 
     public void setScore(int score) {
         this.score = score;
-    }
-
-    public int getState() {
-        return state;
-    }
-
-    public void setState(int state) {
-        this.state = state;
     }
 
     public boolean isQuickClear() {

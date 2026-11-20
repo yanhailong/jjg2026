@@ -36,6 +36,7 @@ public interface MiniGameConstant {
         int CLEARED = 2;
         int FAILED = 3;
         int REWARD_PENDING = 4;
+        int PAUSED = 5;
     }
 
     interface MsgBean {
@@ -136,5 +137,13 @@ public interface MiniGameConstant {
         int RES_SPEEDY_DELIVERY_SKILLS = BASE_MSG_PREFIX | 0x36;
         int REQ_UPGRADE_SPEEDY_DELIVERY_SKILL = BASE_MSG_PREFIX | 0x37;
         int RES_UPGRADE_SPEEDY_DELIVERY_SKILL = BASE_MSG_PREFIX | 0x38;
+
+        //欢乐捉鱼：时间暂停
+        int REQ_SET_HAPPY_HAPPY_FISH_PAUSED = BASE_MSG_PREFIX | 0x39;
+        int RES_SET_HAPPY_HAPPY_FISH_PAUSED = BASE_MSG_PREFIX | 0x3A;
+
+        //飞驰快送：时间暂停
+        int REQ_SET_SPEEDY_DELIVERY_PAUSED = BASE_MSG_PREFIX | 0x3B;
+        int RES_SET_SPEEDY_DELIVERY_PAUSED = BASE_MSG_PREFIX | 0x3C;
     }
 }
