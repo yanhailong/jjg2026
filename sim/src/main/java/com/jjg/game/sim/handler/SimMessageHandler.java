@@ -1187,7 +1187,7 @@ public class SimMessageHandler implements GmListener {
     @Command(SimConstant.MsgBean.REQ_RANDOM_EVENT_ACTION)
     public void reqRandomEventAction(PlayerController pc, ReqSimRandomEventAction req) {
         if (simPlayerContextRegistry.getContext(pc.playerId()) == null) {
-            pc.send(callVisitOwner(pc, "处理随机事件 configId=" + req.configId + ",action=" + req.action,
+            pc.send(callVisitOwner(pc, "处理随机事件 configId=" + req.configId + ",action=" + req.action + ",target=" + req.target,
                     bridge -> bridge.randomEventAction(pc.playerId(), req.configId, req.action, req.target),
                     ResSimRandomEventAction::new));
             return;
@@ -1426,6 +1426,20 @@ public class SimMessageHandler implements GmListener {
                 SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
                 CommonResult<String> stringCommonResult = taskService.jumpTask(ctx, taskId);
                 return stringCommonResult;
+            } else if ("simRandomEvent".equalsIgnoreCase(gmOrders[0])) {
+                long playerId = playerController.playerId();
+                if (gmOrders.length != 2 || !gmOrders[1].matches("[1-6]")) {
+                    log.warn("GM 刷随机事件参数错误，格式为 simRandomEvent <类型1-6> playerId={},orders={}",
+                            playerId, Arrays.toString(gmOrders));
+                    return new CommonResult<>(Code.PARAM_ERROR);
+                }
+                int eventType = Integer.parseInt(gmOrders[1]);
+                SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
+                if (ctx == null) {
+                    log.warn("GM 刷随机事件失败，玩家模拟经营数据未加载 playerId={},eventType={}", playerId, eventType);
+                    return new CommonResult<>(Code.FORBID);
+                }
+                return randomEvents.gmSpawnByType(ctx, eventType);
             } else if ("printGuest".equalsIgnoreCase(gmOrders[0])) {
                 SimPlayerContext context = this.simPlayerContextRegistry.getContext(playerController.playerId());
                 context.printGuest();

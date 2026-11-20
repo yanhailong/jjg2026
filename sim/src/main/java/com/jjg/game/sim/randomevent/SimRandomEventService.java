@@ -4,6 +4,7 @@ import com.jjg.game.common.pb.ItemInfo;
 import com.jjg.game.common.utils.RandomUtils;
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
+import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.sampledata.GameDataManager;
@@ -75,8 +76,13 @@ public class SimRandomEventService {
             return;
         }
         NotifySimRandomEvents update = refresh(ctx, true);
-        if (update != null && ctx.getVisitTargetId() == 0 && controller.getScene() == ctx) {
-            ctx.send(update);
+        if (update != null) {
+            if (ctx.getVisitTargetId() == 0 && controller.getScene() == ctx) {
+                ctx.send(update);
+            } else {
+                log.debug("随机事件刷新已保存，当前场景未推送 playerId={},visitTargetId={},addedCount={}",
+                        ctx.playerId(), ctx.getVisitTargetId(), update.events.size());
+            }
         }
     }
 
@@ -90,6 +96,8 @@ public class SimRandomEventService {
         } else {
             response.events = List.of();
         }
+        log.debug("查询随机事件列表成功 playerId={},visitTargetId={},eventCount={}",
+                ctx.playerId(), response.visitTargetId, response.events.size());
         return response;
     }
 
@@ -128,6 +136,8 @@ public class SimRandomEventService {
                 : ownCompletion(scene, LocalDate.now().toEpochDay());
         ResSimRandomEventInfo response = new ResSimRandomEventInfo(Code.SUCCESS);
         response.event = info(event, cfg, completion);
+        log.debug("查询随机事件详情成功 playerId={},visitTargetId={},configId={},eventType={},position={},progress={},readyAt={}",
+                playerId, visitTargetId, configId, cfg.getAreaId(), event.position(), event.progress(), event.readyAt());
         return response;
     }
 
@@ -136,15 +146,55 @@ public class SimRandomEventService {
         return infos(scene.events, ownCompletion(scene, LocalDate.now().toEpochDay()));
     }
 
-    public int validateRoomEntry(SimPlayerContext ctx, int configId, int requiredConfigId) {
-        if (configId == requiredConfigId && ctx.getVisitTargetId() == 0) {
-            List<SceneEvent> events = dao.load(ctx.playerId()).events;
-            if (indexOf(events, configId) >= 0) {
-                return Code.SUCCESS;
+    public CommonResult<String> gmSpawnByType(SimPlayerContext ctx, int eventType) {
+        long playerId = ctx.playerId();
+        Map<Integer, Integer> candidates = new HashMap<>();
+        for (RandomEventDetailsCfg cfg : GameDataManager.getRandomEventDetailsCfgList()) {
+            if (cfg.getAreaId() == eventType && canSpawn(cfg)) {
+                candidates.put(cfg.getId(), 1);
             }
         }
-        log.warn("随机事件小游戏开局被拒绝 playerId={},configId={},requiredConfigId={},visitTargetId={}",
-                ctx.playerId(), configId, requiredConfigId, ctx.getVisitTargetId());
+        if (candidates.isEmpty()) {
+            log.warn("GM 刷随机事件失败，该类型无可用配置 playerId={},eventType={}", playerId, eventType);
+            return new CommonResult<>(Code.SAMPLE_ERROR);
+        }
+
+        NotifySimRandomEvents update = withScene(playerId, scene -> {
+            if (fill(scene.events, candidates, 1, ignored -> 0) == 0) {
+                String reason = candidates.isEmpty() ? "该类型的候选事件都已在场景中" : "场景位置已满";
+                log.warn("GM 刷随机事件失败 playerId={},eventType={},eventCount={},reason={}",
+                        playerId, eventType, scene.events.size(), reason);
+                return null;
+            }
+            dao.save(scene);
+            return notification(List.of(scene.events.getLast()), ownCompletion(scene, LocalDate.now().toEpochDay()));
+        });
+        if (update == null) {
+            return new CommonResult<>(Code.FAIL);
+        }
+        var controller = ctx.getPlayerController();
+        if (ctx.getVisitTargetId() == 0 && controller != null && controller.getScene() == ctx) {
+            ctx.send(update);
+        }
+        RandomEventInfo added = update.events.getFirst();
+        return new CommonResult<>(Code.SUCCESS, "已生成随机事件，类型=" + eventType
+                + "，配置ID=" + added.configId + "，位置=" + added.position);
+    }
+
+    public int validateRoomEntry(SimPlayerContext ctx, int configId, int requiredConfigId) {
+        long visitTargetId = ctx.getVisitTargetId();
+        if (configId != requiredConfigId || visitTargetId != 0) {
+            log.warn("随机事件小游戏开局被拒绝 playerId={},configId={},requiredConfigId={},visitTargetId={},reason={}",
+                    ctx.playerId(), configId, requiredConfigId, visitTargetId,
+                    configId != requiredConfigId ? "事件与小游戏不匹配" : "当前处于拜访场景");
+            return Code.FORBID;
+        }
+        List<SceneEvent> events = dao.load(ctx.playerId()).events;
+        if (indexOf(events, configId) >= 0) {
+            return Code.SUCCESS;
+        }
+        log.warn("随机事件小游戏开局被拒绝，自己场景没有此事件 playerId={},configId={},eventCount={}",
+                ctx.playerId(), configId, events.size());
         return Code.FORBID;
     }
 
@@ -157,6 +207,8 @@ public class SimRandomEventService {
             ResSimRandomEventAction response = withScene(playerId, scene -> {
                 int index = indexOf(scene.events, configId);
                 if (index < 0) {
+                    log.debug("房间游戏随机事件未结算，场景中已无此事件 playerId={},configId={},eventCount={}",
+                            playerId, configId, scene.events.size());
                     return null;
                 }
                 RandomEventDetailsCfg cfg = GameDataManager.getRandomEventDetailsCfg(configId);
@@ -167,16 +219,16 @@ public class SimRandomEventService {
                 }
                 SceneEvent event = scene.events.get(index);
                 Outcome outcome = Outcome.finishB(event, cfg);
-                int code = grant(playerId, event, outcome.rewards(), false);
+                int code = grant(ctx, event, outcome.rewards(), false, null);
                 if (code != Code.SUCCESS) {
-                    log.warn("房间游戏随机事件发奖失败，保留事件 playerId={},configId={},rewards={},code={}",
-                            playerId, configId, outcome.rewards(), code);
                     return null;
                 }
                 long today = LocalDate.now().toEpochDay();
                 scene.completeEvent(index, today);
                 dao.save(scene);
                 ctx.clearRoomEvent(configId);
+                log.info("房间游戏随机事件结算成功 playerId={},configId={},position={},rewards={},dailyCompletedCount={}",
+                        playerId, configId, event.position(), outcome.rewards(), scene.completedOn(today));
                 return actionResponse(outcome, cfg, ownCompletion(scene, today));
             });
             if (response != null) {
@@ -197,7 +249,8 @@ public class SimRandomEventService {
                 scene -> receive(scene, visitorId, receiveLimit, sendLimit));
         response.remainingRandomEventReceives = received.remaining();
         if (received.update() != null) {
-            sender.sendTo(ownerId, received.update());
+            boolean sent = sender.sendTo(ownerId, received.update());
+            log.debug("随机事件赠送通知 playerId={},visitTargetId={},sent={}", visitorId, ownerId, sent);
         }
         response.remainingRandomEventSends = quotas.remaining(SEND_QUOTA, visitorId, sendLimit);
         DailyCompletion completion = visitCompletion(visitorId);
@@ -205,9 +258,15 @@ public class SimRandomEventService {
         response.remainingRandomEventCompletions = Math.max(0, completion.limit() - completion.completed());
 
         VisitRandomEvents visit = new VisitRandomEvents();
-        fill(visit.events, EventPool.VISIT, Math.min(limit(414), response.remainingRandomEventCompletions), ignored -> 0);
+        int requested = Math.min(limit(414), response.remainingRandomEventCompletions);
+        fill(visit.events, EventPool.VISIT, requested, ignored -> 0);
         ctx.visitRandomEvents = visit;
         response.randomEvents = infos(visit.events, completion);
+        if (log.isDebugEnabled()) {
+            log.debug("拜访随机事件已生成 playerId={},visitTargetId={},requested={},configIds={},remainingCompletions={},completionLimit={}",
+                    visitorId, ownerId, requested, visit.events.stream().map(SceneEvent::configId).toList(),
+                    response.remainingRandomEventCompletions, completion.limit());
+        }
     }
 
     private ReceiveResult receive(SimRandomEventState scene, long visitorId, int receiveLimit, int sendLimit) {
@@ -215,10 +274,18 @@ public class SimRandomEventService {
         int received = scene.receivedOn(day);
         int remaining = Math.max(0, Math.min(receiveLimit - received, receiveLimit - scene.pendingDonors.size()));
         if (remaining == 0 || sendLimit == 0) {
+            log.debug("随机事件赠送跳过 playerId={},visitTargetId={},receiveLimit={},received={},pendingDonorCount={},sendLimit={}",
+                    visitorId, scene.playerId, receiveLimit, received, scene.pendingDonors.size(), sendLimit);
             return new ReceiveResult(remaining, null);
         }
         Map<Integer, Integer> weights = weights(EventPool.DONATION);
-        if (weights.isEmpty() || quotas.consume(SEND_QUOTA, visitorId, 1, sendLimit) < 0) {
+        if (weights.isEmpty()) {
+            log.warn("随机事件赠送跳过，赠送事件池无可用配置 playerId={},visitTargetId={}", visitorId, scene.playerId);
+            return new ReceiveResult(remaining, null);
+        }
+        if (quotas.consume(SEND_QUOTA, visitorId, 1, sendLimit) < 0) {
+            log.debug("随机事件赠送跳过，发送次数已达上限 playerId={},visitTargetId={},sendLimit={}",
+                    visitorId, scene.playerId, sendLimit);
             return new ReceiveResult(remaining, null);
         }
         scene.receiveDay = day;
@@ -231,9 +298,14 @@ public class SimRandomEventService {
         try {
             dao.save(scene);
         } catch (Exception e) {
+            log.error("随机事件赠送保存失败，回退发送次数 playerId={},visitTargetId={},spawned={}",
+                    visitorId, scene.playerId, spawned, e);
             quotas.rollback(SEND_QUOTA, visitorId, 1);
             throw e;
         }
+        log.info("随机事件赠送已保存 playerId={},visitTargetId={},spawned={},configId={},remainingReceives={},pendingDonorCount={}",
+                visitorId, scene.playerId, spawned, spawned ? scene.events.getLast().configId() : null,
+                remaining - 1, scene.pendingDonors.size());
         return new ReceiveResult(remaining - 1,
                 spawned ? notification(List.of(scene.events.getLast()), ownCompletion(scene, day)) : null);
     }
@@ -247,10 +319,15 @@ public class SimRandomEventService {
             }
             int previousSize = scene.events.size();
             int missing = available(scene.events, false, limit(401));
-            if (missing > 0 && (first || scene.refills < limit(400))
-                    && fill(scene.events, EventPool.SYSTEM, missing, ignored -> 0) > 0) {
-                if (!first) {
+            int systemAdded = 0;
+            if (missing > 0 && (first || scene.refills < limit(400))) {
+                systemAdded = fill(scene.events, EventPool.SYSTEM, missing, ignored -> 0);
+                if (systemAdded > 0 && !first) {
                     scene.refills++;
+                }
+                if (systemAdded < missing && (first || systemAdded > 0)) {
+                    log.debug("系统随机事件补刷数量不足 playerId={},day={},requested={},added={},eventCount={}",
+                            ctx.playerId(), today, missing, systemAdded, scene.events.size());
                 }
             }
             if (scheduled && !scene.pendingDonors.isEmpty()) {
@@ -263,6 +340,13 @@ public class SimRandomEventService {
             boolean added = scene.events.size() > previousSize;
             if (first || added) {
                 dao.save(scene);
+                if (log.isInfoEnabled()) {
+                    List<SceneEvent> newEvents = scene.events.subList(previousSize, scene.events.size());
+                    log.info("随机事件刷新已保存 playerId={},day={},scheduled={},firstOfDay={},systemSlots={},systemAdded={},donationAdded={},configIds={},eventCount={},refills={},pendingDonorCount={}",
+                            ctx.playerId(), today, scheduled, first, missing, systemAdded, newEvents.size() - systemAdded,
+                            newEvents.stream().map(SceneEvent::configId).toList(), scene.events.size(), scene.refills,
+                            scene.pendingDonors.size());
+                }
             }
             return scheduled && added
                     ? notification(scene.events.subList(previousSize, scene.events.size()), ownCompletion(scene, today))
@@ -271,42 +355,51 @@ public class SimRandomEventService {
     }
 
     public ResSimRandomEventAction act(SimPlayerContext ctx, ReqSimRandomEventAction request) {
-        long playerId = ctx.playerId();
         if (request.action < RandomEventPlay.VIEW
                 || (request.action > RandomEventPlay.TARGET && request.action != RandomEventPlay.CLAIM)) {
-            return reject(playerId, request, Code.PARAM_ERROR, "不支持的随机事件操作");
+            return reject(ctx, request, Code.PARAM_ERROR, "不支持的随机事件操作");
         }
-        if (ctx.getVisitTargetId() != 0) {
-            if (ctx.visitRandomEvents == null) {
-                return reject(playerId, request, Code.NOT_FOUND, "没有好友随机事件会话");
+        try {
+            if (ctx.getVisitTargetId() != 0) {
+                if (ctx.visitRandomEvents == null) {
+                    return reject(ctx, request, Code.NOT_FOUND, "没有好友随机事件会话");
+                }
+                return apply(ctx, ctx.visitRandomEvents.events, request, null);
             }
-            return apply(ctx, ctx.visitRandomEvents.events, request, null);
+            return withScene(ctx.playerId(), scene -> apply(ctx, scene.events, request, scene));
+        } catch (RuntimeException e) {
+            log.error("处理随机事件异常 playerId={},visitTargetId={},configId={},action={},target={}",
+                    ctx.playerId(), ctx.getVisitTargetId(), request.configId, request.action, request.target, e);
+            throw e;
         }
-        return withScene(playerId, scene -> apply(ctx, scene.events, request, scene));
     }
 
     private ResSimRandomEventAction apply(SimPlayerContext ctx, List<SceneEvent> events, ReqSimRandomEventAction request,
                                           SimRandomEventState scene) {
         long playerId = ctx.playerId();
+        long visitTargetId = ctx.getVisitTargetId();
         int index = indexOf(events, request.configId);
         if (index < 0) {
-            return reject(playerId, request, Code.NOT_FOUND, "该场景没有此事件");
+            return reject(ctx, request, Code.NOT_FOUND, "该场景没有此事件，eventCount=" + events.size());
         }
         SceneEvent event = events.get(index);
         RandomEventDetailsCfg cfg = GameDataManager.getRandomEventDetailsCfg(event.configId());
         if (cfg == null) {
-            return reject(playerId, request, Code.SAMPLE_ERROR, "事件配置缺失");
+            return reject(ctx, request, Code.SAMPLE_ERROR, "事件配置缺失");
         }
-        Outcome outcome = RandomEventPlay.play(event, cfg, request.action, request.target, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        Outcome outcome = RandomEventPlay.play(event, cfg, request.action, request.target, now);
         if (outcome.code() != Code.SUCCESS) {
-            return reject(playerId, request, outcome.code(), "当前状态不允许该操作，progress="
-                    + event.progress() + ", auxiliary=" + event.auxiliary());
+            log.warn("随机事件操作被拒绝 playerId={},visitTargetId={},configId={},eventType={},position={},action={},target={},code={},reason={},progress={},auxiliary={},readyAt={},now={}",
+                    playerId, visitTargetId, event.configId(), cfg.getAreaId(), event.position(), request.action, request.target,
+                    outcome.code(), outcome.rejectionReason(), event.progress(), event.auxiliary(), event.readyAt(), now);
+            return new ResSimRandomEventAction(outcome.code());
         }
         long today = LocalDate.now().toEpochDay();
         if (outcome.completed()) {
-            int code = grant(playerId, event, outcome.rewards(), scene == null);
+            int code = grant(ctx, event, outcome.rewards(), scene == null, request);
             if (code != Code.SUCCESS) {
-                return reject(playerId, request, code, "发奖失败或好友事件次数已用完");
+                return new ResSimRandomEventAction(code);
             }
             if (scene == null) {
                 events.remove(index);
@@ -323,6 +416,16 @@ public class SimRandomEventService {
             ctx.clearRoomEvent(event.configId());
         }
         DailyCompletion completion = scene == null ? visitCompletion(playerId) : ownCompletion(scene, today);
+        SceneEvent updated = outcome.event();
+        if (outcome.completed()) {
+            log.info("随机事件结算成功 playerId={},visitTargetId={},configId={},eventType={},position={},donorId={},action={},target={},rewards={},dailyCompletedCount={},completionLimit={}",
+                    playerId, visitTargetId, event.configId(), cfg.getAreaId(), event.position(), event.donorId(),
+                    request.action, request.target, outcome.rewards(), completion.completed(), completion.limit());
+        } else if (event != updated) {
+            log.debug("随机事件状态已更新 playerId={},visitTargetId={},configId={},eventType={},position={},action={},target={},progress={},auxiliary={},readyAt={}",
+                    playerId, visitTargetId, event.configId(), cfg.getAreaId(), event.position(),
+                    request.action, request.target, updated.progress(), updated.auxiliary(), updated.readyAt());
+        }
         ResSimRandomEventAction response = actionResponse(outcome, cfg, completion);
         if (cfg.getAreaId() == RandomEventPlay.CHEST && request.action == RandomEventPlay.TARGET) {
             response.event.boxInfo.openedReward = outcome.event().values().get(request.target);
@@ -340,23 +443,36 @@ public class SimRandomEventService {
         return response;
     }
 
-    private int grant(long playerId, SceneEvent event, Map<Integer, Long> rewards, boolean visit) {
-        if (visit && quotas.consume(VISIT_QUOTA, playerId, 1, limit(413)) < 0) {
-            return Code.FORBID;
+    private int grant(SimPlayerContext ctx, SceneEvent event, Map<Integer, Long> rewards, boolean visit,
+                      ReqSimRandomEventAction request) {
+        long playerId = ctx.playerId();
+        if (visit) {
+            int completionLimit = limit(413);
+            if (quotas.consume(VISIT_QUOTA, playerId, 1, completionLimit) < 0) {
+                log.warn("随机事件结算被拒绝，拜访完成次数已达上限 playerId={},visitTargetId={},configId={},position={},action={},target={},completionLimit={},code={}",
+                        playerId, ctx.getVisitTargetId(), event.configId(), event.position(), request.action, request.target,
+                        completionLimit, Code.FORBID);
+                return Code.FORBID;
+            }
         }
         if (rewards.isEmpty()) {
             return Code.SUCCESS;
         }
         int code = packs.addItems(playerId, rewards, AddType.SIM_RANDOM_EVENT_REWARD, Integer.toString(event.configId())).code;
-        if (visit && code != Code.SUCCESS) {
-            quotas.rollback(VISIT_QUOTA, playerId, 1);
+        if (code != Code.SUCCESS) {
+            log.warn("随机事件发奖失败，保留事件 playerId={},visitTargetId={},configId={},position={},donorId={},action={},target={},rewards={},code={}",
+                    playerId, ctx.getVisitTargetId(), event.configId(), event.position(), event.donorId(),
+                    request == null ? null : request.action, request == null ? null : request.target, rewards, code);
+            if (visit) {
+                quotas.rollback(VISIT_QUOTA, playerId, 1);
+            }
         }
         return code;
     }
 
-    private static ResSimRandomEventAction reject(long playerId, ReqSimRandomEventAction request, int code, String reason) {
-        log.warn("随机事件操作失败 playerId={},configId={},action={},target={},code={},reason={}",
-                playerId, request.configId, request.action, request.target, code, reason);
+    private static ResSimRandomEventAction reject(SimPlayerContext ctx, ReqSimRandomEventAction request, int code, String reason) {
+        log.warn("随机事件操作失败 playerId={},visitTargetId={},configId={},action={},target={},code={},reason={}",
+                ctx.playerId(), ctx.getVisitTargetId(), request.configId, request.action, request.target, code, reason);
         return new ResSimRandomEventAction(code);
     }
 
@@ -411,17 +527,20 @@ public class SimRandomEventService {
         for (RandomEventDetailsCfg cfg : GameDataManager.getRandomEventDetailsCfgList()) {
             int type = cfg.getAreaId();
             int weight = pool == EventPool.VISIT ? cfg.getF_EventWeight() : cfg.getS_EventWeight();
-            if (weight <= 0 || type < RandomEventPlay.QUIZ || type > RandomEventPlay.DICE
-                    || (pool != EventPool.SYSTEM && type == RandomEventPlay.ROOM)) {
-                continue;
+            if (weight > 0 && (pool == EventPool.SYSTEM || type != RandomEventPlay.ROOM) && canSpawn(cfg)) {
+                weights.put(cfg.getId(), weight);
             }
-            if (type == RandomEventPlay.INVESTMENT
-                    && (cfg.getParameter2() == null || cfg.getParameter2().isEmpty() || cfg.getParameter2().getFirst() <= 0)) {
-                continue;
-            }
-            weights.put(cfg.getId(), weight);
         }
         return weights;
+    }
+
+    private static boolean canSpawn(RandomEventDetailsCfg cfg) {
+        int type = cfg.getAreaId();
+        if (type != RandomEventPlay.INVESTMENT) {
+            return type >= RandomEventPlay.QUIZ && type <= RandomEventPlay.DICE;
+        }
+        List<Integer> duration = cfg.getParameter2();
+        return duration != null && !duration.isEmpty() && duration.getFirst() > 0;
     }
 
     private enum EventPool {
@@ -480,6 +599,7 @@ public class SimRandomEventService {
                 spy.started = event.auxiliary() != 0;
                 spy.capturedCount = event.progress();
                 spy.capturedTargets = event.values();
+                spy.requiredCount = RandomEventPlay.requiredSpyCaptures(cfg.getParameter1());
                 info.spyInfo = spy;
             }
             case RandomEventPlay.INVESTMENT -> {

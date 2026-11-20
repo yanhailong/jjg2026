@@ -46,15 +46,15 @@ final class RandomEventPlay {
             case QUIZ -> switch (action) {
                 case CHOOSE_A -> Outcome.finishA(event, cfg);
                 case CHOOSE_B -> Outcome.finishB(event, cfg);
-                default -> Outcome.reject(event, Code.PARAM_ERROR);
+                default -> Outcome.reject(event, Code.PARAM_ERROR, "问答仅支持选择选项");
             };
             case ROOM -> action == CHOOSE_A ? Outcome.finish(event, Map.of())
-                    : Outcome.reject(event, Code.FORBID);
+                    : Outcome.reject(event, Code.FORBID, "房间小游戏需由小游戏结算回调完成");
             case CHEST -> chest(event, cfg, action, target);
             case SPY -> spy(event, cfg, action, target);
             case INVESTMENT -> investment(event, cfg, action, now);
             case DICE -> dice(event, action, target);
-            default -> Outcome.reject(event, Code.SAMPLE_ERROR);
+            default -> Outcome.reject(event, Code.SAMPLE_ERROR, "事件类型配置无效");
         };
     }
 
@@ -68,13 +68,16 @@ final class RandomEventPlay {
             return Outcome.update(event.advance(0, 0, 0, boxes));
         }
         if (event.values().isEmpty()) {
-            return Outcome.reject(event, Code.FORBID);
+            return Outcome.reject(event, Code.FORBID, "宝箱尚未初始化，请先查看");
         }
         if (action == CLAIM && event.auxiliary() != 0) {
             return Outcome.finish(event, chestRewards(event, cfg));
         }
-        if (action != TARGET || target < 0 || target >= 3 || (event.auxiliary() & (1 << target)) != 0) {
-            return Outcome.reject(event, Code.FORBID);
+        if (action != TARGET || target < 0 || target >= 3) {
+            return Outcome.reject(event, Code.FORBID, "宝箱操作或位置无效，领奖需先打开宝箱");
+        }
+        if ((event.auxiliary() & (1 << target)) != 0) {
+            return Outcome.reject(event, Code.FORBID, "该宝箱已打开");
         }
         int opened = event.auxiliary() | (1 << target);
         SceneEvent updated = event.advance(0, opened, 0, event.values());
@@ -105,22 +108,33 @@ final class RandomEventPlay {
             return Outcome.finishA(event, cfg);
         }
         List<Integer> limits = cfg.getParameter1();
-        if (limits == null || limits.size() != 2 || limits.getFirst() > 20
-                || limits.getLast() <= 0 || limits.getLast() > limits.getFirst()) {
-            return Outcome.reject(event, Code.SAMPLE_ERROR);
+        int requiredCount = requiredSpyCaptures(limits);
+        if (requiredCount == 0) {
+            return Outcome.reject(event, Code.SAMPLE_ERROR, "间谍数量或目标数配置无效 parameter1=" + limits);
         }
         if (action == START) {
             return Outcome.update(event.advance(event.progress(), 1, 0, event.values()));
         }
-        if (action != TARGET || event.auxiliary() == 0 || target < 0 || target >= limits.getFirst()
-                || event.values().contains(target)) {
-            return Outcome.reject(event, Code.FORBID);
+        if (action != TARGET || event.auxiliary() == 0 || target < 0 || target >= limits.getFirst()) {
+            return Outcome.reject(event, Code.FORBID, "抓间谍操作或位置无效，需先开始，位置上限=" + limits.getFirst());
+        }
+        if (event.values().contains(target)) {
+            return Outcome.reject(event, Code.FORBID, "该目标已抓获");
         }
         List<Integer> captured = new ArrayList<>(event.values());
         captured.add(target);
         SceneEvent updated = event.advance(captured.size(), 1, 0, captured);
-        return captured.size() >= limits.getLast()
+        return captured.size() >= requiredCount
                 ? Outcome.finishB(updated, cfg) : Outcome.update(updated);
+    }
+
+    static int requiredSpyCaptures(List<Integer> limits) {
+        if (limits == null || limits.size() != 2) {
+            return 0;
+        }
+        int totalCount = limits.getFirst();
+        int requiredCount = limits.getLast();
+        return totalCount <= 20 && requiredCount > 0 && requiredCount <= totalCount ? requiredCount : 0;
     }
 
     private static Outcome investment(SceneEvent event, RandomEventDetailsCfg cfg, int action, long now) {
@@ -130,7 +144,7 @@ final class RandomEventPlay {
         if (action == CHOOSE_B && event.readyAt() == 0) {
             List<Integer> duration = cfg.getParameter2();
             if (duration == null || duration.isEmpty() || duration.getFirst() <= 0) {
-                return Outcome.reject(event, Code.SAMPLE_ERROR);
+                return Outcome.reject(event, Code.SAMPLE_ERROR, "投资等待时长配置无效 parameter2=" + duration);
             }
             return Outcome.update(event.advance(1, 0, now + TimeUnit.SECONDS.toMillis(duration.getFirst()), List.of()));
         }
@@ -144,18 +158,16 @@ final class RandomEventPlay {
             }
             return Outcome.finishB(event, cfg, rewards);
         }
-        return Outcome.reject(event, Code.FORBID);
+        return Outcome.reject(event, Code.FORBID, "投资操作无效，开始和领奖需匹配当前投资状态");
     }
 
     private static Outcome dice(SceneEvent event, int action, int target) {
         DicePrizes prizes = dicePrizes();
         if (prizes == null) {
-            return Outcome.reject(event, Code.SAMPLE_ERROR);
+            return Outcome.reject(event, Code.SAMPLE_ERROR, "摇骰子奖金配置无效");
         }
         if (event.progress() > prizes.amounts().length) {
-            log.warn("摇骰子连胜次数超出奖金配置档位 configId={},wins={},tierCount={},action={}",
-                    event.configId(), event.progress(), prizes.amounts().length, action);
-            return Outcome.reject(event, Code.SAMPLE_ERROR);
+            return Outcome.reject(event, Code.SAMPLE_ERROR, "摇骰子连胜次数超出奖金档位，档位数=" + prizes.amounts().length);
         }
         if (action == CLAIM) {
             return Outcome.finish(event, prizes.payout(prizes.currentAmount(event)));
@@ -175,7 +187,7 @@ final class RandomEventPlay {
             values.set(target, die());
             rerolls--;
         } else {
-            return Outcome.reject(event, Code.FORBID);
+            return Outcome.reject(event, Code.FORBID, "当前骰子状态或位置不支持该操作，first=" + first + ",big=" + big);
         }
         boolean won = isBig(values);
         int wins = event.progress() + (won ? 1 : 0);
@@ -237,9 +249,10 @@ final class RandomEventPlay {
         }
     }
 
-    record Outcome(int code, SceneEvent event, boolean completed, Map<Integer, Long> rewards, List<Integer> resultLanguageId) {
+    record Outcome(int code, SceneEvent event, boolean completed, Map<Integer, Long> rewards,
+                   List<Integer> resultLanguageId, String rejectionReason) {
         static Outcome update(SceneEvent event) {
-            return new Outcome(Code.SUCCESS, event, false, Map.of(), List.of());
+            return new Outcome(Code.SUCCESS, event, false, Map.of(), List.of(), null);
         }
 
         static Outcome finish(SceneEvent event, Map<Integer, Long> rewards) {
@@ -259,7 +272,7 @@ final class RandomEventPlay {
         }
 
         private static Outcome finish(SceneEvent event, Map<Integer, Long> rewards, List<Integer> resultLanguageId) {
-            return new Outcome(Code.SUCCESS, event, true, rewards == null ? Map.of() : rewards, resultLanguageId);
+            return new Outcome(Code.SUCCESS, event, true, rewards == null ? Map.of() : rewards, resultLanguageId, null);
         }
 
         private static List<Integer> resultLanguageIds(RandomEventDetailsCfg cfg, int rewardIndex) {
@@ -268,8 +281,8 @@ final class RandomEventPlay {
             return ids == null ? List.of() : ids;
         }
 
-        static Outcome reject(SceneEvent event, int code) {
-            return new Outcome(code, event, false, Map.of(), List.of());
+        static Outcome reject(SceneEvent event, int code, String reason) {
+            return new Outcome(code, event, false, Map.of(), List.of(), reason);
         }
     }
 }

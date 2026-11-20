@@ -64,6 +64,8 @@ public class RandomEventInfo {
         public int capturedCount;
         @ProtoDesc("已抓捕的间谍编号列表，编号从0开始")
         public List<Integer> capturedTargets;
+        @ProtoDesc("完成事件所需抓捕的间谍总数，对应RandomEventDetails.parameter1[1]，配置无效时为0")
+        public int requiredCount;
     }
 
     @ProtobufMessage

@@ -74,7 +74,7 @@ public final class MiniGameSkillTree<T extends BaseCfgBean> {
             boolean unlocked = sources.stream().anyMatch(source -> {
                 int sourceGroupId = groupIdOf.applyAsInt(source);
                 int sourceLevel = levelOf.applyAsInt(source);
-                return skillLevels.getOrDefault(sourceGroupId, 0) == sourceLevel
+                return skillLevels.getOrDefault(sourceGroupId, 0) >= sourceLevel
                         && (sourceLevel > 0 || initiallyUnlocked.test(sourceGroupId));
             });
             if (!unlocked) {
