@@ -2,6 +2,7 @@ package com.jjg.game.sim.service;
 
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
+import com.jjg.game.core.data.Player;
 import com.jjg.game.core.listener.ItemAddListener;
 import com.jjg.game.core.listener.ItemNotEnoughListener;
 import com.jjg.game.core.service.GameFunctionService;
@@ -70,16 +71,18 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
 
     private List<Integer> trigger(SimPlayerContext ctx, int condition, int param,
                                   boolean notify, boolean checkPath, String currentPathName) {
-        if (ctx == null || ctx.getSimBaseData() == null) {
-            return Collections.emptyList();
-        }
-        List<Integer> groups = configService.groupsFor(condition, param);
-        if (groups.isEmpty()) {
+        return trigger(ctx, condition, param, configService.groupsFor(condition, param),
+                notify, checkPath, currentPathName);
+    }
+
+    private List<Integer> trigger(SimPlayerContext ctx, int condition, int param, List<Integer> groups,
+                                  boolean notify, boolean checkPath, String currentPathName) {
+        if (groups.isEmpty() || ctx == null || ctx.getSimBaseData() == null) {
             return Collections.emptyList();
         }
         SimBaseData base = ctx.getSimBaseData();
-        List<Integer> triggered = new ArrayList<>(groups.size());
-        List<Integer> deferred = new ArrayList<>(groups.size());
+        List<Integer> triggered = new ArrayList<>();
+        List<Integer> deferred = new ArrayList<>();
         for (int groupId : groups) {
             if (base.hasTriggeredGuideGroup(groupId) || base.hasCompletedGuideGroup(groupId)) {
                 continue;
@@ -98,14 +101,16 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
                 }
             } else if (base.deferGuideGroupForScene(groupId)) {
                 deferred.add(groupId);
+                log.debug("新手引导场景未匹配 playerId={},groupId={},pageId={},currentPathName={},requiredPathName={}",
+                        ctx.playerId(), groupId, ctx.getClientPageId(), currentPathName, requiredPathName);
             }
         }
         if (!triggered.isEmpty() || !deferred.isEmpty()) {
             ctx.setLastSaveTime(0);
         }
         if (!triggered.isEmpty()) {
-            log.info("触发新手引导组 playerId={},condition={},param={},blankPage={},groups={}",
-                    ctx.playerId(), condition, param, ctx.isBlankPage(), triggered);
+            log.info("触发新手引导组 playerId={},condition={},param={},pageId={},groups={}",
+                    ctx.playerId(), condition, param, ctx.getClientPageId(), triggered);
             if (notify) {
                 notifyTriggeredGroups(ctx, triggered);
             }
@@ -141,17 +146,33 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
                 case SimConstant.GuideCondition.FUNCTION_UNLOCKED -> ctx.getPlayer() != null
                         && gameFunctionService.getOpenedFuncIdList(ctx.getPlayer()).contains(param);
                 case SimConstant.GuideCondition.GUIDE_GROUP_FINISHED -> base.hasCompletedGuideGroup(param);
-                case SimConstant.GuideCondition.BLANK_PAGE -> ctx.isBlankPage();
+                case SimConstant.GuideCondition.CLIENT_PAGE -> pageMatches(ctx, groupId, param);
                 default -> false;
             };
-            if (!satisfied) return false;
+            if (!satisfied) {
+                if (condition != SimConstant.GuideCondition.CLIENT_PAGE && log.isDebugEnabled()) {
+                    Player player = ctx.getPlayer();
+                    log.debug("新手引导条件未满足 playerId={},groupId={},condition={},requiredParam={},eventCondition={},eventParam={},pageId={},playerLevel={},allLevel={}",
+                            ctx.playerId(), groupId, condition, param, eventCondition, eventParam,
+                            ctx.getClientPageId(), player == null ? null : player.getLevel(), base.getAllLevel());
+                }
+                return false;
+            }
         }
         return true;
     }
 
-    /** 页面状态上报后，按当前 blankPage 重查所有包含条件11的引导组。 */
-    public List<Integer> triggerBlankPage(SimPlayerContext ctx, boolean notify) {
-        return trigger(ctx, SimConstant.GuideCondition.BLANK_PAGE, 0, notify);
+    /** 上报页面后重查命中的引导组；切回该页面时恢复尚未完成的引导。 */
+    public void onClientPageReported(SimPlayerContext ctx, boolean pageChanged) {
+        int pageId = ctx.getClientPageId();
+        List<Integer> groups = configService.groupsFor(SimConstant.GuideCondition.CLIENT_PAGE, pageId);
+        if (groups.isEmpty()) {
+            log.debug("当前页面没有配置引导组 playerId={},pageId={}", ctx.playerId(), pageId);
+            return;
+        }
+        List<Integer> triggered = trigger(ctx, SimConstant.GuideCondition.CLIENT_PAGE, pageId,
+                groups, false, true, null);
+        notifyTriggeredGroups(ctx, pageChanged ? groups : triggered, pageChanged);
     }
 
     /**
@@ -214,11 +235,11 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
                 stateChanged = true;
                 continue;
             }
-            if (!conditionsSatisfied(ctx, groupId, 0, 0)) {
+            if (!pathName.equals(configService.pathNameOfGroup(groupId))
+                    || !conditionsSatisfied(ctx, groupId, 0, 0)) {
                 continue;
             }
-            if (pathName.equals(configService.pathNameOfGroup(groupId))
-                    && base.activateScenePendingGuideGroup(groupId)) {
+            if (base.activateScenePendingGuideGroup(groupId)) {
                 triggered.add(groupId);
                 stateChanged = true;
             }
@@ -327,34 +348,30 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
 
     /** 下发前重查当前页面，避免延迟通知使用页面切换前的触发结果。 */
     public void notifyTriggeredGroups(SimPlayerContext ctx, List<Integer> guideGroupIds) {
-        if (ctx == null || ctx.getPlayerController() == null
-                || guideGroupIds == null || guideGroupIds.isEmpty()) {
+        notifyTriggeredGroups(ctx, guideGroupIds, false);
+    }
+
+    private void notifyTriggeredGroups(SimPlayerContext ctx, List<Integer> guideGroupIds, boolean checkPath) {
+        if (guideGroupIds == null || guideGroupIds.isEmpty() || ctx == null
+                || ctx.getPlayerController() == null || ctx.getSimBaseData() == null) {
             return;
         }
-        List<Integer> pending = pendingOpenGuideGroupIds(ctx);
-        List<Integer> available = guideGroupIds.stream().filter(pending::contains).toList();
+        SimBaseData base = ctx.getSimBaseData();
+        List<Integer> available = guideGroupIds.stream()
+                .filter(groupId -> base.hasTriggeredGuideGroup(groupId) && !base.hasCompletedGuideGroup(groupId))
+                .filter(groupId -> currentPageAllowsGuide(ctx, groupId))
+                .filter(groupId -> !checkPath || pathMatches(ctx, configService.pathNameOfGroup(groupId)))
+                .toList();
         if (available.isEmpty()) {
-            log.info("暂不下发新手引导触发通知 playerId={},blankPage={},groups={}",
-                    ctx.playerId(), ctx.isBlankPage(), guideGroupIds);
+            log.debug("没有当前可下发的待进行引导组 playerId={},pageId={},groups={}",
+                    ctx.playerId(), ctx.getClientPageId(), guideGroupIds);
             return;
         }
         NotifyGuideTrigger message = new NotifyGuideTrigger(Code.SUCCESS);
         message.guideGroupIds = available;
         ctx.send(message);
-        log.info("下发新手引导触发通知 playerId={},blankPage={},groups={}",
-                ctx.playerId(), ctx.isBlankPage(), available);
-    }
-
-    /** 已触发的引导在恢复时仍须满足当前页面要求。 */
-    public List<Integer> pendingOpenGuideGroupIds(SimPlayerContext ctx) {
-        if (ctx == null || ctx.getSimBaseData() == null) {
-            return Collections.emptyList();
-        }
-        List<Integer> pending = ctx.getSimBaseData().pendingGuideGroupIds().stream()
-                .filter(configService::containsGroup)
-                .filter(groupId -> currentPageAllowsGuide(ctx, groupId))
-                .toList();
-        return pending.isEmpty() ? Collections.emptyList() : pending;
+        log.info("下发新手引导触发通知 playerId={},pageId={},groups={}",
+                ctx.playerId(), ctx.getClientPageId(), available);
     }
 
     /**
@@ -366,27 +383,28 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
             return Collections.emptyList();
         }
         List<Integer> pending = ctx.getSimBaseData().pendingGuideGroupIds().stream()
-                .filter(configService::containsGroup)
-                .filter(groupId -> currentPageAllowsGuide(ctx, groupId))
                 .filter(groupId -> {
                     String configuredPath = configService.pathNameOfGroup(groupId);
                     return configuredPath.isBlank() || pathName.equals(configuredPath);
                 })
+                .filter(groupId -> currentPageAllowsGuide(ctx, groupId))
                 .toList();
         return pending.isEmpty() ? Collections.emptyList() : pending;
     }
 
-    /** 重新回到大厅空白页面时，恢复此前已经触发但尚未完成的条件11引导。 */
-    public List<Integer> pendingBlankPageGuideGroupIds(SimPlayerContext ctx) {
-        return pendingOpenGuideGroupIds(ctx, SimConstant.GuidePath.SIM_HALL).stream()
-                .filter(groupId -> configService.conditionsOfGroup(groupId)
-                        .containsKey(SimConstant.GuideCondition.BLANK_PAGE))
-                .toList();
+    private boolean currentPageAllowsGuide(SimPlayerContext ctx, int groupId) {
+        Map<Integer, Integer> conditions = configService.conditionsOfGroup(groupId);
+        if (conditions.isEmpty()) return false;
+        Integer requiredPageId = conditions.get(SimConstant.GuideCondition.CLIENT_PAGE);
+        return requiredPageId == null || pageMatches(ctx, groupId, requiredPageId);
     }
 
-    private boolean currentPageAllowsGuide(SimPlayerContext ctx, int groupId) {
-        return !configService.conditionsOfGroup(groupId).containsKey(SimConstant.GuideCondition.BLANK_PAGE)
-                || ctx.isBlankPage();
+    private boolean pageMatches(SimPlayerContext ctx, int groupId, int requiredPageId) {
+        int pageId = ctx.getClientPageId();
+        if (pageId == requiredPageId) return true;
+        log.debug("新手引导页面不匹配 playerId={},groupId={},pageId={},requiredPageId={}",
+                ctx.playerId(), groupId, pageId, requiredPageId);
+        return false;
     }
 
     /**

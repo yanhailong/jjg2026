@@ -556,8 +556,8 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
             return new CommonResult<>(Code.NOT_FOUND);
         }
         List<Integer> guideGroupIds = simGuideService.triggerClientEvent(ctx, condition, param);
-        log.info("SIM owner返回客户端事件引导结果 playerId={},condition={},param={},blankPage={},groups={}",
-                playerId, condition, param, ctx.isBlankPage(), guideGroupIds);
+        log.info("SIM owner返回客户端事件引导结果 playerId={},condition={},param={},pageId={},groups={}",
+                playerId, condition, param, ctx.getClientPageId(), guideGroupIds);
         return new CommonResult<>(Code.SUCCESS, guideGroupIds);
     }
 
@@ -576,8 +576,8 @@ public class HallRPCController extends CoreRPCController implements GmToHallBrid
         simGuideService.triggerDeferredForPath(ctx, pathName, false);
         // 返回该场景下全部尚未完成的引导，兼容首次通知丢失及重新进入场景后的恢复。
         List<Integer> guideGroupIds = simGuideService.pendingOpenGuideGroupIds(ctx, pathName);
-        log.info("玩家进入引导场景处理完成 playerId={},pathName={},blankPage={},groups={}",
-                playerId, pathName, ctx.isBlankPage(), guideGroupIds);
+        log.info("玩家进入引导场景处理完成 playerId={},pathName={},pageId={},groups={}",
+                playerId, pathName, ctx.getClientPageId(), guideGroupIds);
         return new CommonResult<>(Code.SUCCESS, guideGroupIds);
     }
 

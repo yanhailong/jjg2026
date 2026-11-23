@@ -14,6 +14,7 @@ import com.jjg.game.minigame.data.SpeedyDeliveryData;
 import com.jjg.game.minigame.data.SpeedyDeliveryRound;
 import com.jjg.game.season.data.SeasonPlayerData;
 import com.jjg.game.sim.constant.BuildingOutputType;
+import com.jjg.game.sim.constant.SimConstant;
 import com.jjg.game.sim.randomevent.VisitRandomEvents;
 
 import java.util.*;
@@ -164,8 +165,7 @@ public class SimPlayerContext {
         }
     }
 
-    //标记客户端是不是空白页面
-    private boolean blankPage;
+    private volatile int clientPageId = SimConstant.ClientPage.UNKNOWN;
 
     public SpeedyDeliveryData getSpeedyDeliveryData() {
         return speedyDeliveryData;
@@ -339,6 +339,9 @@ public class SimPlayerContext {
     }
 
     public void setPlayerController(PlayerController playerController) {
+        if (this.playerController != playerController) {
+            clientPageId = SimConstant.ClientPage.UNKNOWN;
+        }
         this.playerController = playerController;
     }
 
@@ -676,11 +679,11 @@ public class SimPlayerContext {
         this.simChapterData = simChapterData;
     }
 
-    public boolean isBlankPage() {
-        return blankPage;
+    public int getClientPageId() {
+        return clientPageId;
     }
 
-    public void setBlankPage(boolean blankPage) {
-        this.blankPage = blankPage;
+    public void setClientPageId(int clientPageId) {
+        this.clientPageId = clientPageId;
     }
 }

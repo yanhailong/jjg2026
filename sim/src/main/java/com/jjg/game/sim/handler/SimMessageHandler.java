@@ -258,31 +258,39 @@ public class SimMessageHandler implements GmListener {
         SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
         if (ctx != null) {
             ctx.setVisitTargetId(0);
+            ctx.setClientPageId(SimConstant.ClientPage.UNKNOWN);
         }
         playerController.setScene(null);
     }
 
     /**
-     * 上报客户端空白页面状态
+     * 上报客户端当前页面
      */
     @Command(SimConstant.MsgBean.REQ_SIM_BLANK_PAGE)
     public void reqSimBlankPage(PlayerController playerController, ReqSimBlankPage req) {
-        log.warn("记录空白页 playerId={},blank={}", playerController.playerId(), req.blankPage);
-        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerController.playerId());
-        boolean wasBlankPage = ctx != null && ctx.isBlankPage();
-        ResSimBlankPage res = new ResSimBlankPage(ctx == null ? Code.NOT_FOUND : Code.SUCCESS);
-        if (ctx != null) {
-            ctx.setBlankPage(req.blankPage);
+        long playerId = playerController.playerId();
+        int pageId = req.blankPage;
+        ResSimBlankPage res = new ResSimBlankPage(Code.SUCCESS);
+        res.blankPage = pageId;
+        if (pageId < 0) {
+            log.warn("拒绝客户端页面上报，页面编号必须非负 playerId={},pageId={}", playerId, pageId);
+            res.code = Code.PARAM_ERROR;
+            playerController.send(res);
+            return;
         }
-        res.blankPage = req.blankPage;
+        SimPlayerContext ctx = simPlayerContextRegistry.getContext(playerId);
+        if (ctx == null || ctx.getSimBaseData() == null) {
+            log.warn("处理客户端页面上报失败，模拟经营数据未加载 playerId={},pageId={},contextPresent={}",
+                    playerId, pageId, ctx != null);
+            res.code = Code.NOT_FOUND;
+            playerController.send(res);
+            return;
+        }
+        log.info("记录客户端页面上报 playerId={},blankPage={}", ctx.playerId(), req.blankPage);
+        boolean pageChanged = ctx.getClientPageId() != pageId;
+        ctx.setClientPageId(pageId);
         playerController.send(res);
-        if (ctx != null) {
-            List<Integer> groups = guideService.triggerBlankPage(ctx, false);
-            if (req.blankPage && !wasBlankPage) {
-                groups = guideService.pendingBlankPageGuideGroupIds(ctx);
-            }
-            guideService.notifyTriggeredGroups(ctx, groups);
-        }
+        guideService.onClientPageReported(ctx, pageChanged);
     }
 
     /**
@@ -408,13 +416,13 @@ public class SimMessageHandler implements GmListener {
                                             NotifyGuideTrigger notify = new NotifyGuideTrigger(Code.SUCCESS);
                                             notify.guideGroupIds = groupSnapshot;
                                             playerController.send(notify);
-                                            log.info("跨节点延迟下发新手引导触发通知 playerId={},blankPage=unknown,simContextPresent=false,groups={}",
+                                            log.info("跨节点延迟下发新手引导触发通知 playerId={},pageId=unknown,simContextPresent=false,groups={}",
                                                     playerId, groupSnapshot);
                                         }
-                                        log.info("当前节点延迟检查新手引导组通知 playerId={},delayMs={},blankPage={},groups={}",
+                                        log.info("当前节点延迟检查新手引导组通知 playerId={},delayMs={},pageId={},groups={}",
                                                 playerId,
                                                 SimConstant.GuideTiming.GROUP_FINISH_NOTIFY_DELAY_MILLIS,
-                                                currentContext == null ? "unknown" : currentContext.isBlankPage(),
+                                                currentContext == null ? SimConstant.ClientPage.UNKNOWN : currentContext.getClientPageId(),
                                                 groupSnapshot);
                                     }
                                 }.setHandlerParamWithSelf("remote sim guide group finish delayed notify")),
@@ -453,8 +461,8 @@ public class SimMessageHandler implements GmListener {
             NotifyGuideTrigger notify = new NotifyGuideTrigger(Code.SUCCESS);
             notify.guideGroupIds = result.data;
             playerController.send(notify);
-            log.info("客户端事件下发新手引导触发通知 playerId={},blankPage={},simContextPresent={},groups={}",
-                    playerId, ctx == null ? "unknown" : ctx.isBlankPage(), ctx != null, result.data);
+            log.info("客户端事件下发新手引导触发通知 playerId={},pageId={},simContextPresent={},groups={}",
+                    playerId, ctx == null ? SimConstant.ClientPage.UNKNOWN : ctx.getClientPageId(), ctx != null, result.data);
         }
         log.info("处理客户端新手引导事件 playerId={},condition={},param={},code={},groups={}",
                 playerId, req.condition, req.param, res.code,
@@ -1209,7 +1217,7 @@ public class SimMessageHandler implements GmListener {
     }
 
     private <T extends AbstractResponse> T callVisitOwner(PlayerController playerController, String operation,
-                                                         Function<ToSimBridge, T> call, IntFunction<T> error) {
+                                                          Function<ToSimBridge, T> call, IntFunction<T> error) {
         long playerId = playerController.playerId();
         ClusterClient client = simNodeService.getSimClusterClient(playerId, playerController.ipAddress());
         if (client == null) {

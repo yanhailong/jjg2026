@@ -67,7 +67,7 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
             if (!cfg.getIsOpen()) {
                 continue;
             }
-            Map<Integer, Integer> configuredConditions = normalizeConditions(cfg.getCondition());
+            Map<Integer, Integer> configuredConditions = normalizeConditions(cfg);
             if (cfg.getGuideGroupId() <= 0 || configuredConditions.isEmpty()) {
                 continue;
             }
@@ -143,7 +143,7 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
     }
 
     public List<Integer> groupsFor(int condition, int param) {
-        int normalized = conditionNeedsParam(condition) ? param : 0;
+        int normalized = condition == SimConstant.GuideCondition.NEW_PLAYER ? 0 : param;
         return triggerGroups.getOrDefault(new TriggerKey(condition, normalized), Collections.emptyList());
     }
 
@@ -277,7 +277,8 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
         return Collections.unmodifiableList(result);
     }
 
-    private Map<Integer, Integer> normalizeConditions(Map<Integer, Integer> configuredConditions) {
+    private Map<Integer, Integer> normalizeConditions(GuideCfg cfg) {
+        Map<Integer, Integer> configuredConditions = cfg.getCondition();
         if (configuredConditions == null || configuredConditions.isEmpty()) {
             return Collections.emptyMap();
         }
@@ -285,33 +286,31 @@ public class SimGuideConfigService implements ConfigExcelChangeListener {
         for (Map.Entry<Integer, Integer> entry : configuredConditions.entrySet()) {
             Integer condition = entry.getKey();
             Integer param = entry.getValue();
-            if (condition == null || param == null || !validCondition(condition)
-                    || conditionNeedsParam(condition) && param <= 0) {
-                log.warn("无效的新手引导条件，整组不建立触发索引 conditions={}", configuredConditions);
+            if (condition == null || param == null || !validCondition(condition, param)) {
+                log.warn("无效的新手引导条件，整组不建立触发索引 groupId={},guideId={},condition={},param={}",
+                        cfg.getGuideGroupId(), cfg.getId(), condition, param);
                 return Collections.emptyMap();
             }
-            normalized.put(condition, conditionNeedsParam(condition) ? param : 0);
+            normalized.put(condition, condition == SimConstant.GuideCondition.NEW_PLAYER ? 0 : param);
         }
         return Collections.unmodifiableMap(normalized);
     }
 
-    private boolean validCondition(int condition) {
-        return condition == SimConstant.GuideCondition.NEW_PLAYER
-                || condition == SimConstant.GuideCondition.TASK_REWARD_CLAIMED
-                || condition == SimConstant.GuideCondition.SCENE_TOTAL_LEVEL
-                || condition == SimConstant.GuideCondition.PLAYER_LEVEL
-                || condition == SimConstant.GuideCondition.ITEM_NOT_ENOUGH
-                || condition == SimConstant.GuideCondition.ITEM_GAINED
-                || condition == SimConstant.GuideCondition.FUNCTION_UNLOCKED
-                || condition == SimConstant.GuideCondition.GUIDE_GROUP_FINISHED
-                || condition == SimConstant.GuideCondition.ENTER_MINI_GAME
-                || condition == SimConstant.GuideCondition.CLIENT_EVENT
-                || condition == SimConstant.GuideCondition.BLANK_PAGE;
-    }
-
-    private boolean conditionNeedsParam(int condition) {
-        return condition != SimConstant.GuideCondition.NEW_PLAYER
-                && condition != SimConstant.GuideCondition.BLANK_PAGE;
+    private boolean validCondition(int condition, int param) {
+        return switch (condition) {
+            case SimConstant.GuideCondition.NEW_PLAYER -> true;
+            case SimConstant.GuideCondition.CLIENT_PAGE -> param >= 0 && param != SimConstant.ClientPage.UNKNOWN;
+            case SimConstant.GuideCondition.TASK_REWARD_CLAIMED,
+                 SimConstant.GuideCondition.SCENE_TOTAL_LEVEL,
+                 SimConstant.GuideCondition.PLAYER_LEVEL,
+                 SimConstant.GuideCondition.ITEM_NOT_ENOUGH,
+                 SimConstant.GuideCondition.ITEM_GAINED,
+                 SimConstant.GuideCondition.FUNCTION_UNLOCKED,
+                 SimConstant.GuideCondition.GUIDE_GROUP_FINISHED,
+                 SimConstant.GuideCondition.ENTER_MINI_GAME,
+                 SimConstant.GuideCondition.CLIENT_EVENT -> param > 0;
+            default -> false;
+        };
     }
 
     private String normalizePathName(String pathName) {
