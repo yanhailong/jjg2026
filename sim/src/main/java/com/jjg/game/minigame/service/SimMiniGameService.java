@@ -6,6 +6,8 @@ import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
 import com.jjg.game.core.data.CommonResult;
 import com.jjg.game.core.data.ItemOperationResult;
+import com.jjg.game.core.data.PlayerPack;
+import com.jjg.game.core.listener.InitPlayerPackListener;
 import com.jjg.game.core.service.PlayerPackService;
 import com.jjg.game.core.utils.ItemUtils;
 import com.jjg.game.minigame.constant.MiniGameConstant;
@@ -39,7 +41,7 @@ import java.util.Map;
  * 沿用玩家串行队列及统一背包接口，不额外创建锁、事务或定时器。
  */
 @Service
-public class SimMiniGameService {
+public class SimMiniGameService implements InitPlayerPackListener {
     @Autowired
     private SimRandomEventService randomEvents;
     private static final Logger log = LoggerFactory.getLogger(SimMiniGameService.class);
@@ -548,4 +550,42 @@ public class SimMiniGameService {
         return info;
     }
 
+    @Override
+    public void initPack(PlayerPack playerPack) {
+        var cheaterHunt = GameDataManager.getMinigameCheaterHuntLevelCfg(MiniGameConstant.FIRST_CHEATER_HUNT_LEVEL_ID);
+        addInitialItems(playerPack, "找老千", cheaterHunt == null ? null : cheaterHunt.getDailyFreeItemCount());
+
+        var godGamblers = GameDataManager.getMinigameGodofGamblersRubbingCfg(MiniGameConstant.GOD_GAMBLERS_CONFIG_ID);
+        addInitialItems(playerPack, "赌神搓牌", godGamblers == null ? null : godGamblers.getItemGift());
+
+        var fishConfigs = GameDataManager.getMinigameHappyHappyFishCfgMap();
+        if (fishConfigs.size() == 1) {
+            addInitialItems(playerPack, "欢乐捉鱼", fishConfigs.values().iterator().next().getGrantCount());
+        } else {
+            log.warn("欢乐捉鱼注册赠送配置行数无效 playerId={},configCount={},required=1", playerPack.getPlayerId(), fishConfigs.size());
+        }
+
+        var deliveryConfigs = GameDataManager.getMinigameSpeedyDeliveryCfgMap();
+        if (deliveryConfigs.size() == 1) {
+            addInitialItems(playerPack, "飞驰快送", deliveryConfigs.values().iterator().next().getGrantCount());
+        } else {
+            log.warn("飞驰快送注册赠送配置行数无效 playerId={},configCount={},required=1", playerPack.getPlayerId(), deliveryConfigs.size());
+        }
+    }
+
+    private void addInitialItems(PlayerPack playerPack, String gameName, Map<Integer, Long> items) {
+        if (!validItems(items)) {
+            log.warn("小游戏注册赠送配置缺失或无效 playerId={},game={},items={}", playerPack.getPlayerId(), gameName, items);
+            return;
+        }
+        for (var entry : items.entrySet()) {
+            var itemCfg = GameDataManager.getItemCfg(entry.getKey());
+            if (itemCfg == null) {
+                log.warn("小游戏注册赠送缺少道具配置 playerId={},game={},itemId={},count={}",
+                        playerPack.getPlayerId(), gameName, entry.getKey(), entry.getValue());
+                continue;
+            }
+            playerPack.addItem(entry.getKey(), entry.getValue(), itemCfg.getProp());
+        }
+    }
 }

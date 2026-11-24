@@ -1,6 +1,7 @@
 package com.jjg.game.core.service;
 
 import cn.hutool.core.collection.CollectionUtil;
+import com.jjg.game.common.baselogic.function.SystemInterfaceHolder;
 import com.jjg.game.common.data.DataSaveCallback;
 import com.jjg.game.common.pb.ItemInfo;
 import com.jjg.game.common.redis.RedisLock;
@@ -12,11 +13,8 @@ import com.jjg.game.core.constant.GameConstant;
 import com.jjg.game.core.constant.TaskConstant;
 import com.jjg.game.core.dao.PlayerPackDao;
 import com.jjg.game.core.data.*;
-import com.jjg.game.core.listener.SpecialItemListener;
+import com.jjg.game.core.listener.*;
 import com.jjg.game.core.logger.CoreLogger;
-import com.jjg.game.core.listener.ItemAddListener;
-import com.jjg.game.core.listener.ItemNotEnoughListener;
-import com.jjg.game.core.listener.ItemConsumeListener;
 import com.jjg.game.core.pb.PackItemInfo;
 import com.jjg.game.core.task.manager.TaskManager;
 import com.jjg.game.core.task.param.TaskConditionParam12101;
@@ -1411,6 +1409,8 @@ public class PlayerPackService implements IPlayerRegister {
     @Override
     public void playerRegister(PlayerController playerController) {
         PlayerPack pack = new PlayerPack(playerController.playerId());
+        SystemInterfaceHolder.callGameSysAction(
+                InitPlayerPackListener.class, (f) -> f.initPack(pack));
         redisSave(pack);
     }
 
