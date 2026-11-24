@@ -35,7 +35,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
-/** 欢乐捉鱼：客户端负责操作，服务器负责单局时限、积分和道具结算。 */
+/**
+ * 欢乐捉鱼：客户端负责操作，服务器负责单局时限、积分和道具结算。
+ */
 @Service
 public class HappyHappyFishService {
     @Autowired
@@ -54,8 +56,8 @@ public class HappyHappyFishService {
     private final SimConfigCacheService configCacheService;
 
     public HappyHappyFishService(HappyHappyFishDao dao, SimAutoSaveService autoSaveService,
-                                PlayerPackService playerPackService, SimChapterService chapterService,
-                                MiniGameConditionService conditionService, SimConfigCacheService configCacheService) {
+                                 PlayerPackService playerPackService, SimChapterService chapterService,
+                                 MiniGameConditionService conditionService, SimConfigCacheService configCacheService) {
         this.dao = dao;
         this.autoSaveService = autoSaveService;
         this.playerPackService = playerPackService;
@@ -79,7 +81,9 @@ public class HappyHappyFishService {
         }
     }
 
-    /** 进入只获取费用、持有量及章节解锁状态，不重置已有单局。 */
+    /**
+     * 进入只获取费用、持有量及章节解锁状态，不重置已有单局。
+     */
     public ResEnterHappyHappyFishGame enter(SimPlayerContext ctx) {
         ResEnterHappyHappyFishGame res = new ResEnterHappyHappyFishGame(grantDaily(ctx, System.currentTimeMillis()));
         MinigameHappyHappyFishCfg cfg = config(ctx);
@@ -134,6 +138,8 @@ public class HappyHappyFishService {
             autoSaveService.enqueueSave(data);
             log.info("欢乐捉鱼技能升级成功 playerId={},groupId={},level={},cost={},skillPoints={}",
                     ctx.playerId(), groupId, level, upgrade.cost(), data.getSkillPoints());
+        } else {
+            log.warn("欢乐捉鱼技能升级失败 playerId={},groupId={}", ctx.playerId(), groupId);
         }
         ResUpgradeHappyHappyFishSkill res = new ResUpgradeHappyHappyFishSkill(upgrade.code());
         res.skill = new HappyHappyFishSkillInfo(groupId, level);
@@ -176,7 +182,9 @@ public class HappyHappyFishService {
         return res;
     }
 
-    /** 每次合法捕获按鱼表累加积分；仅保存各配置的累计次数，不模拟鱼群。 */
+    /**
+     * 每次合法捕获按鱼表累加积分；仅保存各配置的累计次数，不模拟鱼群。
+     */
     public ResCatchHappyHappyFish catchFish(SimPlayerContext ctx, long roundId, int fishId) {
         ResCatchHappyHappyFish res = new ResCatchHappyHappyFish(Code.SUCCESS);
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
@@ -228,7 +236,9 @@ public class HappyHappyFishService {
         return res;
     }
 
-    /** 按已接受的捕获入账积分，单局道具奖励沿用结束请求的时间窗口。 */
+    /**
+     * 按已接受的捕获入账积分，单局道具奖励沿用结束请求的时间窗口。
+     */
     public ResEndHappyHappyFishGame end(SimPlayerContext ctx, long roundId) {
         ResEndHappyHappyFishGame res = new ResEndHappyHappyFishGame(Code.SUCCESS);
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
@@ -255,7 +265,9 @@ public class HappyHappyFishService {
         return res;
     }
 
-    /** 一键通关不生成鱼群，发奖失败重试本协议时复用积分及奖励，不再扣费。 */
+    /**
+     * 一键通关不生成鱼群，发奖失败重试本协议时复用积分及奖励，不再扣费。
+     */
     public ResQuickClearHappyHappyFishGame quickClear(SimPlayerContext ctx) {
         ResQuickClearHappyHappyFishGame res = new ResQuickClearHappyHappyFishGame(Code.SUCCESS);
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
@@ -295,7 +307,9 @@ public class HappyHappyFishService {
         return res;
     }
 
-    /** 断线或退出立即按当前积分结算；失败保留会话内待发奖状态，不持久化单局。 */
+    /**
+     * 断线或退出立即按当前积分结算；失败保留会话内待发奖状态，不持久化单局。
+     */
     public int onExit(SimPlayerContext ctx) {
         HappyHappyFishRound round = ctx.getHappyHappyFishRound();
         if (round != null) {
@@ -408,7 +422,9 @@ public class HappyHappyFishService {
         autoSaveService.enqueueSave(data);
     }
 
-    /** 无序map中选择不大于积分的最高阈值，只扫描一次，不排序或复制整张奖励表。 */
+    /**
+     * 无序map中选择不大于积分的最高阈值，只扫描一次，不排序或复制整张奖励表。
+     */
     private int settle(SimPlayerContext ctx, HappyHappyFishRound round) {
         creditScore(ctx, round);
         round.setState(RoundState.REWARD_PENDING);
@@ -470,7 +486,9 @@ public class HappyHappyFishService {
         return data;
     }
 
-    /** 每日首次处理时补足道具；已充足也记录当天，补足失败则保留重试机会。 */
+    /**
+     * 每日首次处理时补足道具；已充足也记录当天，补足失败则保留重试机会。
+     */
     private int grantDaily(SimPlayerContext ctx, long now) {
         HappyHappyFishData data = getData(ctx);
         if (data.getLastDailyGrantTime() >= now || TimeHelper.inSameDay(data.getLastDailyGrantTime(), now)) {
@@ -497,7 +515,9 @@ public class HappyHappyFishService {
         return Code.SUCCESS;
     }
 
-    /** 单行配置按需读取，扣费前保证零分奖励及各档奖励合法。 */
+    /**
+     * 单行配置按需读取，扣费前保证零分奖励及各档奖励合法。
+     */
     private MinigameHappyHappyFishCfg config(SimPlayerContext ctx) {
         Map<Integer, MinigameHappyHappyFishCfg> configs = GameDataManager.getMinigameHappyHappyFishCfgMap();
         if (configs.size() != 1) {

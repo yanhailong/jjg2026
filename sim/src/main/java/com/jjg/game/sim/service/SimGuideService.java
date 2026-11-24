@@ -2,7 +2,6 @@ package com.jjg.game.sim.service;
 
 import com.jjg.game.core.constant.AddType;
 import com.jjg.game.core.constant.Code;
-import com.jjg.game.core.data.Player;
 import com.jjg.game.core.listener.ItemAddListener;
 import com.jjg.game.core.listener.ItemNotEnoughListener;
 import com.jjg.game.core.service.GameFunctionService;
@@ -20,13 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /** 服务端按组触发引导，按 GuideId 保存具体步骤进度。 */
 @Service
@@ -150,12 +143,12 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
                 default -> false;
             };
             if (!satisfied) {
-                if (condition != SimConstant.GuideCondition.CLIENT_PAGE && log.isDebugEnabled()) {
-                    Player player = ctx.getPlayer();
-                    log.debug("新手引导条件未满足 playerId={},groupId={},condition={},requiredParam={},eventCondition={},eventParam={},pageId={},playerLevel={},allLevel={}",
-                            ctx.playerId(), groupId, condition, param, eventCondition, eventParam,
-                            ctx.getClientPageId(), player == null ? null : player.getLevel(), base.getAllLevel());
-                }
+//                if (condition != SimConstant.GuideCondition.CLIENT_PAGE && log.isDebugEnabled()) {
+//                    Player player = ctx.getPlayer();
+//                    log.debug("新手引导条件未满足 playerId={},groupId={},condition={},requiredParam={},eventCondition={},eventParam={},pageId={},playerLevel={},allLevel={}",
+//                            ctx.playerId(), groupId, condition, param, eventCondition, eventParam,
+//                            ctx.getClientPageId(), player == null ? null : player.getLevel(), base.getAllLevel());
+//                }
                 return false;
             }
         }
@@ -167,7 +160,7 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
         int pageId = ctx.getClientPageId();
         List<Integer> groups = configService.groupsFor(SimConstant.GuideCondition.CLIENT_PAGE, pageId);
         if (groups.isEmpty()) {
-            log.debug("当前页面没有配置引导组 playerId={},pageId={}", ctx.playerId(), pageId);
+//            log.debug("当前页面没有配置引导组 playerId={},pageId={}", ctx.playerId(), pageId);
             return;
         }
         List<Integer> triggered = trigger(ctx, SimConstant.GuideCondition.CLIENT_PAGE, pageId,
@@ -363,8 +356,7 @@ public class SimGuideService implements ItemAddListener, ItemNotEnoughListener {
                 .filter(groupId -> !checkPath || pathMatches(ctx, configService.pathNameOfGroup(groupId)))
                 .toList();
         if (available.isEmpty()) {
-            log.debug("没有当前可下发的待进行引导组 playerId={},pageId={},groups={}",
-                    ctx.playerId(), ctx.getClientPageId(), guideGroupIds);
+//            log.debug("没有当前可下发的待进行引导组 playerId={},pageId={},groups={}",ctx.playerId(), ctx.getClientPageId(), guideGroupIds);
             return;
         }
         NotifyGuideTrigger message = new NotifyGuideTrigger(Code.SUCCESS);
